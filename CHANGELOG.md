@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.1](https://github.com/lilsnibbi/Virello/compare/v0.1.0...v0.1.1) (2026-10-17)
+
+
+### Bug Fixes
+
+* **ci:** target npm trusted publisher environment ([a50c431](https://github.com/lilsnibbi/Virello/commit/a50c43124bf8082a62b2260c01ab73832fa2c4d9))
+
 ## 0.1.0 (2026-10-16)
 
 ### Bug Fixes

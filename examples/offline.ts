@@ -43,7 +43,9 @@ async function main(): Promise<void> {
 				);
 			await Bun.sleep(25);
 		}
+		// The coordinator can report readiness before the host receives its reply.
 		const results = await manager.broadcast("exampleStats", null, {
+			waitForCoordinator: true,
 			timeoutMs: 5000,
 		});
 		for (const result of results) {

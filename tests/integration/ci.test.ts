@@ -219,7 +219,7 @@ describe("CI release boundary", () => {
 			"${{ steps.release_please.outputs.release_created }}",
 		);
 		expect(workflow.jobs.publish.if).toBe(
-			"${{ needs.release.outputs.release_created == 'true' }}",
+			"${{ !cancelled() && needs.release.result == 'success' && needs.release.outputs.release_created == 'true' }}",
 		);
 		expect(workflow.jobs.publish.permissions).toEqual({
 			contents: "read",

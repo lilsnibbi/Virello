@@ -1,163 +1,122 @@
-# Shard maintenance, leases and recovery
+# Maintenance and recovery
 
-Each shard runs in its own Bun OS process. A `ShardManager` supervises its local
-children and proxies their authenticated coordinator traffic. A child receives
-only its own assignment and total count: no peer list, peer connections or
-dependency on another shard's arrival. Coordination is entirely in memory.
-There are no ownership files, state directories or persistent locks.
+[Docs](README.md) / [Sharding](sharding.md) / Recovery
 
-Fixed shard totals remain the default. Opt-in [automatic scaling](sharding-scaling.md)
-retains its five-minute polling, three matching decisions and thirty-minute
-cooldown defaults.
-
-## Maintenance and bounded calls
-
-A managed client starts with `client.maintenance === true`. A detected coordinator
-connection loss immediately sets it back to `true` and keeps the existing Discord
-session open. Socket closure is detected directly; a silent partition uses the
-existing fifteen-second heartbeat deadline. Parent/child IPC heartbeats continue
-through coordinator outages. Unmanaged clients default to `maintenance = false`.
-
-Only authenticated control, an accepted lease, local assignment application and
-coordinator registration clear maintenance. Opening a socket or receiving a
-welcome is insufficient. Virello does not install a command policy or send outage
-replies: developers choose the response appropriate to each operation.
+For an operation that needs coordination, choose an outage reply in your handler:
 
 ```ts
-if (client.maintenance) {
-	return interaction.reply(
-		"Coordination is temporarily unavailable. Try again shortly.",
-	);
+if (this.container.client.maintenance) {
+	await interaction.reply("Coordination is recovering. Try again shortly.");
+	return;
 }
 ```
 
-Ordinary requests fail with `DISCONNECTED` while the local assignment is
-unreconciled. Each request or broadcast can opt into bounded waiting:
+Virello maintains the flag. Your application decides which commands can continue.
+Local commands may still work while the existing Discord connection stays open.
 
-```ts
-const result = await client.sharding.request(0, "exampleStats", null, {
-	waitForCoordinator: true,
-	timeoutMs: 5000,
-	signal: controller.signal,
-});
+## Follow the state
+
+| Situation                        | Discord connection                      | `maintenance`                                     | What happens next                 |
+| -------------------------------- | --------------------------------------- | ------------------------------------------------- | --------------------------------- |
+| Managed child starting           | Closed until assigned                   | `true`                                            | Wait for an accepted lease        |
+| Reconciled assignment            | Open/login permitted                    | `false`                                           | Normal operation                  |
+| Coordinator connection lost      | Existing session kept open              | `true`                                            | Host reconnects; child reconciles |
+| Same ID and total accepted       | Existing session preserved              | Clears after reconciliation                       | Resume coordination               |
+| Total changes                    | Old gateway closed, cache/session reset | Clears after assignment is applied and registered | Reconnect using new total         |
+| ID taken/invalid, or no capacity | Closed                                  | `true`                                            | Child becomes dormant             |
+| Assigned outage lifetime expires | Closed                                  | Process terminates                                | Host restart policy applies       |
+
+Unmanaged clients default to `maintenance = false`. A socket welcome alone does
+not clear maintenance: authentication, lease acceptance, local assignment
+application and coordinator registration must finish.
+
+```mermaid
+stateDiagram-v2
+    [*] --> Waiting
+    Waiting --> Assigned: lease accepted
+    Assigned --> Maintenance: coordinator lost
+    Maintenance --> Assigned: assignment reconciled
+    Maintenance --> Dormant: ID rejected and gateway closed
+    Waiting --> Dormant: no capacity
+    Dormant --> Assigned: later lease accepted
+    Maintenance --> Stopped: outage deadline
 ```
 
-The timeout includes waiting and execution; broadcasts share one overall deadline
-across all targets. The default is `limits.timeoutMs` (15 seconds). Waits are
-bounded by `limits.maxPending`, respect cancellation and return `TIMEOUT` or
-`CAPACITY` instead of building an unlimited queue. Already dispatched calls fail
-on disconnect and are never replayed. Waiting does not guarantee a destination
-is available: routing can still return `UNAVAILABLE`, or `RESHARDING` during an
-automatic scaling drain. Host manager calls support the same options.
+In words: assigned children keep Discord during a bounded outage. Rejected or
+unassigned children close Discord and wait dormant until a slot becomes available.
 
-Discord IDENTIFY still requires a coordinator permit. Control loss during a
-permit wait waits for reconciliation within the shard's outage lifetime;
-permit queue deadlines and exhausted allowance remain explicit failures.
-An existing Discord session does not authorize new IDENTIFY calls offline.
+## Recovery knobs
 
-## Leases and dormant processes
+These are `ShardManager` options, in milliseconds unless stated otherwise:
 
-The coordinator maintains slots `0..shardCount - 1`. `workers[].shards` provide
-initial placement preferences; leases determine actual ownership. `maxShards`
-bounds new allocations per host, defaulting to its initial preference count
-in fixed mode. Valid returning IDs are retained even if the host's configured
-capacity was reduced during the outage. Allocation and lease installation are atomic, authenticated by
-host credentials, supervisor instance and child generation. Duplicate sockets
-for the same supervisor instance are refused. Different authenticated instances
-can connect independently to reconcile their children or wait dormant.
+| Option                                    | Default          | Effect                                            |
+| ----------------------------------------- | ---------------- | ------------------------------------------------- |
+| `reconnect`                               | Enabled          | Coordinator retries without an attempt limit      |
+| `reconnect.initialDelayMs` / `maxDelayMs` | `500` / `30000`  | Capped reconnect backoff                          |
+| `restart.maxRestarts`                     | `5`              | Consecutive child crash restarts                  |
+| `restart.initialDelayMs` / `maxDelayMs`   | `1000` / `30000` | Exponential restart backoff with jitter           |
+| `restart.stableAfterMs`                   | `60000`          | Uninterrupted uptime needed to reset crash count  |
+| `startupTimeoutMs`                        | `30000`          | Each handshake/boot attempt                       |
+| `shutdownTimeoutMs`                       | `5000`           | Each graceful shutdown stage                      |
+| `identifyTimeoutMs`                       | `120000`         | Permit queue and identification; maximum `300000` |
+| `assignmentPollIntervalMs`                | `30000`          | Dormant polling; accepts `50..300000`             |
+| `maxDisconnectedLifetimeMs`               | `900000`         | Assigned outage lifetime; accepts `1..2147483647` |
 
-A new/restarted process must obtain a valid assignment before opening Discord.
-A returning process reports its previous ID. If valid and free, or already
-reserved for that exact process, it keeps that ID. An invalid or taken ID is
-refused: the child closes any old Discord session, forgets its ID
-(`client.sharding.id === null`), warns clearly and becomes dormant. New processes
-without capacity behave the same way.
+`restart: false` disables crash restarts. `reconnect: false` opts out of
+coordinator recovery and stops children on loss. A host can start before the
+coordinator and retry; `manager.close()` cancels the wait.
 
-Dormant children stay alive indefinitely with no Discord connection. They request
-an assignment every `assignmentPollIntervalMs` (default 30,000), and open Discord
-only after acceptance. Repeated full-capacity polls do not repeat the warning.
-`client.login()` and transport-only `client.sharding.connect()` intentionally wait
-for the first assignment. Ordinary coordinator RPC calls retain deadlines.
+A silent partition is detected by the 15-second heartbeat deadline. Failed
+connections or welcomes do not reset an assigned child's outage timer; successful
+reconciliation does. Dormant children are exempt once the old gateway is closed
+and may stay alive indefinitely. Their first `login()` or transport `connect()`
+can therefore remain pending.
 
-The host normally starts one child per initial placement. Optional `processCount`
-sets a minimum local pool, including standby processes, within host capacity.
-Scaling may require more children up to that capacity. Surviving processes are
-reconciled independently, including IDs removed by a restarted coordinator.
+## Leases are process ownership
 
-`manager.processes` exposes a stable local `slot`, nullable leased `shard`, PID,
-restart count and state. States include `maintenance` and `dormant`, alongside
-`starting`, `running`, `backoff`, `failed` and `stopped`. Local slots are not
-Discord shard IDs. Dormant clients remain in maintenance.
+- A lease belongs to an authenticated host, supervisor instance and child
+  generation. Initial `workers[].shards` are placement preferences.
+- Connection loss **does not release ownership** during a coordinator's lifetime.
+  The owner must confirm child exit or graceful release.
+- Valid returning IDs can be retained even if host capacity was reduced.
+  A taken/invalid ID is forgotten: `client.sharding.id` becomes `null`.
+- Different authenticated supervisor instances can wait dormant. Duplicate
+  sockets for the same instance are refused.
+- `manager.processes` reports local `slot`, nullable `shard`, `pid`,
+  `restarts` and `state`. A local slot is not a Discord shard ID.
 
-## Gateway changes and process lifetime
+## Restart tradeoffs
 
-Recovery with the same ID and total preserves the Discord session. If the total
-changed, the child closes its old gateway and reconnects with the accepted ID
-and current total, even when the numerical ID is unchanged. VirelloClient, modules
-and application listeners stay alive. Assignment changes reset gateway resume
-data and guild/channel/user caches. Extension login hooks run once per client;
-Discord ready events may repeat. The gateway adapter targets discord.js 14.
+> [!IMPORTANT]
+> Coordination lives in memory. A coordinator restart immediately rebuilds the
+> pool; there is no global reconciliation grace period or durable ownership lock.
+> A partitioned old Discord session can overlap a replacement until it reconnects
+> or reaches its outage cutoff. Exactly-once processing is not guaranteed.
 
-A lost connection never releases a lease during the current coordinator lifetime.
-Network loss is not proof of death. The owning supervisor must confirm the child
-exited, including after reconnect, or release it after graceful shutdown/scaling.
-Only then can an idle process acquire the slot. Another instance or generation
-cannot release it. Lost first-lease replies and confirmed-exit acknowledgements
-can be retried without stealing or releasing a replacement's assignment.
+Run **one coordinator per bot** and supervise each host's whole process tree.
+A responsive child exits on parent IPC loss. A new supervisor cannot prove its
+predecessor's children died just by presenting the same host credentials; those
+leases remain reserved until coordinator restart. A wedged process needs external
+process supervision.
 
-An assigned child has `maxDisconnectedLifetimeMs` (default 900,000: fifteen
-minutes) to reconnect and reconcile. Failed connections, welcomes and failed
-reconciliations never reset that timer. Success resets it for a future outage.
-Expiry closes down and terminates the **entire shard process**; the existing host
-restart/backoff policy applies. The host also bounds a stalled child's shutdown.
-Dormant processes are exempt once their old Discord session is closed.
+Gateway reassignment keeps the VirelloClient, modules and application listeners
+alive. It resets gateway resume data and guild/channel/user caches when the
+assignment changes. Extension login hooks do not repeat; Discord ready events
+can repeat.
 
-```ts
-new ShardManager({
-	id: "local",
-	url,
-	token,
-	script,
-	assignmentPollIntervalMs: 30_000,
-	maxDisconnectedLifetimeMs: 15 * 60_000,
-});
-```
+## Requests and login permits during recovery
 
-Polling accepts 50..300,000 ms; the outage lifetime accepts 1..2,147,483,647 ms.
-`startupTimeoutMs` separately bounds boot, lease and local gateway application.
-A gateway that cannot close/reconfigure is a process failure. `shutdownTimeoutMs`
-bounds graceful exit. `reconnect: false` explicitly opts out of recovery and
-stops children on loss. Hosts may start before the coordinator and retry with
-capped backoff; closing the manager cancels the wait.
+Ordinary calls fail fast with `DISCONNECTED`. Opt into
+[`waitForCoordinator`](shard-messaging.md#deadlines-and-bounds) for bounded waiting.
+Dispatched calls fail on disconnect and are never replayed. A reconciled caller
+can still get `UNAVAILABLE` from a destination, or `RESHARDING` during a drain.
 
-Parent IPC loss still terminates a responsive child, since it cannot reconnect
-to a dead parent. Supervise each host's whole process tree. A new supervisor
-instance cannot prove the old children died merely by presenting the same host
-credentials. Their leases remain reserved for that coordinator lifetime; a
-coordinator restart rebuilds the pool. No PID discovery or disk cleanup occurs.
+Every fresh IDENTIFY needs a coordinator permit. With `botToken`, startup waits
+5.5 seconds before fetching fresh Discord metadata; this is a login cooldown,
+not an ownership grace period. Permits are charged before delivery and never
+refunded. Manual `sessionStartLimit` snapshots need refreshing on restart/expiry;
+elapsed time alone never replenishes them.
 
-## Coordinator restart tradeoff
-
-Restart rebuilds zero-based slots from the currently required count (configured,
-or the automatic scaling startup recommendation). Arrivals are admitted
-independently, with **no global reconciliation grace period**.
-
-An old partitioned Discord session may overlap a newly assigned replacement
-until the old process reconnects or reaches its configured outage cutoff. If its
-ID is taken on return, it closes Discord and becomes dormant. This policy cannot
-promise zero duplicate processing or exactly-once delivery. A wedged process
-needs host/service supervision to enforce termination. Run one coordinator per
-bot; independent coordinators are not fenced from each other.
-
-Use `botToken` in production. Each coordinator start waits 5.5 seconds before
-fetching fresh `GET /gateway/bot` limits. This is an IDENTIFY cooldown, not a
-reconciliation grace period. Permits are charged before sending and never refunded
-on loss. An unexpired allowance cannot increase. `sessionStartLimit` is the
-manual/offline alternative and needs a fresh snapshot on every start and expiry.
-Restarting Virello does not reset Discord's allowance.
-
-Upgrade coordinator, hosts and children together: the internal protocol changed.
-Restart running processes deliberately to load the new version. `statePath`,
-`stateDirectory`, `releaseWorker`, `SHARD_STATE_PATH` and `SHARD_HOST_STATE_DIR`
-remain removed. Legacy state files stay ignored and unused. See
-[breaking changes](../BREAKING_CHANGES.md) and [examples](../examples/README.md).
+No `statePath`, `stateDirectory`, `releaseWorker` or disk cleanup is involved.
+Old state files remain unused. [Migration notes](../BREAKING_CHANGES.md) ·
+[Recovery implementation](../src/sharding/client/gateway.ts)

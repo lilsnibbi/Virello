@@ -4,7 +4,7 @@ import {
 	ApplicationCommandType,
 	Locale,
 	type RESTPostAPIChatInputApplicationCommandsJSONBody,
-} from "discord.js";
+} from "discord-api-types/v10";
 import type { Resource } from "i18next";
 import {
 	ApplicationCommandRegistry,
@@ -655,7 +655,7 @@ describe("Discord command localisation", () => {
 			{
 				name: "paint",
 				description: "Choose a colour",
-				nameLocalizations: { fr: "explicite" },
+				name_localizations: { fr: "explicite" },
 			},
 			{ localisation: { name: "commands:paint.name" } },
 		);

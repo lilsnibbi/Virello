@@ -1,24 +1,29 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import {
-	type ButtonInteraction,
-	type Message,
 	type ModalBuilder,
-	type ModalSubmitInteraction,
-	type InteractionCollectorOptions,
+	EmbedBuilder,
+	SeparatorBuilder,
+} from "@discordjs/builders";
+import {
 	type APIContainerComponent,
 	type APIActionRowComponent,
 	type APIButtonComponentWithCustomId,
 	type APIEmbed,
 	ButtonStyle,
-	Client,
 	ComponentType,
-	EmbedBuilder,
-	Events,
-	InteractionCollector,
 	InteractionType,
 	MessageFlags,
-	SeparatorBuilder,
-} from "discord.js";
+} from "discord-api-types/v10";
+import {
+	type ButtonInteraction,
+	type MessageContext as Message,
+	type ModalSubmitInteraction,
+	type InteractionCollectorOptions,
+	VirelloClient as Client,
+	Events,
+	InteractionCollector,
+} from "virello";
+import { RestError } from "../../../src/engine/rest/RestError";
 import { container, Pagination, type PaginationTarget } from "virello";
 
 type Snapshot = {
@@ -29,7 +34,7 @@ type Snapshot = {
 	embeds: APIEmbed[];
 	content?: string;
 	flags?: number;
-	allowedMentions?: { parse?: string[]; repliedUser?: boolean };
+	allowed_mentions?: { parse?: string[]; replied_user?: boolean };
 };
 
 const paginations: Pagination[] = [];
@@ -44,8 +49,13 @@ function track(p: Pagination): Pagination {
 	return p;
 }
 function harness(interaction = false) {
-	const client = new Client({ intents: [] });
-	clients.push(client);
+	const client =
+		clients[0] ??
+		new Client({
+			intents: [],
+			logger: { debug() {}, notif() {}, alert() {}, error() {} },
+		});
+	if (!clients.includes(client)) clients.push(client);
 	const payloads: Snapshot[] = [];
 	const collectors: InteractionCollector<ButtonInteraction>[] = [];
 	const messageBase = {
@@ -63,10 +73,10 @@ function harness(interaction = false) {
 		edit: mock(async (payload: unknown) => save(payload)),
 		createMessageComponentCollector: mock(
 			(options: InteractionCollectorOptions<ButtonInteraction>) => {
-				const collector = new InteractionCollector<ButtonInteraction>(
-					client as Client<true>,
-					{ ...options, message: messageBase as unknown as Message },
-				);
+				const collector = new InteractionCollector<ButtonInteraction>(client, {
+					...options,
+					message: messageBase as unknown as Message,
+				});
 				collectors.push(collector);
 				return collector;
 			},
@@ -118,7 +128,8 @@ function harness(interaction = false) {
 			guildId: null,
 			client,
 			type: InteractionType.MessageComponent,
-			componentType: ComponentType.Button,
+			data: { data: { component_type: ComponentType.Button } },
+			isMessageComponent: () => true,
 			deferUpdate: mock(async () => {}),
 			showModal: mock(async (_modal: ModalBuilder) => {}),
 			isModalSubmit: () => false,
@@ -235,9 +246,9 @@ describe("list pagination interactions", () => {
 			flags: MessageFlags.Ephemeral,
 		});
 		expect(h.payloads[0].flags).toBe(MessageFlags.IsComponentsV2);
-		expect(h.payloads[0].allowedMentions).toEqual({
+		expect(h.payloads[0].allowed_mentions).toEqual({
 			parse: [],
-			repliedUser: false,
+			replied_user: false,
 		});
 		expect(h.text(2)).toBe("@everyone $& literal");
 		expect(h.buttons().at(-1)!.label).toBe("More");
@@ -270,7 +281,8 @@ describe("list pagination interactions", () => {
 			customId: id,
 			user: { id: user },
 			isModalSubmit: () => true,
-			fields: { getTextInputValue: () => value },
+			isMessageComponent: () => false,
+			fields: { getTextInput: () => value },
 			deferUpdate: mock(async () => {}),
 			reply: mock(async () => {}),
 		});
@@ -382,9 +394,7 @@ describe("list pagination interactions", () => {
 			}),
 		);
 		await p.send(h.target);
-		h.message.edit.mockRejectedValue(
-			Object.assign(new Error("Unknown Message"), { code: 10008 }),
-		);
+		h.message.edit.mockRejectedValue(new RestError(404, { code: 10008 }));
 		await h.click("next");
 		await tick();
 		expect(p.stopped).toBe(true);

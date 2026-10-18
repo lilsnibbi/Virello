@@ -1,4 +1,4 @@
-import type { Interaction } from "discord.js";
+import type { InteractionContext as Interaction } from "../../discord/InteractionContext";
 import { ModuleStore } from "../../core/modules/index";
 import { type Option, Result } from "../../utilities/result/index";
 import { Events } from "../events";

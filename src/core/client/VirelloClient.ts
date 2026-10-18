@@ -1,10 +1,7 @@
 import type { Logger, LoggerOptions } from "@lilsnibbi/logger";
-import {
-	Client,
-	type ClientOptions,
-	type Message,
-	type Snowflake,
-} from "discord.js";
+import type { Snowflake } from "discord-api-types/v10";
+import type { MessageContext as Message } from "../../discord/MessageContext";
+import { DiscordRuntime, type DiscordRuntimeOptions } from "./DiscordRuntime";
 import { ArgumentStore } from "../../commands/arguments/ArgumentStore";
 // Load built-in pieces
 import { loadArguments } from "../../commands/arguments/register";
@@ -50,8 +47,8 @@ export type Prefix = string | readonly string[] | null;
  */
 export type PrefixHook = (message: Message) => Awaitable<Prefix>;
 
-/** Virello options added to discord.js ClientOptions. */
-export interface VirelloClientOptions {
+/** Framework features and native Discord runtime options. */
+export interface VirelloClientOptions extends DiscordRuntimeOptions {
 	/** Configure built-in features and custom extensions. Built-ins run first, in the documented extension order. */
 	extensions?: ExtensionOptions;
 	/** Base directory for module patterns. Defaults to cwd. */
@@ -128,17 +125,15 @@ interface FeatureState {
 const clientState: { active?: VirelloClient } = {};
 
 /** One active Discord client owns the shared services. */
-export class VirelloClient<
-	Ready extends boolean = boolean,
-> extends Client<Ready> {
+export class VirelloClient extends DiscordRuntime {
 	/** Bot user ID used for mention prefixes, or null before it is known. */
-	public override id: Snowflake | null = null;
+	public id: Snowflake | null = null;
 	/** Resolve prefixes for each message. Defaults to returning options.defaultPrefix or null. */
-	public override fetchPrefix: PrefixHook;
+	public fetchPrefix: PrefixHook;
 	/** The supplied logger, or a console logger owned and closed by this client. */
-	public override logger: LoggerLike;
+	public logger: LoggerLike;
 	/** Registry of this client’s module stores and configured module paths. */
-	public override modules: ModuleRegistry;
+	public modules: ModuleRegistry;
 	/** Disable mention prefixes when true. Undefined leaves them enabled. */
 	public disableMentionPrefix?: boolean;
 	/** Frozen extension class list, with enabled built-ins first and duplicate custom classes removed. */
@@ -167,26 +162,32 @@ export class VirelloClient<
 	 * @throws If options are invalid, another VirelloClient is active, or required setup fails. Managed children reject
 	 * conflicting shard options.
 	 */
-	public constructor(options: ClientOptions) {
+	public constructor(options: VirelloClientOptions) {
 		clientOptionsSchema.assert(options);
 		const managed = shardConfig();
 		if (managed) {
 			if (
-				options.shards !== undefined ||
-				options.shardCount !== undefined ||
-				options.ws?.buildIdentifyThrottler ||
-				options.ws?.buildStrategy
+				options.gateway?.shard !== undefined ||
+				options.waitForIdentify !== undefined
 			)
 				throw new TypeError(
 					"ShardManager owns shard IDs, count, strategy and identify throttling. Remove conflicting client options.",
 				);
 			options = {
 				...options,
-				shards: [managed.shard ?? 0],
-				shardCount: managed.count,
+				gateway: {
+					...options.gateway,
+					shard: [managed.shard ?? 0, managed.count],
+				},
 			};
 		}
 		for (const key of [
+			"shards",
+			"shardCount",
+			"ws",
+			"partials",
+			"makeCache",
+			"sweepers",
 			"baseUserDirectory",
 			"plugins",
 			"hmr",
@@ -266,7 +267,7 @@ export class VirelloClient<
 					});
 				await this.destroy();
 			},
-			() => ({ ready: this.isReady(), guilds: this.guilds.cache.size }),
+			() => ({ ready: this.isReady(), guilds: this.cache.guilds.size }),
 			{
 				maintenance: (value) => {
 					this.maintenance = value;
@@ -287,11 +288,8 @@ export class VirelloClient<
 					if (!this.closed) void this.sharding.terminate(error);
 				},
 			);
-			this.options.ws ??= {};
-			this.options.ws.buildIdentifyThrottler = () => ({
-				waitForIdentify: (id, signal) =>
-					this.sharding.waitForIdentify(id, signal),
-			});
+			this.options.waitForIdentify = (id, signal) =>
+				this.sharding.waitForIdentify(id, signal);
 			this.on("shardReady", () => this.sharding.identified());
 		}
 		this.modules = new ModuleRegistry();
@@ -358,7 +356,7 @@ export class VirelloClient<
 
 	/**
 	 * Load modules, connect managed sharding, run extension hooks, and log in to Discord once.
-	 * @param token - Bot token; omitted tokens use the discord.js default.
+	 * @param token - Bot token, supplied explicitly; environment variables are not read by the client.
 	 * @returns The login token. Repeated calls share the same promise.
 	 * @throws On startup or login failure; the client is destroyed before the rejection.
 	 */
@@ -617,25 +615,4 @@ export interface CooldownOptions {
 	filteredUsers?: Snowflake[];
 	/** Command names exempt from the default cooldown. Defaults to an empty list. */
 	filteredCommands?: string[];
-}
-
-/** Add Virello client properties and options to discord.js types. */
-declare module "discord.js" {
-	/** Framework services available on a VirelloClient. */
-	interface Client {
-		/** Bot user ID used for mention prefixes, or null before it is known. */
-		id: Snowflake | null;
-		/** Logger used by the framework. */
-		logger: LoggerLike;
-		/** Registry of module stores owned by the active client. */
-		modules: ModuleRegistry;
-		/** Callback that selects prefixes for a message. */
-		fetchPrefix: PrefixHook;
-	}
-
-	/** Discord client options with Virello configuration. */
-	interface ClientOptions extends VirelloClientOptions {
-		/** Configure built-in features and custom extensions. */
-		extensions?: ExtensionOptions;
-	}
 }

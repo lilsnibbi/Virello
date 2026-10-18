@@ -1,5 +1,7 @@
 import { afterEach, expect, spyOn, test } from "bun:test";
-import { ApplicationCommandManager, Client, Collection } from "discord.js";
+import { ApplicationCommands } from "../../../src/discord/ApplicationCommands";
+import { RestClient } from "../../../src/engine/rest/RestClient";
+import { DiscordRuntime } from "../../../src/core/client/DiscordRuntime";
 import * as Virello from "virello";
 import {
 	ApplicationCommandRegistry,
@@ -11,11 +13,6 @@ import {
 import { handleRegistryAPICalls } from "../../../src/commands/registration/registries";
 
 let client: VirelloClient | undefined;
-class TestCommandManager extends ApplicationCommandManager {
-	public constructor(client: Client) {
-		super(client as Client<true>);
-	}
-}
 const restores: (() => void)[] = [];
 afterEach(async () => {
 	for (const restore of restores.splice(0)) restore();
@@ -54,11 +51,13 @@ test("editable re-execution exports/config/listeners are removed while ordinary 
 });
 
 test("login loads the default-enabled local manager before the Discord transport hook runs", async () => {
-	const hook = spyOn(Client.prototype, "login").mockImplementation(async () => {
-		expect(container.i18n.languagesLoaded).toBe(true);
-		expect(container.i18n.format("fr", "hello")).toBe("bonjour");
-		return "local-test";
-	});
+	const hook = spyOn(DiscordRuntime.prototype, "login").mockImplementation(
+		async () => {
+			expect(container.i18n.languagesLoaded).toBe(true);
+			expect(container.i18n.format("fr", "hello")).toBe("bonjour");
+			return "local-test";
+		},
+	);
 	restores.push(() => hook.mockRestore());
 	client = new VirelloClient({
 		intents: [],
@@ -75,7 +74,9 @@ test("login loads the default-enabled local manager before the Discord transport
 
 test("invalid localisation engine configuration follows recoverable extension failure without hiding the cause", async () => {
 	const logs = logger();
-	const hook = spyOn(Client.prototype, "login").mockResolvedValue("local-test");
+	const hook = spyOn(DiscordRuntime.prototype, "login").mockResolvedValue(
+		"local-test",
+	);
 	restores.push(() => hook.mockRestore());
 	client = new VirelloClient({
 		intents: [],
@@ -98,7 +99,7 @@ test("invalid localisation engine configuration follows recoverable extension fa
 	expect(registry["apiCalls"]).toHaveLength(0);
 });
 
-test("real discord.js manager serialises translated registry payloads for global/guild REST and retains returned ID routing", async () => {
+test("native command client serialises translated registry payloads for global/guild REST and retains returned ID routing", async () => {
 	const logs = logger();
 	client = new VirelloClient({
 		intents: [],
@@ -126,15 +127,20 @@ test("real discord.js manager serialises translated registry payloads for global
 		configurable: true,
 	});
 	const sent: unknown[] = [];
-	const post = spyOn(client.rest, "post").mockImplementation(
-		async (route, options) => {
+	const rest = new RestClient("offline-placeholder", { maxRetries: 0 });
+	client.addDisposer(() => rest.close());
+	const post = spyOn(rest, "request").mockImplementation(
+		async <T>(
+			options: import("../../../src/engine/rest/RestClient").$RestRequest,
+		): Promise<T> => {
+			const route = options.path;
 			sent.push({ route, body: structuredClone(options?.body) });
 			return {
 				...JSON.parse(JSON.stringify(options?.body)),
 				id: "123456789012345679",
 				application_id: "123456789012345678",
 				version: "123456789012345680",
-			};
+			} as T;
 		},
 	);
 	restores.push(() => post.mockRestore());
@@ -164,8 +170,8 @@ test("real discord.js manager serialises translated registry payloads for global
 		},
 	);
 	await registry["runAPICalls"](
-		new TestCommandManager(client),
-		new Collection(),
+		new ApplicationCommands(rest, "123456789012345678"),
+		new Map(),
 		new Map(),
 	);
 	expect(post).toHaveBeenCalledTimes(1);
@@ -199,8 +205,8 @@ test("real discord.js manager serialises translated registry payloads for global
 		{ guildIds: ["123456789012345681"], localisation: { name: "name" } },
 	);
 	await guild["runAPICalls"](
-		new TestCommandManager(client),
-		new Collection(),
+		new ApplicationCommands(rest, "123456789012345678"),
+		new Map(),
 		new Map(),
 	);
 	expect(sent[1]).toMatchObject({
@@ -255,7 +261,7 @@ test("strict translation errors isolate their command while other commands reach
 	Object.defineProperty(client, "application", {
 		value: {
 			commands: {
-				fetch: async () => new Collection(),
+				fetch: async () => new Map(),
 				create: async (data: { name: string }) => {
 					created.push(data.name);
 					return { id: "123456789012345679" };

@@ -46,6 +46,8 @@ export interface $RestRequest {
 	path: string;
 	/** Optional JSON-serializable body, serialized when the request is queued. */
 	body?: unknown;
+	/** Optional file uploads. Blobs (including Bun.file) are sent as Discord multipart files with payload_json. */
+	files?: readonly { name: string; data: Blob }[];
 	/** Send the bot token unless false. Defaults to true; interaction callbacks use false. */
 	auth?: boolean;
 	/** Optional cancellation signal for the full operation, including queue and retry waits. */
@@ -186,10 +188,20 @@ export class RestClient {
 		if (signal.aborted) return Promise.reject(signal.reason);
 		if (this.pending >= this.maximumPending)
 			return Promise.reject(new Error("REST queue capacity exceeded."));
-		let body: string | undefined;
+		let body: string | FormData | undefined;
 		try {
 			body =
 				request.body === undefined ? undefined : JSON.stringify(request.body);
+			if (request.files?.length) {
+				const form = new FormData();
+				form.set("payload_json", body ?? "{}");
+				request.files.forEach((file, index) => {
+					if (!(file.data instanceof Blob) || !file.name)
+						throw new TypeError("Uploads require a name and Blob data.");
+					form.set(`files[${index}]`, file.data, file.name);
+				});
+				body = form;
+			}
 		} catch (error) {
 			return Promise.reject(error);
 		}
@@ -201,7 +213,7 @@ export class RestClient {
 	}
 	private async execute<T>(
 		request: $RestRequest,
-		body: string | undefined,
+		body: string | FormData | undefined,
 		signal: AbortSignal,
 	): Promise<T> {
 		const route = routeKey(request.method, request.path);
@@ -259,7 +271,7 @@ export class RestClient {
 	}
 	private async attempt(
 		request: $RestRequest,
-		body: string | undefined,
+		body: string | FormData | undefined,
 		signal: AbortSignal,
 		route: $RouteKey,
 		rates: RateLimits,
@@ -278,7 +290,8 @@ export class RestClient {
 			});
 			if (request.auth !== false)
 				headers.set("Authorization", `Bot ${this.#token}`);
-			if (body !== undefined) headers.set("Content-Type", "application/json");
+			if (typeof body === "string")
+				headers.set("Content-Type", "application/json");
 			const response = await this.fetcher(this.base + request.path, {
 				method: request.method,
 				headers,

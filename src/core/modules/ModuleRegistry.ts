@@ -1,4 +1,3 @@
-import { Collection } from "@discordjs/collection";
 import type { ArgumentStore } from "../../commands/arguments/ArgumentStore";
 import type { CommandStore } from "../../commands/CommandStore";
 import type { PreconditionStore } from "../../commands/checks/PreconditionStore";
@@ -20,9 +19,9 @@ import type { Module } from "./Module";
 import type { ModuleRegistration, ModuleStore } from "./ModuleStore";
 
 /** A strict-typed store registry. This is available in {@link container}. */
-export class ModuleRegistry extends Collection<ModuleKind, ModuleStoreValue> {
+export class ModuleRegistry extends Map<ModuleKind, ModuleStoreValue> {
 	/** The queue of pieces to load. */
-	readonly #pendingManuallyRegisteredPieces = new Collection<
+	readonly #pendingManuallyRegisteredPieces = new Map<
 		ModuleKind,
 		ModuleRegistration<ModuleKind>[]
 	>();
@@ -315,9 +314,10 @@ export class ModuleRegistry extends Collection<ModuleKind, ModuleStoreValue> {
 				);
 			}
 
-			this.#pendingManuallyRegisteredPieces
-				.ensure(entry.store, () => [])
-				.push({ ...entry } as unknown as ModuleRegistration<ModuleKind>);
+			const pending =
+				this.#pendingManuallyRegisteredPieces.get(entry.store) ?? [];
+			pending.push({ ...entry } as unknown as ModuleRegistration<ModuleKind>);
+			this.#pendingManuallyRegisteredPieces.set(entry.store, pending);
 		}
 	}
 }

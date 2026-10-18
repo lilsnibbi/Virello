@@ -1,9 +1,8 @@
 import type {
 	CollectorFilter,
-	EmojiResolvable,
-	MessageReaction,
-	User,
-} from "discord.js";
+	Reaction as MessageReaction,
+} from "../../../../discord/Collector";
+import type { APIUser as User } from "discord-api-types/v10";
 import type {
 	MessagePrompterChannelTypes,
 	MessagePrompterMessage,
@@ -18,10 +17,10 @@ export class MessagePrompterConfirmStrategy
 	implements IMessagePrompterConfirmStrategyOptions
 {
 	/** The confirm emoji used */
-	public confirmEmoji: string | EmojiResolvable;
+	public confirmEmoji: string;
 
 	/** The cancel emoji used */
-	public cancelEmoji: string | EmojiResolvable;
+	public cancelEmoji: string;
 
 	/** Constructor for the {@link MessagePrompterBaseStrategy} class */
 	public constructor(
@@ -47,14 +46,15 @@ export class MessagePrompterConfirmStrategy
 		]);
 
 		const confirmed =
-			(response?.emoji?.id ?? response?.emoji?.name) === this.confirmEmoji;
+			(response?.emoji?.id ?? response?.emoji?.name) ===
+			this.reactionKey(this.confirmEmoji);
 
 		return this.explicitReturn ? { ...response, confirmed } : confirmed;
 	}
 
 	/** The default confirm emoji used for {@link MessagePrompterConfirmStrategy} */
-	public static confirmEmoji: string | EmojiResolvable = "🇾";
+	public static confirmEmoji: string = "🇾";
 
 	/** The default cancel emoji used for {@link MessagePrompterConfirmStrategy} */
-	public static cancelEmoji: string | EmojiResolvable = "🇳";
+	public static cancelEmoji: string = "🇳";
 }

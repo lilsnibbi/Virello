@@ -1,8 +1,8 @@
 import type {
 	ChatInputCommandInteraction,
 	ContextMenuCommandInteraction,
-	Message,
-} from "discord.js";
+} from "../../../discord/InteractionContext";
+import type { MessageContext as Message } from "../../../discord/MessageContext";
 import { Command } from "../../Command";
 import { Identifiers } from "../../errors/Identifiers";
 import type {
@@ -25,15 +25,15 @@ export class RunInCheck extends AllFlowsPrecondition {
 	 * Check a message invocation. Require the invocation channel type to appear in the configured list.
 	 * @returns Ok to allow or a precondition error to deny. Any failed Discord fetch rejects.
 	 */
-	public override messageRun(
+	public override async messageRun(
 		message: Message<boolean>,
 		_: MessageCommand,
 		context: RunInPreconditionContext,
-	): AllFlowsPrecondition.Result {
+	): AllFlowsPrecondition.AsyncResult {
 		const commandType = "message";
 		if (!context.types) return this.ok();
 
-		const channelType = message.channel.type;
+		const channelType = (await this.fetchChannelFromMessage(message)).type;
 
 		if (Command.runInTypeIsSpecificsObject(context.types)) {
 			return context.types.messageRun.includes(channelType)

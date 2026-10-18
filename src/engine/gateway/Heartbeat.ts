@@ -6,6 +6,8 @@ export class Heartbeat {
 	private awaitingSince?: number;
 	private interval = 0;
 	private running = false;
+	/** Last acknowledged heartbeat latency, or null before an acknowledgement. */
+	public latency: number | null = null;
 	public constructor(
 		private readonly clock: $Clock,
 		private readonly send: () => void,
@@ -18,6 +20,8 @@ export class Heartbeat {
 		this.schedule(interval * this.clock.random());
 	}
 	public acknowledge(): void {
+		if (this.awaitingSince !== undefined)
+			this.latency = Math.max(0, this.clock.now() - this.awaitingSince);
 		this.awaitingSince = undefined;
 	}
 	public request(): void {
@@ -41,6 +45,7 @@ export class Heartbeat {
 	}
 	public stop(): void {
 		this.running = false;
+		this.latency = null;
 		if (this.timer !== undefined) this.clock.clearTimeout(this.timer);
 		this.timer = undefined;
 		this.awaitingSince = undefined;

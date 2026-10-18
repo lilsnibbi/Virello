@@ -4,6 +4,7 @@ import type {
 	APIGuildMember,
 	APIMessage,
 	APIRole,
+	APIVoiceState,
 } from "discord-api-types/v10";
 import type { $GatewayDispatch } from "../gateway/types";
 
@@ -44,6 +45,8 @@ export interface $CacheEntities {
 	member: APIGuildMember;
 	/** Native Discord message data, scoped to a channel. */
 	message: APIMessage;
+	/** Connected voice states, scoped to a guild and keyed by user ID. */
+	voiceState: APIVoiceState;
 }
 /** Entity names accepted by cache policies and deletion events. */
 export type $CacheKind = keyof $CacheEntities;
@@ -68,6 +71,8 @@ export interface $CacheOptions {
 	channels?: boolean;
 	/** Cache roles unless false. Defaults to true. */
 	roles?: boolean;
+	/** Retain connected voice states from guild snapshots and voice updates. Defaults to true; requires GuildVoiceStates intent for updates. */
+	voiceStates?: boolean;
 	/**
 	 * Nonnegative member limit per guild, or a callback returning that limit when the guild cache is created. Defaults to
 	 * 1000; 0 disables it.

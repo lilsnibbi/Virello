@@ -1,6 +1,6 @@
-import type { MessageCreateOptions } from "discord.js";
+import type { MessageBody as MessageCreateOptions } from "../../../discord/payloads";
 
-/** One file attachment accepted by discord.js message creation. */
+/** One named Blob upload accepted by the native REST client. */
 export type MessageBuilderFileResolvable = NonNullable<
 	MessageCreateOptions["files"]
 >[number];
@@ -33,9 +33,9 @@ export class MessageBuilder implements MessageCreateOptions {
 	public components?: MessageCreateOptions["components"];
 
 	/** Which mentions should be parsed from the message content. */
-	public allowedMentions?: MessageCreateOptions["allowedMentions"];
+	public allowed_mentions?: MessageCreateOptions["allowed_mentions"];
 
-	/** Files to send with the message. This should not be set when editing a message, as Discord does not support editing file attachments. */
+	/** Files to upload. When editing, use attachments to retain existing attachments. */
 	public files?: MessageCreateOptions["files"];
 
 	/**
@@ -48,8 +48,8 @@ export class MessageBuilder implements MessageCreateOptions {
 		this.content = options?.content ?? MessageBuilder.defaults.content;
 		this.embeds = options?.embeds ?? MessageBuilder.defaults.embeds;
 		this.components = options?.components ?? MessageBuilder.defaults.components;
-		this.allowedMentions =
-			options?.allowedMentions ?? MessageBuilder.defaults.allowedMentions;
+		this.allowed_mentions =
+			options?.allowed_mentions ?? MessageBuilder.defaults.allowed_mentions;
 		this.files = options?.files ?? MessageBuilder.defaults.files;
 	}
 
@@ -88,11 +88,11 @@ export class MessageBuilder implements MessageCreateOptions {
 		return this;
 	}
 
-	/** Set the value for the {@link MessageBuilder.allowedMentions} field. */
+	/** Set the native allowed_mentions field. */
 	public setAllowedMentions(
-		allowedMentions?: MessageCreateOptions["allowedMentions"],
+		allowedMentions?: MessageCreateOptions["allowed_mentions"],
 	): this {
-		this.allowedMentions = allowedMentions;
+		this.allowed_mentions = allowedMentions;
 		return this;
 	}
 

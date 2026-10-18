@@ -1,4 +1,5 @@
-import type { Guild, NewsChannel } from "discord.js";
+import type { APINewsChannel as NewsChannel } from "discord-api-types/v10";
+import type { GuildReference as Guild } from "../../../discord/entities";
 import { isNewsChannel } from "../../../utilities/discord/index";
 import type { Result } from "../../../utilities/result/index";
 import { Identifiers } from "../../errors/Identifiers";

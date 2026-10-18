@@ -1,5 +1,5 @@
 import { type } from "arktype";
-import type { Client } from "discord.js";
+import type { VirelloClient as Client } from "../core/client/VirelloClient";
 import { ShardError, type ShardStats, type ShardStatsResult } from "./types";
 
 // Internal RPC uses the usual coordinator routing, ownership checks and request limits.
@@ -29,15 +29,27 @@ const schema = type({
 
 export function sampleStats(client: Client): ShardStats {
 	const ready = client.isReady();
-	const ping = client.ws.ping;
+	const ping = client.ping;
 	const uptime = client.uptime;
+	const users = new Set<string>();
+	if (client.user) users.add(client.user.id);
+	for (const scope of client.cache.members.scopeIds())
+		for (const entry of client.cache.members.values(scope))
+			if (entry.data.user?.id) users.add(entry.data.user.id);
+	for (const scope of client.cache.messages.scopeIds())
+		for (const entry of client.cache.messages.values(scope))
+			if (entry.data.author?.id) users.add(entry.data.author.id);
+	for (const entry of client.cache.channels.values())
+		if ("recipients" in entry.data)
+			for (const user of entry.data.recipients ?? [])
+				if (user.id) users.add(user.id);
 	return {
 		sampledAt: Date.now(),
 		ready,
-		guilds: client.guilds.cache.size,
-		users: client.users.cache.size,
-		channels: client.channels.cache.size,
-		pingMs: Number.isFinite(ping) && ping >= 0 ? ping : null,
+		guilds: client.cache.guilds.size,
+		users: users.size,
+		channels: client.cache.channels.size,
+		pingMs: ping !== null && Number.isFinite(ping) && ping >= 0 ? ping : null,
 		uptimeMs:
 			ready && uptime !== null && Number.isFinite(uptime) && uptime >= 0
 				? uptime

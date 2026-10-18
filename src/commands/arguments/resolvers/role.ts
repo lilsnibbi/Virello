@@ -1,4 +1,6 @@
-import type { Guild, Role, Snowflake } from "discord.js";
+import { Routes, type APIRole as Role } from "discord-api-types/v10";
+import type { GuildReference as Guild } from "../../../discord/entities";
+import { container } from "../../../core/Container";
 import {
 	RoleMentionRegex,
 	SnowflakeRegex,
@@ -33,14 +35,22 @@ async function resolveById(
 ): Promise<Role | null> {
 	const roleId =
 		RoleMentionRegex.exec(argument) ?? SnowflakeRegex.exec(argument);
-	return roleId ? guild.roles.fetch(roleId[1] as Snowflake) : null;
+	if (!roleId) return null;
+	const cached = container.client.cache.roles.get(guild.id, roleId[1]);
+	if (cached?.complete) return cached.data;
+	const roles = await container.client.rest.request<Role[]>({
+		method: "GET",
+		path: Routes.guildRoles(guild.id),
+	});
+	return roles.find((role) => role.id === roleId[1]) ?? null;
 }
 
 function resolveByQuery(argument: string, guild: Guild): Role | null {
 	const lowerCaseArgument = argument.toLowerCase();
 	return (
-		guild.roles.cache.find(
-			(role) => role.name.toLowerCase() === lowerCaseArgument,
-		) ?? null
+		([...container.client.cache.roles.values(guild.id)].find(
+			(entry) =>
+				entry.complete && entry.data.name.toLowerCase() === lowerCaseArgument,
+		)?.data as Role | undefined) ?? null
 	);
 }

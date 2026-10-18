@@ -1,22 +1,26 @@
 import {
-	type MessageEditOptions,
-	type MessageReplyOptions,
 	ActionRowBuilder,
-	type ActionRowComponentOptions,
+	ButtonBuilder,
+	type MessageActionRowComponentBuilder,
+} from "@discordjs/builders";
+import {
+	type APIComponentInMessageActionRow as ActionRowComponentOptions,
 	type APIActionRowComponent,
 	type APIButtonComponent,
 	type APIComponentInMessageActionRow,
-	ButtonBuilder,
-	type ButtonComponentData,
+	type APIButtonComponent as ButtonComponentData,
+	type APIChannelSelectComponent as ChannelSelectMenuComponentData,
+	type APIMentionableSelectComponent as MentionableSelectMenuComponentData,
+	type APIRoleSelectComponent as RoleSelectMenuComponentData,
+	type APIStringSelectComponent as StringSelectMenuComponentData,
+	type APIUserSelectComponent as UserSelectMenuComponentData,
 	ButtonStyle,
-	type ChannelSelectMenuComponentData,
 	ComponentType,
-	type MentionableSelectMenuComponentData,
-	type MessageActionRowComponentBuilder,
-	type RoleSelectMenuComponentData,
-	type StringSelectMenuComponentData,
-	type UserSelectMenuComponentData,
-} from "discord.js";
+} from "discord-api-types/v10";
+import type {
+	MessageEditBody as MessageEditOptions,
+	MessageBody as MessageReplyOptions,
+} from "../../../discord/payloads";
 import { chunk, partition } from "../../index";
 import {
 	isAnyInteractableInteraction,
@@ -181,13 +185,13 @@ export function createPartitionedMessageRow(
 	// Map all the button components to ActionRowBuilders
 	const messageActionButtonActionRows = chunkedActionButtonComponents.map(
 		(componentsChunk) =>
-			new ActionRowBuilder() //
+			new ActionRowBuilder<MessageActionRowComponentBuilder>() //
 				.setComponents(componentsChunk),
 	);
 
 	// Map all the select menu components to ActionRowBuilders
 	const selectMenuActionRows = selectMenus.map((component) =>
-		new ActionRowBuilder() //
+		new ActionRowBuilder<MessageActionRowComponentBuilder>() //
 			.setComponents(component),
 	);
 
@@ -197,7 +201,7 @@ export function createPartitionedMessageRow(
 	// Map all the button components to ActionRowBuilders
 	const messageLinkButtonActionRows = chunkedLinkButtonComponents.map(
 		(componentsChunk) =>
-			new ActionRowBuilder() //
+			new ActionRowBuilder<MessageActionRowComponentBuilder>() //
 				.setComponents(componentsChunk),
 	);
 

@@ -1,8 +1,12 @@
-import type { DMChannel, Message, PartialDMChannel } from "discord.js";
-import { isDMChannel } from "../../../utilities/discord/index";
+import {
+	ChannelType,
+	type APIDMChannel as DMChannel,
+} from "discord-api-types/v10";
+import type { MessageContext as Message } from "../../../discord/MessageContext";
+import type { PartialDMChannel } from "../../../discord/entities";
+import { ChannelMentionRegex } from "../../../utilities/discord/constants/regexes";
 import { Result } from "../../../utilities/result/index";
 import { Identifiers } from "../../errors/Identifiers";
-import { resolveChannel } from "./channel";
 
 /**
  * Resolve a cached DM channel by ID or mention, allowing partial channels.
@@ -17,14 +21,15 @@ export function resolvePartialDMChannel(
 	DMChannel | PartialDMChannel,
 	Identifiers.ArgumentChannelError | Identifiers.ArgumentDMChannelError
 > {
-	const result = resolveChannel(parameter, message);
-	return result.mapInto((channel) => {
-		if (isDMChannel(channel)) {
-			return Result.ok(channel);
-		}
-
-		return Result.err<Identifiers.ArgumentDMChannelError>(
-			Identifiers.ArgumentDMChannelError,
-		);
-	});
+	const id = ChannelMentionRegex.exec(parameter)?.[1] ?? parameter;
+	const entry = message.client.cache.channels.get(id);
+	if (!entry || message.guildId)
+		return Result.err(Identifiers.ArgumentChannelError);
+	if (entry.data.type !== ChannelType.DM)
+		return Result.err(Identifiers.ArgumentDMChannelError);
+	return Result.ok({
+		...entry.data,
+		id,
+		type: ChannelType.DM,
+	} as PartialDMChannel);
 }

@@ -1,8 +1,8 @@
 import type {
 	ChatInputCommandInteraction,
 	ContextMenuCommandInteraction,
-	Message,
-} from "discord.js";
+} from "../../../discord/InteractionContext";
+import type { MessageContext as Message } from "../../../discord/MessageContext";
 import { isVoiceChannel } from "../../../utilities/discord/index";
 import { Identifiers } from "../../errors/Identifiers";
 import { AllFlowsPrecondition } from "../Precondition";
@@ -16,8 +16,10 @@ export class GuildVoiceOnlyCheck extends AllFlowsPrecondition {
 	 * Check a message invocation. Require a guild voice channel.
 	 * @returns Ok to allow or a precondition error to deny. Any failed Discord fetch rejects.
 	 */
-	public messageRun(message: Message): AllFlowsPrecondition.Result {
-		return isVoiceChannel(message.channel) ? this.ok() : this.makeSharedError();
+	public async messageRun(message: Message): AllFlowsPrecondition.AsyncResult {
+		return isVoiceChannel(await this.fetchChannelFromMessage(message))
+			? this.ok()
+			: this.makeSharedError();
 	}
 
 	/**

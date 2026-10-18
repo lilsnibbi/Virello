@@ -1,5 +1,6 @@
 import type { EventEmitter } from "node:events";
-import type { Client, ClientEvents } from "discord.js";
+import type { VirelloClient as Client } from "../core/client/VirelloClient";
+import type { ClientEvents } from "./events";
 import { Module } from "../core/modules/index";
 import { Result } from "../utilities/result/index";
 import { Events } from "./events";
@@ -40,7 +41,7 @@ export abstract class Listener<
 						? (Reflect.get(
 								this.container.client,
 								options.emitter,
-							) as EventEmitter)
+							) as unknown as EventEmitter)
 						: (options.emitter as EventEmitter)) ?? null);
 		this.event = options.event ?? this.name;
 		this.once = options.once ?? false;

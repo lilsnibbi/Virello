@@ -1,4 +1,6 @@
-import { EmbedBuilder, Message, User } from "discord.js";
+import { EmbedBuilder } from "@discordjs/builders";
+import type { APIUser as User } from "discord-api-types/v10";
+import type { MessageContext as Message } from "../../../discord/MessageContext";
 import { isFunction } from "../../index";
 import { MessageBuilder } from "../builders/MessageBuilder";
 import type { AnyInteractableInteraction } from "../utility-types";

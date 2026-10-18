@@ -1,9 +1,7 @@
-import { afterEach, expect, spyOn, test } from "bun:test";
-import {
-	ApplicationCommandManager,
-	ApplicationCommandType,
-	type Client,
-} from "discord.js";
+import { afterEach, expect, test } from "bun:test";
+import { ApplicationCommandType } from "discord-api-types/v10";
+import { ApplicationCommands } from "../../../src/discord/ApplicationCommands";
+import { RestClient } from "../../../src/engine/rest/RestClient";
 import { Command, VirelloClient } from "virello";
 import {
 	handleBulkOverwrite,
@@ -16,12 +14,6 @@ afterEach(async () => {
 	client = undefined;
 	setBulkOverwriteRetries(null);
 });
-
-class TestCommandManager extends ApplicationCommandManager {
-	public constructor(client: Client) {
-		super(client as Client<true>);
-	}
-}
 
 for (const guildId of [undefined, "123456789012345681"]) {
 	test(`bulk registration retries a failed ${guildId ? "guild" : "global"} overwrite before storing its returned ID`, async () => {
@@ -42,24 +34,31 @@ for (const guildId of [undefined, "123456789012345681"]) {
 			configurable: true,
 		});
 		let attempts = 0;
-		spyOn(client.rest, "put").mockImplementation(async (_route, request) => {
-			const body = JSON.parse(JSON.stringify(request?.body)) as Record<
-				string,
-				unknown
-			>[];
-			if (!body.length) return [];
-			if (++attempts === 1) throw new Error("temporary registration failure");
-			return [
-				{
-					...body[0],
-					id: "123456789012345690",
-					application_id: "123456789012345678",
-					version: "123456789012345680",
-				},
-			];
+		const rest = new RestClient("offline-placeholder", {
+			maxRetries: 0,
+			fetch: async (_url, request) => {
+				const body = JSON.parse(String(request?.body)) as Record<
+					string,
+					unknown
+				>[];
+				if (!body.length) return Response.json([]);
+				if (++attempts === 1) throw new Error("temporary registration failure");
+				return Response.json([
+					{
+						...body[0],
+						id: "123456789012345690",
+						application_id: "123456789012345678",
+						version: "123456789012345680",
+					},
+				]);
+			},
 		});
+		client.addDisposer(() => rest.close());
 		setBulkOverwriteRetries(2);
-		await handleBulkOverwrite(store, new TestCommandManager(client));
+		await handleBulkOverwrite(
+			store,
+			new ApplicationCommands(rest, "123456789012345678"),
+		);
 		expect(attempts).toBe(2);
 		expect(store.get("123456789012345690")?.name).toBe("retry");
 	});
@@ -95,20 +94,29 @@ for (const guildId of [undefined, "123456789012345681"]) {
 			value: { id: "123456789012345678" },
 			configurable: true,
 		});
-		spyOn(client.rest, "put").mockImplementation(async (_route, request) => {
-			const body = JSON.parse(JSON.stringify(request?.body)) as Record<
-				string,
-				unknown
-			>[];
-			return body.map((data, index) => ({
-				...data,
-				id: String(123456789012345690n + BigInt(index)),
-				application_id: "123456789012345678",
-				guild_id: guildId,
-				version: "123456789012345680",
-			}));
+		const rest = new RestClient("offline-placeholder", {
+			maxRetries: 0,
+			fetch: async (_url, request) => {
+				const body = JSON.parse(String(request?.body)) as Record<
+					string,
+					unknown
+				>[];
+				return Response.json(
+					body.map((data, index) => ({
+						...data,
+						id: String(123456789012345690n + BigInt(index)),
+						application_id: "123456789012345678",
+						guild_id: guildId,
+						version: "123456789012345680",
+					})),
+				);
+			},
 		});
-		await handleBulkOverwrite(store, new TestCommandManager(client));
+		client.addDisposer(() => rest.close());
+		await handleBulkOverwrite(
+			store,
+			new ApplicationCommands(rest, "123456789012345678"),
+		);
 		expect(store.get("123456789012345690")).toBe(slash);
 		expect(store.get("123456789012345691")).toBe(user);
 		expect(store.get("123456789012345692")).toBe(message);

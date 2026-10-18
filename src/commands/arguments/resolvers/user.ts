@@ -1,4 +1,4 @@
-import type { Snowflake, User } from "discord.js";
+import type { Snowflake, APIUser as User } from "discord-api-types/v10";
 import { container } from "../../../core/modules/index";
 import {
 	SnowflakeRegex,
@@ -18,9 +18,7 @@ export async function resolveUser(
 	const userId =
 		UserOrMemberMentionRegex.exec(parameter) ?? SnowflakeRegex.exec(parameter);
 	const user = userId
-		? await container.client.users
-				.fetch(userId[1] as Snowflake)
-				.catch(() => null)
+		? await container.client.fetchUser(userId[1] as Snowflake).catch(() => null)
 		: null;
 
 	if (user) {

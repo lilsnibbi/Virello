@@ -1,4 +1,3 @@
-import { parseEmoji } from "discord.js";
 import {
 	createTwemojiRegex,
 	EmojiRegex,
@@ -27,15 +26,13 @@ export function resolveEmoji(
 		});
 	}
 
-	const emojiId = EmojiRegex.test(parameter);
-
-	if (emojiId) {
-		const resolved = parseEmoji(parameter) as EmojiObject | null;
-
-		if (resolved) {
-			return Result.ok(resolved);
-		}
-	}
+	const custom = EmojiRegex.exec(parameter)?.groups;
+	if (custom)
+		return Result.ok({
+			id: custom.id,
+			name: custom.name ?? null,
+			animated: custom.animated === "a",
+		});
 
 	return Result.err(Identifiers.ArgumentEmojiError);
 }

@@ -1,4 +1,4 @@
-import type { User } from "discord.js";
+import type { APIUser as User } from "discord-api-types/v10";
 import { Argument } from "../Argument";
 import { resolveUser } from "../resolvers/user";
 

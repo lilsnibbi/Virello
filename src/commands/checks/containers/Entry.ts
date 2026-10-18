@@ -1,8 +1,8 @@
 import type {
 	ChatInputCommandInteraction,
 	ContextMenuCommandInteraction,
-	Message,
-} from "discord.js";
+} from "../../../discord/InteractionContext";
+import type { MessageContext as Message } from "../../../discord/MessageContext";
 import { container } from "../../../core/modules/index";
 import { err } from "../../../utilities/result/index";
 import { Identifiers } from "../../errors/Identifiers";

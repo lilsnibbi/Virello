@@ -1,11 +1,10 @@
-import {
-	type AutocompleteInteraction,
-	ChannelType,
+import type {
+	AutocompleteInteraction,
 	ChatInputCommandInteraction,
 	ContextMenuCommandInteraction,
-	type PermissionResolvable,
-	type Snowflake,
-} from "discord.js";
+} from "../discord/InteractionContext";
+import type { PermissionInput as PermissionResolvable } from "../discord/permissions";
+import { ChannelType, type Snowflake } from "discord-api-types/v10";
 import { AliasModule, type AliasModuleJSON } from "../core/modules/index";
 import type { Nullish } from "../utilities/index";
 import { type FlagStrategyOptions } from "../utilities/parsing/strategies/FlagUnorderedStrategy";
@@ -180,10 +179,7 @@ export declare namespace AutocompleteCommand {
 	/** Shorthand for {@link AutocompleteCommandContext}. */
 	export type RunContext = AutocompleteCommandContext;
 	/** Shorthand for {@link AutocompleteInteraction}. */
-	export type Interaction<
-		Cached extends import("discord.js").CacheType =
-			import("discord.js").CacheType,
-	> = AutocompleteInteraction<Cached>;
+	export type Interaction = AutocompleteInteraction;
 	/** Shorthand for {@link ApplicationCommandRegistry}. */
 	export type Registry = ApplicationCommandRegistry;
 }
@@ -205,10 +201,7 @@ export declare namespace ContextMenuCommand {
 	/** Shorthand for {@link ContextMenuCommandContext}. */
 	export type RunContext = ContextMenuCommandContext;
 	/** Shorthand for {@link ContextMenuCommandInteraction}. */
-	export type Interaction<
-		Cached extends import("discord.js").CacheType =
-			import("discord.js").CacheType,
-	> = ContextMenuCommandInteraction<Cached>;
+	export type Interaction = ContextMenuCommandInteraction;
 	/** Shorthand for {@link ApplicationCommandRegistry}. */
 	export type Registry = ApplicationCommandRegistry;
 }
@@ -247,10 +240,7 @@ export declare namespace ChatInputCommand {
 	/** Shorthand for {@link ChatInputCommandContext}. */
 	export type RunContext = ChatInputCommandContext;
 	/** Shorthand for {@link ChatInputCommandInteraction}. */
-	export type Interaction<
-		Cached extends import("discord.js").CacheType =
-			import("discord.js").CacheType,
-	> = ChatInputCommandInteraction<Cached>;
+	export type Interaction = ChatInputCommandInteraction;
 	/** Shorthand for {@link ApplicationCommandRegistry}. */
 	export type Registry = ApplicationCommandRegistry;
 }

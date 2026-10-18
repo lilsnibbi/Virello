@@ -1,4 +1,4 @@
-import type { Guild } from "discord.js";
+import type { GuildReference as Guild } from "../../../../discord/entities";
 import type {
 	ChannelTypes,
 	GuildBasedChannelTypes,

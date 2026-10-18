@@ -1,4 +1,6 @@
-import type { CommandInteraction, Message, Snowflake } from "discord.js";
+import type { CommandInteraction } from "../../../discord/InteractionContext";
+import type { MessageContext as Message } from "../../../discord/MessageContext";
+import type { Snowflake } from "discord-api-types/v10";
 import { container } from "../../../core/modules/index";
 import {
 	ChannelMentionRegex,
@@ -19,11 +21,14 @@ export function resolveChannel(
 ): Result<ChannelTypes, Identifiers.ArgumentChannelError> {
 	const channelId = (ChannelMentionRegex.exec(parameter)?.[1] ??
 		parameter) as Snowflake;
-	const channel = (
-		messageOrInteraction.guild
-			? messageOrInteraction.guild.channels
-			: container.client.channels
-	).cache.get(channelId);
+	const { cache } = container.client;
+	if (
+		messageOrInteraction.guildId &&
+		cache.guildForChannel(channelId) !== messageOrInteraction.guildId
+	)
+		return Result.err(Identifiers.ArgumentChannelError);
+	const entry = cache.channels.get(channelId);
+	const channel = entry?.complete ? entry.data : undefined;
 
 	if (channel) {
 		return Result.ok(channel as ChannelTypes);

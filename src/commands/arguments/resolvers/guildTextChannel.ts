@@ -1,4 +1,5 @@
-import type { Guild, TextChannel } from "discord.js";
+import type { APITextChannel as TextChannel } from "discord-api-types/v10";
+import type { GuildReference as Guild } from "../../../discord/entities";
 import { isTextChannel } from "../../../utilities/discord/index";
 import type { Result } from "../../../utilities/result/index";
 import { Identifiers } from "../../errors/Identifiers";

@@ -1,36 +1,35 @@
+import type { EmbedBuilder } from "@discordjs/builders";
 import type {
-	ActionRowComponentOptions,
-	ActionRowData,
 	APIActionRowComponent,
 	APIComponentInMessageActionRow,
 	APIEmbed,
 	APIMessage,
-	BaseMessageOptions,
+	APIButtonComponentWithCustomId as InteractionButtonComponentData,
+	APIButtonComponentWithURL as LinkButtonComponentData,
+	APIStringSelectComponent as StringSelectMenuComponentData,
+	APIUserSelectComponent as UserSelectMenuComponentData,
+	APIRoleSelectComponent as RoleSelectMenuComponentData,
+	APIMentionableSelectComponent as MentionableSelectMenuComponentData,
+	APIChannelSelectComponent as ChannelSelectMenuComponentData,
+	APISelectMenuOption as SelectMenuComponentOptionData,
+	APIUser as User,
+} from "discord-api-types/v10";
+import type { MessageContext as Message } from "../../../discord/MessageContext";
+import type {
 	ButtonInteraction,
-	ChannelSelectMenuComponentData,
-	CollectedInteraction,
 	CommandInteraction,
-	EmbedBuilder,
-	InteractionButtonComponentData,
-	InteractionCollector,
-	InteractionReplyOptions,
-	InteractionUpdateOptions,
-	JSONEncodable,
-	LinkButtonComponentData,
-	MentionableSelectMenuComponentData,
-	Message,
-	MessageActionRowComponentBuilder,
 	MessageComponentInteraction,
-	MessageEditOptions,
-	MessageReplyOptions,
-	ModalSubmitInteraction,
-	RoleSelectMenuComponentData,
-	SelectMenuComponentOptionData,
-	StringSelectMenuComponentData,
-	User,
-	UserSelectMenuComponentData,
-	WebhookMessageEditOptions,
-} from "discord.js";
+} from "../../../discord/InteractionContext";
+import type { InteractionCollector } from "../../../discord/Collector";
+import type {
+	MessageBody as BaseMessageOptions,
+	MessageBody as MessageReplyOptions,
+	MessageEditBody as MessageEditOptions,
+	MessageEditBody as WebhookMessageEditOptions,
+	MessageEditBody as InteractionUpdateOptions,
+	InteractionReplyBody as InteractionReplyOptions,
+	JSONEncodable,
+} from "../../../discord/payloads";
 import type { InternationalizationContext } from "../../../extensions/localisation/types";
 import type { Awaitable } from "../../index";
 import type { AnyInteractableInteraction } from "../utility-types";
@@ -100,7 +99,7 @@ export interface PaginatedMessageActionContext {
 	/** User allowed to control this pagination. */
 	author: User;
 	/** Channel containing the response. */
-	channel: Message["channel"];
+	channel: InternationalizationContext["channel"];
 	/** Current pagination response or interaction target. */
 	response:
 		| APIMessage
@@ -181,15 +180,11 @@ export type PaginatedMessageMessageOptionsUnion = Omit<
 };
 
 /** The union type of interactions for a paginated message, excluding the ModalSubmitInteraction. */
-export type PaginatedMessageInteractionUnion = Exclude<
-	CollectedInteraction,
-	ModalSubmitInteraction
->;
+export type PaginatedMessageInteractionUnion = MessageComponentInteraction;
 
 /** A union type for components in a paginated message. */
 export type PaginatedMessageComponentUnion =
 	| JSONEncodable<APIActionRowComponent<APIComponentInMessageActionRow>>
-	| ActionRowData<ActionRowComponentOptions | MessageActionRowComponentBuilder>
 	| APIActionRowComponent<APIComponentInMessageActionRow>;
 
 /** Locale context shared with the localization feature. */
@@ -232,7 +227,10 @@ export type PaginatedMessageStopReasons =
 	| "guildDelete"
 	| "limit"
 	| "componentLimit"
-	| "userLimit";
+	| "userLimit"
+	| "clientDestroyed"
+	| "capacity"
+	| "error";
 
 /** A resolvable object that can be used to create an embed in Discord. It can be either a JSON-encodable object or an APIEmbed object. */
 export type EmbedResolvable = JSONEncodable<APIEmbed> | APIEmbed;

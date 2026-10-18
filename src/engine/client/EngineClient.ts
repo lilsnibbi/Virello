@@ -27,6 +27,8 @@ export class EngineClient {
 	private readonly events: EventHub<$EngineEvents>;
 	private gateway?: GatewayShard;
 	private connection?: Promise<void>;
+	private connecting?: AbortController;
+	private generation = 0;
 	private closed = false;
 	private revision = 0;
 	private reporting = false;
@@ -37,13 +39,13 @@ export class EngineClient {
 	 * @param options - Bot token, intents, cache, and transport settings.
 	 * @throws If token or queue/cache settings are invalid.
 	 */
-	public constructor(options: $EngineOptions) {
+	public constructor(options: $EngineOptions, cache?: EngineCache) {
 		this.#options = {
 			...options,
 			gateway: { ...options.gateway },
 			rest: { ...options.rest },
 		};
-		this.cache = new EngineCache(options.cache);
+		this.cache = cache ?? new EngineCache(options.cache);
 		this.rest = new RestClient(options.token, {
 			clock: options.clock,
 			...options.rest,
@@ -63,6 +65,26 @@ export class EngineClient {
 	/** Number of unfinished asynchronous event handlers. */
 	public get pendingHandlers(): number {
 		return this.events.pendingCount;
+	}
+	/** Last acknowledged heartbeat latency in milliseconds, or null before an acknowledgement. */
+	public get ping(): number | null {
+		return this.gateway?.ping ?? null;
+	}
+	/** Stop the current session and clear its cache, retaining REST and event subscriptions for reassignment. */
+	public reassign(shard: readonly [number, number] | null): void {
+		if (this.closed) throw new Error("Engine client is closed.");
+		++this.generation;
+		++this.revision;
+		this.connecting?.abort(new Error("Gateway assignment changed."));
+		this.gateway?.stop();
+		this.gateway = undefined;
+		this.connection = undefined;
+		this.cache.clear();
+		this.#options.gateway = {
+			...this.#options.gateway,
+			shard: shard ?? undefined,
+		};
+		this.events.emit("gatewayState", "idle");
 	}
 	/**
 	 * Listen to an engine event. Handlers start synchronously in registration order; async results are tracked.
@@ -85,14 +107,21 @@ export class EngineClient {
 	public connect(): Promise<void> {
 		if (this.closed)
 			return Promise.reject(new Error("Engine client is closed."));
-		this.connection ??= this.open().catch((error: unknown) => {
-			this.close();
-			throw error;
-		});
+		if (!this.connection) {
+			const generation = this.generation;
+			this.connecting = new AbortController();
+			this.connection = this.open(this.connecting.signal).catch(
+				(error: unknown) => {
+					if (generation === this.generation) this.close();
+					throw error;
+				},
+			);
+		}
 		return this.connection;
 	}
-	private async open(): Promise<void> {
-		const info = await this.rest.getGatewayBot();
+	private async open(signal: AbortSignal): Promise<void> {
+		const info = await this.rest.getGatewayBot(signal);
+		signal.throwIfAborted();
 		if (this.closed)
 			throw new Error("Engine client closed while discovering gateway.");
 		const clock = this.#options.clock ?? systemClock;
@@ -232,6 +261,8 @@ export class EngineClient {
 	public close(): void {
 		if (this.closed) return;
 		this.closed = true;
+		++this.generation;
+		this.connecting?.abort(new Error("Engine client closed."));
 		++this.revision;
 		this.gateway?.stop();
 		this.rest.close();

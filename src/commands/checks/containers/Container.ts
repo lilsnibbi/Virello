@@ -1,8 +1,8 @@
 import type {
 	ChatInputCommandInteraction,
 	ContextMenuCommandInteraction,
-	Message,
-} from "discord.js";
+} from "../../../discord/InteractionContext";
+import type { MessageContext as Message } from "../../../discord/MessageContext";
 import type { Awaitable } from "../../../utilities/index";
 import type { Result } from "../../../utilities/result/index";
 import type { Command } from "../../Command";

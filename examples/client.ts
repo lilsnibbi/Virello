@@ -1,5 +1,5 @@
 import "./contracts";
-import { GatewayIntentBits } from "discord.js";
+import { GatewayIntentBits } from "discord-api-types/v10";
 import { VirelloClient, type LoggerLike } from "virello/client";
 import { ApplicationCommandRegistries } from "virello/commands";
 import { developmentGuild } from "./config";
@@ -26,7 +26,7 @@ export function createBot(logger: LoggerLike = exampleLogger): VirelloClient {
 	client.sharding.handle("exampleStats", () => ({
 		shard: client.sharding.id ?? 0,
 		pid: process.pid,
-		guilds: client.guilds.cache.size,
+		guilds: client.cache.guilds.size,
 		uptimeSeconds: Math.floor(process.uptime()),
 		memoryMb: Math.round(process.memoryUsage().rss / 1024 / 1024),
 		ready: client.isReady(),

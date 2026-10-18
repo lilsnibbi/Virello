@@ -1,4 +1,4 @@
-import type { InteractionContextType } from "discord.js";
+import type { InteractionContextType } from "discord-api-types/v10";
 import type { CommandDifference } from "./_shared";
 
 export function* checkInteractionContextTypes(

@@ -1,4 +1,4 @@
-import type { TextChannel } from "discord.js";
+import type { APITextChannel as TextChannel } from "discord-api-types/v10";
 import { Identifiers } from "../../errors/Identifiers";
 import { Argument } from "../Argument";
 import { resolveGuildTextChannel } from "../resolvers/guildTextChannel";

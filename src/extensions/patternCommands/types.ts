@@ -1,5 +1,5 @@
 import type { PreconditionContext } from "../../commands/checks/Precondition";
-import type { Message } from "discord.js";
+import type { MessageContext as Message } from "../../discord/MessageContext";
 import type { PatternCommand } from "./PatternCommand";
 
 /** Data passed with the pattern command pre event. */

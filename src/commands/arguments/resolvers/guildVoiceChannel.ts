@@ -1,4 +1,5 @@
-import type { Guild, VoiceChannel } from "discord.js";
+import type { APIGuildVoiceChannel as VoiceChannel } from "discord-api-types/v10";
+import type { GuildReference as Guild } from "../../../discord/entities";
 import { isVoiceChannel } from "../../../utilities/discord/index";
 import type { Result } from "../../../utilities/result/index";
 import { Identifiers } from "../../errors/Identifiers";

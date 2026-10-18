@@ -1,59 +1,35 @@
 import { describe, expect, test } from "bun:test";
+import { ChannelType, PermissionFlagsBits } from "discord-api-types/v10";
 import {
-	ChannelType,
-	Message as DJSMessage,
-	PermissionFlagsBits,
-	type PermissionResolvable,
-	PermissionsBitField,
-	type PermissionsString,
-} from "discord.js";
-import diff from "lodash/difference";
+	Permissions,
+	type PermissionInput,
+	type MessageContext as Message,
+	type VirelloClient,
+} from "virello";
+import { message as nativeMessage } from "../../../fixtures/discord";
 import { UserError } from "../../../../src/core/index";
 import {
 	DecoratorIdentifiers,
 	RequiresUserPermissions,
 } from "../../../../src/utilities/decorators/index";
 
-interface BitField {
-	missing(resolvedPermissions: PermissionsBitField): PermissionsString[];
-}
-
-interface Message {
-	channel: {
-		type: DJSMessage["channel"]["type"];
-		permissionsFor(): BitField;
-	};
-	guild: {
-		members: { me: string };
-	};
-}
-
-function buildMissing(
-	resolvedPermissions: PermissionsBitField,
-	...givenPermissions: PermissionResolvable[]
-) {
-	return diff(
-		resolvedPermissions.toArray(),
-		new PermissionsBitField(givenPermissions).toArray(),
-	);
-}
-
 function buildMessage(
-	channelType: DJSMessage["channel"]["type"],
-	...givenPermissions: PermissionResolvable[]
+	channelType: ChannelType,
+	...givenPermissions: PermissionInput[]
 ): Message {
-	return {
-		channel: {
-			type: channelType,
-			permissionsFor: () => ({
-				missing: (resolvedPermissions: PermissionsBitField) =>
-					buildMissing(resolvedPermissions, givenPermissions),
-			}),
+	const message = nativeMessage({ user: { id: "bot" } } as VirelloClient, {
+		guild_id: channelType === ChannelType.DM ? undefined : "guild",
+	});
+	Object.defineProperty(message, "guildId", {
+		value: channelType === ChannelType.DM ? null : "guild",
+	});
+	Object.defineProperty(message, "permissionsFor", {
+		value: async (userId: string) => {
+			expect(userId).toBe(message.author.id);
+			return new Permissions(givenPermissions);
 		},
-		guild: {
-			members: { me: "" },
-		},
-	};
+	});
+	return message;
 }
 
 describe("RequiresUserPermissions", () => {

@@ -27,7 +27,7 @@ let loggedIn = false;
 if (process.env.SHARD_TEST_MODE === "scaling") {
 	Reflect.set(client, "isReady", () => loggedIn);
 	for (let index = 0; index < 100; index++)
-		client.guilds.cache.set(String(index), {} as never);
+		client.cache.guilds.patch(String(index), { id: String(index) });
 }
 client.sharding.handle("loginState", () => loggedIn);
 client.sharding.handle(
@@ -72,32 +72,27 @@ client.sharding.handle("oversized", () => "x".repeat(100000));
 client.sharding.handle("lossy", () => ({ value: undefined }));
 client.sharding.handle("hung", () => new Promise<null>(() => {}));
 client.sharding.handle("identify", async () => {
-	const throttler = await client.options.ws!.buildIdentifyThrottler!(
-		null as never,
-	);
-	await throttler.waitForIdentify(
+	await client.options.waitForIdentify!(
 		client.sharding.id!,
 		new AbortController().signal,
 	);
 	const at = Date.now();
 	client.sharding.identified();
-	return { at, hooked: !!client.options.ws?.buildIdentifyThrottler };
+	return { at, hooked: !!client.options.waitForIdentify };
 });
 if (
 	process.env.SHARD_TEST_MODE === "login" ||
 	process.env.SHARD_TEST_MODE === "scaling"
 ) {
 	// Exercise VirelloClient.login and the actual installed throttler, replacing only Discord network connection.
-	Reflect.set(client.ws, "connect", async () => {
-		const throttler = await client.options.ws!.buildIdentifyThrottler!(
-			null as never,
-		);
-		await throttler.waitForIdentify(
+	Reflect.set(client, "openGateway", async () => {
+		await client.options.waitForIdentify!(
 			client.sharding.id!,
 			new AbortController().signal,
 		);
 		if (process.env.SHARD_TEST_MODE === "scaling") loggedIn = true;
-		client.emit("shardReady", client.sharding.id!, new Set());
+		client.emit("shardReady", client.sharding.id!);
+		return "offline-test-placeholder";
 	});
 	await client.login("offline-test-placeholder");
 	loggedIn = true;

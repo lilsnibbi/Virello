@@ -1,4 +1,4 @@
-import type { Interaction } from "discord.js";
+import type { InteractionContext as Interaction } from "../../discord/InteractionContext";
 import { Module } from "../../core/modules/index";
 import type { Awaitable } from "../../utilities/index";
 import { Option } from "../../utilities/result/index";

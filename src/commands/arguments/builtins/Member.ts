@@ -1,4 +1,4 @@
-import type { GuildMember } from "discord.js";
+import type { APIGuildMember as GuildMember } from "discord-api-types/v10";
 import { Identifiers } from "../../errors/Identifiers";
 import { Argument } from "../Argument";
 import type { MemberArgumentContext } from "../contexts";

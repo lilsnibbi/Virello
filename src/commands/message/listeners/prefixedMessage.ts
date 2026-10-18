@@ -1,4 +1,4 @@
-import type { Message } from "discord.js";
+import type { MessageContext as Message } from "../../../discord/MessageContext";
 import { Events } from "../../../events/events";
 import { Listener } from "../../../events/listener";
 import type { MessageCommand } from "../../types";

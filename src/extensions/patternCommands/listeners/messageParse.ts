@@ -1,10 +1,7 @@
-import { Message, PermissionFlagsBits, PermissionsBitField } from "discord.js";
+import type { MessageContext as Message } from "../../../discord/MessageContext";
+import { canRunMessageCommand } from "../../../commands/message/access";
 import { Events } from "../../../events/events";
 import { Listener } from "../../../events/listener";
-import {
-	type GuildBasedChannelTypes,
-	isDMChannel,
-} from "../../../utilities/discord/index";
 import { PatternCommandEvents } from "../events";
 import type { PatternCommandStore } from "../PatternCommandStore";
 import type { PossiblePatternCommand } from "../types";
@@ -12,16 +9,12 @@ import type { PossiblePatternCommand } from "../types";
 export class MessageParseListener extends Listener<
 	typeof Events.PreMessageParsed
 > {
-	private readonly requiredPermissions = new PermissionsBitField([
-		PermissionFlagsBits.ViewChannel,
-		PermissionFlagsBits.SendMessages,
-	]).freeze();
 	public constructor(context: Listener.Context) {
 		super(context, { event: Events.PreMessageParsed });
 	}
 
 	public override async run(message: Message) {
-		const canRun = await this.canRunInChannel(message);
+		const canRun = await canRunMessageCommand(message);
 		if (!canRun) return;
 
 		let { content } = message;
@@ -109,15 +102,5 @@ export class MessageParseListener extends Listener<
 				possibleCommands: sortedPossiblePatternCommands,
 			});
 		}
-	}
-
-	private async canRunInChannel(message: Message): Promise<boolean> {
-		if (isDMChannel(message.channel)) return true;
-
-		const me = await message.guild?.members.fetchMe();
-		if (!me) return false;
-
-		const channel = message.channel as GuildBasedChannelTypes;
-		return channel.permissionsFor(me).has(this.requiredPermissions, false);
 	}
 }

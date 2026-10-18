@@ -1,8 +1,5 @@
-import type {
-	ApplicationCommand,
-	ApplicationCommandManager,
-	Collection,
-} from "discord.js";
+import type { APIApplicationCommand as ApplicationCommand } from "discord-api-types/v10";
+import type { ApplicationCommands as ApplicationCommandManager } from "../../discord/ApplicationCommands";
 import { writeEvent } from "../../core/logging/diagnostics";
 import { container } from "../../core/modules/index";
 
@@ -28,7 +25,7 @@ async function fetchGuildCommands(
 	commands: ApplicationCommandManager,
 	guildIds: Set<string>,
 ) {
-	const map = new Map<string, Collection<string, ApplicationCommand>>();
+	const map = new Map<string, Map<string, ApplicationCommand>>();
 
 	for (const guildId of guildIds) {
 		try {

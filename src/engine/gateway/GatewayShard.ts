@@ -1,4 +1,7 @@
-import type { GatewaySendPayload } from "discord-api-types/v10";
+import type {
+	GatewaySendPayload,
+	GatewayPresenceUpdateData,
+} from "discord-api-types/v10";
 import {
 	GatewayDispatchEvents as E,
 	GatewayOpcodes as Op,
@@ -39,6 +42,8 @@ export interface $GatewayOptions {
 	intents: number;
 	/** Tuple of zero-based shard ID and total shard count. Defaults to [0, 1]. */
 	shard?: readonly [number, number];
+	/** Native presence included with fresh IDENTIFY payloads. */
+	presence?: GatewayPresenceUpdateData;
 	/** Clock and timer hooks. Defaults to performance.now, Math.random, and native timers. */
 	clock?: $Clock;
 	/** Create a WebSocket for the supplied gateway URL. Defaults to new WebSocket(url). */
@@ -73,6 +78,10 @@ export interface $GatewayCallbacks {
 
 /** Owns exactly one shard's socket, ordered dispatches, session and timers. */
 export class GatewayShard {
+	/** Latency of the last acknowledged heartbeat in this connection. */
+	public get ping(): number | null {
+		return this.heartbeat.latency;
+	}
 	readonly #options: $GatewayOptions;
 	private readonly clock: $Clock;
 	private readonly heartbeat: Heartbeat;
@@ -289,6 +298,7 @@ export class GatewayShard {
 						token: this.#options.token,
 						intents: this.#options.intents,
 						shard: this.shard,
+						presence: this.#options.presence,
 						properties: {
 							os: process.platform,
 							browser: "virello-engine",

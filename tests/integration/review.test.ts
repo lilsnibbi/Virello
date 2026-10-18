@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, spyOn, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve, sep } from "node:path";
-import { Client } from "discord.js";
+import { DiscordRuntime } from "../../src/core/client/DiscordRuntime";
 import {
 	ApplyOptions,
 	Command,
@@ -168,7 +168,7 @@ describe("review configuration and ownership", () => {
 				throw new Error("optional hook failed");
 			}
 		}
-		const login = spyOn(Client.prototype, "login").mockResolvedValue(
+		const login = spyOn(DiscordRuntime.prototype, "login").mockResolvedValue(
 			"mock-token",
 		);
 		client = new VirelloClient({

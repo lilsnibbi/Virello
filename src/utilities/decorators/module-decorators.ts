@@ -1,10 +1,10 @@
-import {
-	ApplicationCommandType,
-	type ContextMenuCommandBuilder,
-	type SlashCommandBuilder,
-	type SlashCommandOptionsOnlyBuilder,
-	type SlashCommandSubcommandsOnlyBuilder,
-} from "discord.js";
+import { ApplicationCommandType } from "discord-api-types/v10";
+import type {
+	ContextMenuCommandBuilder,
+	SlashCommandBuilder,
+	SlashCommandOptionsOnlyBuilder,
+	SlashCommandSubcommandsOnlyBuilder,
+} from "@discordjs/builders";
 import { type Command } from "../../commands/Command";
 import { type ApplicationCommandRegistryRegisterOptions } from "../../commands/registration/Registry";
 import { container } from "../../core/Container";

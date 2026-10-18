@@ -8,6 +8,8 @@ import {
 	InteractionType,
 } from "discord-api-types/v10";
 import type { RestClient } from "../rest/RestClient";
+import type { $RestRequest } from "../rest/RestClient";
+import { Routes } from "discord-api-types/v10";
 import { RestError } from "../rest/RestError";
 
 /** Initial-response state. Unknown means a transport failure left delivery uncertain; another initial response is blocked. */
@@ -63,6 +65,7 @@ export class EngineInteraction {
 	 */
 	public async respond(
 		body: RESTPostAPIInteractionCallbackJSONBody,
+		files?: $RestRequest["files"],
 	): Promise<void> {
 		if (this.current !== "unanswered")
 			throw new Error(
@@ -70,7 +73,13 @@ export class EngineInteraction {
 			);
 		this.current = "pending";
 		try {
-			await this.rest.interactionCallback(this.data.id, this.data.token, body);
+			await this.rest.request({
+				method: "POST",
+				path: Routes.interactionCallback(this.data.id, this.data.token),
+				body,
+				files,
+				auth: false,
+			});
 			this.current = "answered";
 		} catch (error) {
 			this.current =

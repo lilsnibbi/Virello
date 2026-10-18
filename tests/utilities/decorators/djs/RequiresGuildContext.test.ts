@@ -3,6 +3,7 @@ import { RequiresGuildContext } from "../../../../src/utilities/decorators/index
 
 describe("RequiresGuildContext", () => {
 	interface Message {
+		guildId: string | null;
 		guild: { name: string } | null;
 	}
 
@@ -15,7 +16,7 @@ describe("RequiresGuildContext", () => {
 		}
 
 		const instance = new Test();
-		const result = await instance.getValue({ guild: null });
+		const result = await instance.getValue({ guildId: null, guild: null });
 		expect(result).toBe("Fallback!");
 	});
 
@@ -28,7 +29,10 @@ describe("RequiresGuildContext", () => {
 		}
 
 		const instance = new Test();
-		const result = await instance.getValue({ guild: { name: "World!" } });
+		const result = await instance.getValue({
+			guildId: "guild",
+			guild: { name: "World!" },
+		});
 		expect(result).toBe("World!");
 	});
 
@@ -41,7 +45,7 @@ describe("RequiresGuildContext", () => {
 		}
 
 		const instance = new Test();
-		const result = await instance.getValue({ guild: null });
+		const result = await instance.getValue({ guildId: null, guild: null });
 		expect(result).toBeUndefined();
 	});
 });

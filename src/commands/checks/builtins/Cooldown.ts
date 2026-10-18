@@ -1,12 +1,10 @@
-import {
-	type ChatInputCommandInteraction,
-	type CommandInteraction,
-	type ContextMenuCommandInteraction,
-	type Message,
-	type Snowflake,
-	TimestampStyles,
-	time,
-} from "discord.js";
+import type {
+	ChatInputCommandInteraction,
+	CommandInteraction,
+	ContextMenuCommandInteraction,
+} from "../../../discord/InteractionContext";
+import type { MessageContext as Message } from "../../../discord/MessageContext";
+import type { Snowflake } from "discord-api-types/v10";
 import { RateLimitManager } from "../../../utilities/time/ratelimits/index";
 import type { Command } from "../../Command";
 import { BucketScope } from "../../enums";
@@ -114,10 +112,7 @@ export class CooldownCheck extends AllFlowsPrecondition {
 
 		if (rateLimit.limited) {
 			const remaining = rateLimit.remainingTime;
-			const nextAvailable = time(
-				Math.floor(rateLimit.expires / 1000),
-				TimestampStyles.RelativeTime,
-			);
+			const nextAvailable = `<t:${Math.floor(rateLimit.expires / 1000)}:R>`;
 
 			return this.error({
 				identifier: Identifiers.PreconditionCooldown,
@@ -154,9 +149,11 @@ export class CooldownCheck extends AllFlowsPrecondition {
 			case BucketScope.Global:
 				return "global";
 			case BucketScope.Channel:
-				return interaction.channelId;
+				return interaction.channelId ?? interaction.user.id;
 			case BucketScope.Guild:
-				return interaction.guildId ?? interaction.channelId;
+				return (
+					interaction.guildId ?? interaction.channelId ?? interaction.user.id
+				);
 			default:
 				return interaction.user.id;
 		}

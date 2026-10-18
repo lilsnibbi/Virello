@@ -2,27 +2,32 @@
 import { randomUUIDv7 } from "bun";
 import {
 	ActionRowBuilder,
-	type APIContainerComponent,
 	ButtonBuilder,
-	type ButtonInteraction,
-	ButtonStyle,
-	ComponentType,
 	ContainerBuilder,
 	EmbedBuilder,
-	Events,
-	type Interaction,
-	type InteractionCollector,
-	type JSONEncodable,
 	LabelBuilder,
-	type Message,
-	MessageFlags,
 	ModalBuilder,
-	type ModalSubmitInteraction,
-	type RepliableInteraction,
 	TextDisplayBuilder,
 	TextInputBuilder,
+} from "@discordjs/builders";
+import {
+	type APIContainerComponent,
+	ButtonStyle,
+	ComponentType,
+	MessageFlags,
 	TextInputStyle,
-} from "discord.js";
+} from "discord-api-types/v10";
+import type {
+	ButtonInteraction,
+	InteractionContext as Interaction,
+	ModalSubmitInteraction,
+	RepliableInteraction,
+} from "../../../discord/InteractionContext";
+import type { InteractionCollector } from "../../../discord/Collector";
+import type { MessageContext as Message } from "../../../discord/MessageContext";
+import type { JSONEncodable } from "../../../discord/payloads";
+import { Events } from "../../../events/events";
+import { RestError } from "../../../engine/rest/RestError";
 import { container } from "../../../core/Container";
 import { fallbackLogger } from "../../../core/logging/console";
 import { writeEvent } from "../../../core/logging/diagnostics";
@@ -45,7 +50,7 @@ export type PaginationEndReason =
 export interface PaginationButtonOptions {
 	/** Button text. Defaults to the action’s built-in label or current page/count for jump. */
 	label?: string;
-	/** Optional button emoji accepted by discord.js. */
+	/** Optional Unicode emoji or custom emoji mention (<:name:id> or <a:name:id>). */
 	emoji?: string;
 	/** Non-link button style. Defaults to ButtonStyle.Secondary. */
 	style?:
@@ -103,7 +108,7 @@ export type PaginationOptions = PaginationBaseOptions &
 		  }
 	);
 
-const allowedMentions = { parse: [] as [], repliedUser: false };
+const allowed_mentions = { parse: [] as [], replied_user: false };
 const actions = ["first", "back", "jump", "next", "last"] as const;
 type Action = (typeof actions)[number];
 type Mode =
@@ -398,13 +403,13 @@ export class Pagination {
 			await submission.deferUpdate();
 			return;
 		}
-		const value = submission.fields.getTextInputValue(input).trim();
+		const value = submission.fields.getTextInput(input).trim();
 		const page = /^\d+$/.test(value) ? Number(value) : NaN;
 		if (!Number.isSafeInteger(page) || page < 1 || page > this.pages) {
 			await submission.reply({
 				content: `Choose a page from 1 to ${this.pages}.`,
 				flags: MessageFlags.Ephemeral,
-				allowedMentions,
+				allowed_mentions,
 			});
 			return;
 		}
@@ -430,7 +435,14 @@ export class Pagination {
 				.setLabel(options?.label ?? label)
 				.setStyle(options?.style ?? ButtonStyle.Secondary)
 				.setDisabled(this.ended || disabled);
-			if (options?.emoji) button.setEmoji(options.emoji);
+			if (options?.emoji) {
+				const match = /^<(a?):([\w]+):(\d+)>$/.exec(options.emoji);
+				button.setEmoji(
+					match
+						? { animated: match[1] === "a", name: match[2], id: match[3] }
+						: { name: options.emoji },
+				);
+			}
 			return button;
 		};
 		const buttons = [
@@ -454,7 +466,7 @@ export class Pagination {
 					),
 				],
 				components: this.entries.length ? [this.row()] : [],
-				allowedMentions,
+				allowed_mentions,
 			};
 		const components = mode.layout.flatMap((item) =>
 			item === DATA
@@ -478,7 +490,7 @@ export class Pagination {
 				}),
 			],
 			flags: MessageFlags.IsComponentsV2 as const,
-			allowedMentions,
+			allowed_mentions,
 		};
 	}
 	private async render(): Promise<void> {
@@ -487,10 +499,11 @@ export class Pagination {
 	}
 	private isDeleted(error: unknown): boolean {
 		return (
-			typeof error === "object" &&
-			error !== null &&
-			"code" in error &&
-			error.code === 10008
+			error instanceof RestError &&
+			typeof error.body === "object" &&
+			error.body !== null &&
+			"code" in error.body &&
+			error.body.code === 10008
 		);
 	}
 	private fail(error: unknown): void {

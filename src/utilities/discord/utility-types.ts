@@ -1,86 +1,60 @@
 import type {
+	APIChannel,
+	APIThreadChannel,
+	APIGuildVoiceChannel,
+	APIGuildStageVoiceChannel,
+} from "discord-api-types/v10";
+import { ChannelType } from "discord-api-types/v10";
+import type {
+	InteractionContext,
+	CommandInteraction,
 	AutocompleteInteraction,
 	ButtonInteraction,
-	CategoryChannel,
-	Channel,
-	ChatInputCommandInteraction,
-	DirectoryChannel,
-	DMChannel,
-	GuildChannel,
-	Interaction,
-	Message,
-	MessageContextMenuCommandInteraction,
-	NewsChannel,
-	PartialDMChannel,
-	StageChannel,
-	StringSelectMenuInteraction,
-	TextChannel,
-	ThreadChannel,
-	UserContextMenuCommandInteraction,
-	VoiceChannel,
-} from "discord.js";
+	SelectMenuInteraction,
+	RepliableInteraction,
+} from "../../discord/InteractionContext";
 
-/** A union of all the various types of channels that Discord.js has */
-export type ChannelTypes =
-	| CategoryChannel
-	| DMChannel
-	| DirectoryChannel
-	| PartialDMChannel
-	| NewsChannel
-	| StageChannel
-	| TextChannel
-	| ThreadChannel
-	| VoiceChannel
-	| GuildChannel
-	| Channel;
-
-/** A union of all the channel types that a message can come from */
-export type TextBasedChannelTypes = Message["channel"];
-
-/** A union of all the voice-based channel types that Discord.js has */
-export type VoiceBasedChannelTypes = VoiceChannel | StageChannel;
-
-/** A union of all the channel types that belong to a guild, not including {@link ThreadChannel} */
-export type NonThreadGuildBasedChannelTypes = Extract<
-	ChannelTypes,
-	GuildChannel
+/** Native channels described by discord-api-types. */
+export type ChannelTypes = APIChannel;
+export type TextBasedChannelTypes = Extract<
+	APIChannel,
+	{
+		type:
+			| ChannelType.DM
+			| ChannelType.GroupDM
+			| ChannelType.GuildText
+			| ChannelType.GuildAnnouncement
+			| ChannelType.GuildVoice
+			| ChannelType.GuildStageVoice
+			| ChannelType.PublicThread
+			| ChannelType.PrivateThread
+			| ChannelType.AnnouncementThread;
+	}
 >;
-
-/** A union of all the channel types that belong to a guild, including {@link ThreadChannel} */
-export type GuildBasedChannelTypes =
-	NonThreadGuildBasedChannelTypes | ThreadChannel;
-
-/** A union of guild based message channels, not including {@link ThreadChannel} */
-export type NonThreadGuildTextBasedChannelTypes = Extract<
+export type VoiceBasedChannelTypes =
+	APIGuildVoiceChannel | APIGuildStageVoiceChannel;
+export type GuildBasedChannelTypes = Exclude<
+	APIChannel,
+	{ type: ChannelType.DM | ChannelType.GroupDM }
+>;
+export type NonThreadGuildBasedChannelTypes = Exclude<
+	GuildBasedChannelTypes,
+	APIThreadChannel
+>;
+export type GuildTextBasedChannelTypes = Extract<
 	TextBasedChannelTypes,
-	GuildChannel
+	GuildBasedChannelTypes
 >;
-
-/** A union of guild based message channels, including {@link ThreadChannel} */
-export type GuildTextBasedChannelTypes =
-	NonThreadGuildTextBasedChannelTypes | ThreadChannel;
-
-/** The types of a channel, with the addition of `'UNKNOWN'` */
+export type NonThreadGuildTextBasedChannelTypes = Exclude<
+	GuildTextBasedChannelTypes,
+	APIThreadChannel
+>;
 export type ChannelTypeString = ChannelTypes["type"] | "UNKNOWN";
-
-/** A union of {@link ChatInputCommandInteraction}, {@link UserContextMenuCommandInteraction} and {@link MessageContextMenuCommandInteraction}. Similar to {@link CommandInteraction} class but as a type union. */
-export type ChatInputOrContextMenuCommandInteraction =
-	| ChatInputCommandInteraction
-	| UserContextMenuCommandInteraction
-	| MessageContextMenuCommandInteraction;
-
-/** Any Discord interaction. */
+export type ChatInputOrContextMenuCommandInteraction = CommandInteraction;
 export type NonModalInteraction =
-	| ChatInputOrContextMenuCommandInteraction
+	| CommandInteraction
 	| AutocompleteInteraction
-	| StringSelectMenuInteraction
+	| SelectMenuInteraction
 	| ButtonInteraction;
-
-/** Any Discord interaction. */
-export type AnyInteraction = Interaction;
-
-/** A union of {@link ChatInputCommandInteraction}, {@link UserContextMenuCommandInteraction}, {@link MessageContextMenuCommandInteraction}, {@link StringSelectMenuInteraction}, {@link ButtonInteraction}, and {@link ModalSubmitInteraction} */
-export type AnyInteractableInteraction = Exclude<
-	AnyInteraction,
-	AutocompleteInteraction
->;
+export type AnyInteraction = InteractionContext;
+export type AnyInteractableInteraction = RepliableInteraction;

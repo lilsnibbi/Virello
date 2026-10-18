@@ -1,4 +1,4 @@
-import type { Message } from "discord.js";
+import type { MessageContext as Message } from "../../../discord/MessageContext";
 import { Args } from "../../../commands/arguments/Args";
 import { writeEvent } from "../../../core/logging/diagnostics";
 import { Listener } from "../../../events/listener";

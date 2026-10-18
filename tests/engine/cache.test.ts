@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { ChannelType, GatewayDispatchEvents as E } from "discord-api-types/v10";
+import type { APIVoiceState } from "discord-api-types/v10";
 import { CacheStore } from "../../src/engine/cache/CacheStore";
 import { EngineCache } from "../../src/engine/cache/EngineCache";
 import { ScopedCache } from "../../src/engine/cache/ScopedCache";
@@ -12,6 +13,20 @@ import {
 	message,
 	user,
 } from "./fixtures";
+
+const voice: APIVoiceState = {
+	guild_id: "30",
+	channel_id: "20",
+	user_id: "1",
+	session_id: "offline-voice-state",
+	deaf: false,
+	mute: false,
+	self_deaf: false,
+	self_mute: false,
+	self_video: false,
+	suppress: false,
+	request_to_speak_timestamp: null,
+};
 
 describe("native cache semantics", () => {
 	test("omissions, nested partials, arrays and null merge in place without mutating input", () => {
@@ -157,10 +172,16 @@ describe("native cache semantics", () => {
 	test("guild/channel/role defaults, guild snapshots never retain bulk members, and policy overrides", () => {
 		const cache = new EngineCache({ membersPerGuild: 1 });
 		const input = guild();
+		input.voice_states = [voice];
 		cache.apply(dispatch(E.GuildCreate, input));
 		expect(cache.guilds.size).toBe(1);
 		expect(cache.channels.size).toBe(1);
 		expect(cache.roles.size("30")).toBe(1);
+		expect(cache.voiceStates.peek("30", "1")).toMatchObject({
+			complete: true,
+			data: { channel_id: "20", user_id: "1" },
+		});
+		expect(cache.guilds.peek("30")?.data).not.toHaveProperty("voice_states");
 		expect(cache.guilds.peek("30")?.complete).toBe(false);
 		expect(cache.guilds.peek("30")?.data).not.toHaveProperty("members");
 		expect(cache.guilds.peek("30")?.data).not.toHaveProperty("roles");
@@ -171,14 +192,28 @@ describe("native cache semantics", () => {
 			channels: false,
 			roles: false,
 			guilds: false,
+			voiceStates: false,
 		});
 		filtered.apply(dispatch(E.GuildCreate, input));
 		expect(
 			filtered.guilds.size +
 				filtered.channels.size +
 				filtered.roles.size("30") +
-				filtered.members.size("30"),
+				filtered.members.size("30") +
+				filtered.voiceStates.size("30"),
 		).toBe(0);
+		cache.apply(dispatch(E.VoiceStateUpdate, { ...voice, channel_id: null }));
+		expect(cache.voiceStates.size("30")).toBe(0);
+		cache.apply(dispatch(E.VoiceStateUpdate, voice));
+		cache.apply(
+			dispatch(E.GuildMemberRemove, { guild_id: "30", user: user("1") }),
+		);
+		expect(cache.voiceStates.size("30")).toBe(0);
+		cache.apply(dispatch(E.VoiceStateUpdate, voice));
+		cache.apply(
+			dispatch(E.ChannelDelete, { ...input.channels[0]!, guild_id: "30" }),
+		);
+		expect(cache.voiceStates.scopeCount).toBe(0);
 	});
 	test("message updates preserve identity, null reference removes deleted content, and miss is partial", () => {
 		const cache = new EngineCache({ messagesPerChannel: 2 });
@@ -229,12 +264,16 @@ describe("native cache semantics", () => {
 	test("unavailable guild is retained as unavailable; clear ends resident identity", () => {
 		const cache = new EngineCache();
 		cache.apply(dispatch(E.GuildCreate, guild()));
+		cache.apply(dispatch(E.VoiceStateUpdate, voice));
 		expect(
 			cache.apply(dispatch(E.GuildDelete, { id: "30", unavailable: true })),
 		).toEqual([]);
 		expect(cache.guilds.peek("30")?.data.unavailable).toBe(true);
 		expect(cache.members.size("30")).toBe(0);
+		expect(cache.voiceStates.size("30")).toBe(0);
+		cache.apply(dispatch(E.VoiceStateUpdate, voice));
 		cache.clear();
+		expect(cache.voiceStates.scopeCount).toBe(0);
 		expect(
 			cache.guilds.size + cache.channels.size + cache.roles.scopeCount,
 		).toBe(0);
@@ -348,4 +387,7 @@ test("disabling channel cache does not discard independently enabled messages on
 	expect(cache.messages.size("20")).toBe(1);
 	cache.apply(dispatch(E.GuildDelete, { id: "30" }));
 	expect(cache.messages.scopeCount).toBe(0);
+	cache.apply(dispatch(E.VoiceStateUpdate, voice));
+	cache.apply(dispatch(E.ChannelDelete, { ...channel, guild_id: "30" }));
+	expect(cache.voiceStates.scopeCount).toBe(0);
 });

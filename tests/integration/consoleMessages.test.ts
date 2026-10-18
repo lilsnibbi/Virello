@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import type { ApplicationCommand, ApplicationCommandManager } from "discord.js";
-import { Collection } from "discord.js";
+import type { APIApplicationCommand as ApplicationCommand } from "discord-api-types/v10";
+import type { ApplicationCommands } from "../../src/discord/ApplicationCommands";
 import {
 	ApplicationCommandRegistries,
 	ApplicationCommandRegistry,
@@ -86,19 +86,22 @@ for (const behavior of [
 			description: "Old remote description",
 			type: 1,
 			options: [],
-			dmPermission: true,
-			defaultMemberPermissions: null,
+			dm_permission: true,
+			default_member_permissions: null,
 			nsfw: false,
-			nameLocalizations: null,
-			descriptionLocalizations: null,
-			async edit() {
-				edits++;
-				return this;
-			},
+			name_localizations: null,
+			description_localizations: null,
 		} as unknown as ApplicationCommand;
+		const commands = {
+			edit: async () => {
+				edits++;
+				return command;
+			},
+		} as unknown as ApplicationCommands;
+		client.application = { id: "application", commands };
 		await registry["runAPICalls"](
-			{} as ApplicationCommandManager,
-			new Collection([[command.id, command]]),
+			commands,
+			new Map([[command.id, command]]),
 			new Map(),
 		);
 		expect(edits).toBe(behavior === RegisterBehavior.LogToConsole ? 0 : 1);

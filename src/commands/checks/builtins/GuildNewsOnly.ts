@@ -1,10 +1,12 @@
 import {
 	ChannelType,
+	type ChannelType as TextBasedChannelTypes,
+} from "discord-api-types/v10";
+import type {
 	ChatInputCommandInteraction,
 	ContextMenuCommandInteraction,
-	Message,
-	type TextBasedChannelTypes,
-} from "discord.js";
+} from "../../../discord/InteractionContext";
+import type { MessageContext as Message } from "../../../discord/MessageContext";
 import { Identifiers } from "../../errors/Identifiers";
 import { AllFlowsPrecondition } from "../Precondition";
 
@@ -22,8 +24,10 @@ export class GuildNewsOnlyCheck extends AllFlowsPrecondition {
 	 * Check a message invocation. Require a guild announcement channel or announcement thread.
 	 * @returns Ok to allow or a precondition error to deny. Any failed Discord fetch rejects.
 	 */
-	public messageRun(message: Message): AllFlowsPrecondition.Result {
-		return this.allowedTypes.includes(message.channel.type)
+	public async messageRun(message: Message): AllFlowsPrecondition.AsyncResult {
+		return this.allowedTypes.includes(
+			(await this.fetchChannelFromMessage(message)).type,
+		)
 			? this.ok()
 			: this.makeSharedError();
 	}

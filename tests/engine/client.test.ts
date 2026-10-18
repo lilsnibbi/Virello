@@ -420,11 +420,14 @@ test("closing from the connecting state callback never constructs a socket", asy
 	expect(sockets).toBe(0);
 });
 
-test("engine and existing VirelloClient coexist without changing the framework container", async () => {
+test("VirelloClient uses its native engine without a standalone engine changing the container", async () => {
 	const { VirelloClient, container } = await import("virello/client");
+	const server = new MockDiscord();
 	const framework = new VirelloClient({
 		intents: [],
 		logger: { debug() {}, notif() {}, alert() {}, error() {} },
+		rest: { baseURL: server.baseURL },
+		cache: { messagesPerChannel: 2 },
 	});
 	const engine = new EngineClient({ token: "offline-test", intents: 0 });
 	try {
@@ -434,8 +437,54 @@ test("engine and existing VirelloClient coexist without changing the framework c
 		expect(engine.state).toBe("idle");
 		engine.close();
 		expect(container.client).toBe(framework);
+		const replied = Promise.withResolvers<void>();
+		framework.once("messageCreate", async (context) => {
+			try {
+				expect(context.client).toBe(framework);
+				expect(framework.cache.messages.peek("20", "100")?.data).toBe(
+					context.data,
+				);
+				await context.reply("Framework reply");
+				replied.resolve();
+			} catch (error) {
+				replied.reject(error);
+			}
+		});
+		await framework.login("loopback-fake");
+		expect(framework.engine).toBeInstanceOf(EngineClient);
+		expect(framework.engine.cache).toBe(framework.cache);
+		expect(framework.rest).toBe(framework.engine.rest);
+		expect(framework.isReady()).toBe(true);
+		server.dispatch("MESSAGE_CREATE", MockDiscord.message());
+		await replied.promise;
+		expect(server.sentMessages[0]).toMatchObject({
+			content: "Framework reply",
+		});
+		const answered = Promise.withResolvers<void>();
+		framework.once("interactionCreate", async (context) => {
+			try {
+				expect(context.user.id).toBe("1");
+				expect(context.guildId).toBeNull();
+				await context.reply("Native interaction");
+				expect(context.replied).toBe(true);
+				await expect(context.reply("Duplicate")).rejects.toThrow();
+				answered.resolve();
+			} catch (error) {
+				answered.reject(error);
+			}
+		});
+		const directInteraction = interaction(InteractionType.MessageComponent);
+		Reflect.deleteProperty(directInteraction, "member");
+		Reflect.deleteProperty(directInteraction, "guild_id");
+		Reflect.deleteProperty(directInteraction, "guild_locale");
+		Reflect.set(directInteraction, "user", user("1"));
+		Reflect.set(directInteraction, "channel", { id: "20", type: 1 });
+		server.dispatch("INTERACTION_CREATE", directInteraction);
+		await answered.promise;
+		expect(server.callbacks).toHaveLength(1);
 	} finally {
 		engine.close();
 		await framework.destroy();
+		await server.stop();
 	}
 });

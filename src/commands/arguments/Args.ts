@@ -1,18 +1,18 @@
 import type { URL } from "node:url";
 import type {
-	CategoryChannel,
+	APIGuildCategoryChannel as CategoryChannel,
 	ChannelType,
-	DMChannel,
-	GuildMember,
-	Message,
-	NewsChannel,
-	Role,
-	StageChannel,
-	TextChannel,
-	ThreadChannel,
-	User,
-	VoiceChannel,
-} from "discord.js";
+	APIDMChannel as DMChannel,
+	APIGuildMember as GuildMember,
+	APINewsChannel as NewsChannel,
+	APIRole as Role,
+	APIGuildStageVoiceChannel as StageChannel,
+	APITextChannel as TextChannel,
+	APIThreadChannel as ThreadChannel,
+	APIUser as User,
+	APIGuildVoiceChannel as VoiceChannel,
+} from "discord-api-types/v10";
+import type { MessageContext as Message } from "../../discord/MessageContext";
 import { container } from "../../core/modules/index";
 import type {
 	ChannelTypes,

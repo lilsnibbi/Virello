@@ -1,108 +1,75 @@
-import {
+import type {
 	ChatInputCommandInteraction,
 	ContextMenuCommandInteraction,
-	type Message,
-	type NewsChannel,
-	PermissionFlagsBits,
-	PermissionsBitField,
-	type TextChannel,
-} from "discord.js";
+} from "../../../discord/InteractionContext";
+import type { MessageContext as Message } from "../../../discord/MessageContext";
+import {
+	Permissions as PermissionsBitField,
+	directMessagePermissions,
+} from "../../../discord/permissions";
 import type { Command } from "../../Command";
 import { Identifiers } from "../../errors/Identifiers";
 import { AllFlowsPrecondition } from "../Precondition";
 import {
-	ClientPermissionsCheck as ClientPrecondition,
+	ClientPermissionsCheck,
 	type PermissionPreconditionContext,
 } from "./ClientPermissions";
 
-/** Require the invoking user’s configured permissions. Available through CorePreconditions. */
+/** Require the invoking user's channel permissions, using native member_permissions for interactions. */
 export class UserPermissionsCheck extends AllFlowsPrecondition {
-	private readonly dmChannelPermissions = new PermissionsBitField(
-		~new PermissionsBitField([
-			PermissionFlagsBits.AddReactions,
-			PermissionFlagsBits.AttachFiles,
-			PermissionFlagsBits.EmbedLinks,
-			PermissionFlagsBits.ReadMessageHistory,
-			PermissionFlagsBits.SendMessages,
-			PermissionFlagsBits.UseExternalEmojis,
-			PermissionFlagsBits.ViewChannel,
-			PermissionFlagsBits.UseExternalStickers,
-			PermissionFlagsBits.MentionEveryone,
-		]).bitfield & PermissionsBitField.All,
-	).freeze();
-
-	/**
-	 * Check a message invocation. Require the invoking user’s configured permissions.
-	 * @returns Ok to allow or a precondition error to deny. Any failed Discord fetch rejects.
-	 */
-	public messageRun(
+	public async messageRun(
 		message: Message,
-		_command: Command,
+		_: Command,
 		context: PermissionPreconditionContext,
-	): AllFlowsPrecondition.Result {
-		const required = context.permissions ?? new PermissionsBitField();
-		const channel = message.channel as TextChannel | NewsChannel;
-		const permissions = message.guild
-			? channel.permissionsFor(message.author)
-			: this.dmChannelPermissions;
-
-		return this.sharedRun(required, permissions, "message");
+	): AllFlowsPrecondition.AsyncResult {
+		return this.sharedRun(
+			context.permissions ?? new PermissionsBitField(),
+			await message.permissionsFor(message.author.id),
+			"message",
+		);
 	}
-
-	/**
-	 * Check a slash invocation. Require the invoking user’s configured permissions.
-	 * @returns Ok to allow or a precondition error to deny. Any failed Discord fetch rejects.
-	 */
 	public chatInputRun(
 		interaction: ChatInputCommandInteraction,
-		_command: Command,
+		_: Command,
 		context: PermissionPreconditionContext,
 	): AllFlowsPrecondition.Result {
-		const required = context.permissions ?? new PermissionsBitField();
-		const permissions = interaction.guildId
-			? interaction.memberPermissions
-			: this.dmChannelPermissions;
-
-		return this.sharedRun(required, permissions, "chat input");
+		return this.sharedRun(
+			context.permissions ?? new PermissionsBitField(),
+			interaction.guildId
+				? interaction.memberPermissions
+				: directMessagePermissions,
+			"chat input",
+		);
 	}
-
-	/**
-	 * Check a context-menu invocation. Require the invoking user’s configured permissions.
-	 * @returns Ok to allow or a precondition error to deny. Any failed Discord fetch rejects.
-	 */
 	public contextMenuRun(
 		interaction: ContextMenuCommandInteraction,
-		_command: Command,
+		_: Command,
 		context: PermissionPreconditionContext,
 	): AllFlowsPrecondition.Result {
-		const required = context.permissions ?? new PermissionsBitField();
-		const permissions = interaction.guildId
-			? interaction.memberPermissions
-			: this.dmChannelPermissions;
-
-		return this.sharedRun(required, permissions, "context menu");
+		return this.sharedRun(
+			context.permissions ?? new PermissionsBitField(),
+			interaction.guildId
+				? interaction.memberPermissions
+				: directMessagePermissions,
+			"context menu",
+		);
 	}
-
 	private sharedRun(
-		requiredPermissions: PermissionsBitField,
-		availablePermissions: PermissionsBitField | null,
+		required: PermissionsBitField,
+		available: PermissionsBitField | null,
 		commandType: string,
 	): AllFlowsPrecondition.Result {
-		if (!availablePermissions) {
+		if (!available)
 			return this.error({
 				identifier: Identifiers.PreconditionUserPermissionsNoPermissions,
 				message: `I was unable to resolve the end-user's permissions in the ${commandType} command invocation channel.`,
 			});
-		}
-
-		const missing = availablePermissions.missing(requiredPermissions);
+		const missing = available.missing(required);
 		return missing.length === 0
 			? this.ok()
 			: this.error({
 					identifier: Identifiers.PreconditionUserPermissions,
-					message: `You are missing the following permissions to run this command: ${missing
-						.map((perm) => ClientPrecondition.readablePermissions[perm])
-						.join(", ")}`,
+					message: `You are missing the following permissions to run this command: ${missing.map((name) => ClientPermissionsCheck.readablePermissions[name] ?? name).join(", ")}`,
 					context: { missing },
 				});
 	}

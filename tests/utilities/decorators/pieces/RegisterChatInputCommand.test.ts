@@ -3,7 +3,7 @@ import {
 	type APIApplicationCommandIntegerOption,
 	ApplicationCommandOptionType,
 	type RESTPostAPIChatInputApplicationCommandsJSONBody,
-} from "discord.js";
+} from "discord-api-types/v10";
 import {
 	type ApplicationCommandRegistry,
 	Command,

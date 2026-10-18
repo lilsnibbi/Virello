@@ -3,6 +3,7 @@ import type {
 	APIGuildMember,
 	APIMessage,
 	APIRole,
+	APIVoiceState,
 } from "discord-api-types/v10";
 import { ChannelType, GatewayDispatchEvents as E } from "discord-api-types/v10";
 import { integer, record } from "../common";
@@ -30,8 +31,16 @@ export class EngineCache {
 	public readonly members: ScopedCache<APIGuildMember>;
 	/** Messages grouped by channel ID, then message ID. */
 	public readonly messages: ScopedCache<APIMessage>;
+	/** Connected voice states, grouped by guild and keyed by user ID. */
+	public readonly voiceStates = new ScopedCache<APIVoiceState>(
+		Number.POSITIVE_INFINITY,
+	);
 	private readonly channelOwners = new Map<string, string>();
 	private readonly options: $CacheOptions;
+	/** Guild owning a cached channel or message scope, including ownership supplied by a guild snapshot. */
+	public guildForChannel(channelId: string): string | undefined {
+		return this.channelOwners.get(channelId);
+	}
 
 	/**
 	 * Create empty resident caches.
@@ -59,6 +68,7 @@ export class EngineCache {
 		this.roles.clear();
 		this.members.clear();
 		this.messages.clear();
+		this.voiceStates.clear();
 		this.channelOwners.clear();
 	}
 	private allows(
@@ -74,7 +84,9 @@ export class EngineCache {
 					? this.options.channels !== false
 					: kind === "role"
 						? this.options.roles !== false
-						: true;
+						: kind === "voiceState"
+							? this.options.voiceStates !== false
+							: true;
 		return (
 			enabled && (this.options.policy?.({ kind, id, scope, data }) ?? true)
 		);
@@ -144,7 +156,14 @@ export class EngineCache {
 		if (!this.channels.has(id) && !this.messages.size(id))
 			this.channelOwners.delete(id);
 	}
-	private removeChannel(id: string): void {
+	private removeChannel(
+		id: string,
+		guildId = this.channelOwners.get(id),
+	): void {
+		if (guildId)
+			for (const [userId, entry] of this.voiceStates.entries(guildId))
+				if (entry.data.channel_id === id)
+					this.voiceStates.delete(guildId, userId);
 		this.channels.delete(id);
 		this.messages.clear(id);
 		this.channelOwners.delete(id);
@@ -153,6 +172,7 @@ export class EngineCache {
 		this.guilds.delete(id);
 		this.roles.clear(id);
 		this.members.clear(id);
+		this.voiceStates.clear(id);
 		for (const [channelId, owner] of this.channelOwners)
 			if (owner === id) this.removeChannel(channelId);
 	}
@@ -189,7 +209,7 @@ export class EngineCache {
 					threads,
 					roles,
 					presences: _presences,
-					voice_states: _voices,
+					voice_states: voices,
 					...metadata
 				} = guild;
 				if (this.allows("guild", guild.id, "", metadata))
@@ -208,6 +228,16 @@ export class EngineCache {
 				for (const role of roles) this.putRole(guild.id, role);
 				for (const member of members)
 					if (member.user) this.putMember(guild.id, member.user.id, member);
+				this.voiceStates.clear(guild.id);
+				for (const voice of voices ?? [])
+					if (
+						voice.channel_id &&
+						this.allows("voiceState", voice.user_id, guild.id, voice)
+					)
+						this.voiceStates.put(guild.id, voice.user_id, {
+							...voice,
+							guild_id: guild.id,
+						});
 				break;
 			}
 			case E.GuildUpdate: {
@@ -231,6 +261,7 @@ export class EngineCache {
 					else this.guilds.delete(id);
 					// No valid member snapshot survives an outage without replay.
 					this.members.clear(id);
+					this.voiceStates.clear(id);
 					break;
 				}
 				const previous = this.guilds.peek(id);
@@ -258,8 +289,11 @@ export class EngineCache {
 			case E.ThreadDelete: {
 				const { id } = payload.d;
 				const previous = this.channels.peek(id);
-				const owner = this.channelOwners.get(id) ?? "";
-				this.removeChannel(id);
+				const owner =
+					("guild_id" in payload.d ? payload.d.guild_id : undefined) ??
+					this.channelOwners.get(id) ??
+					"";
+				this.removeChannel(id, owner || undefined);
 				// Deleting a parent channel also invalidates resident child threads.
 				for (const [child, { data: channel }] of this.channels)
 					if (
@@ -327,10 +361,22 @@ export class EngineCache {
 			}
 			case E.GuildMemberRemove: {
 				const { guild_id, user } = payload.d;
+				this.voiceStates.delete(guild_id, user.id);
 				const previous = this.members.delete(guild_id, user.id);
 				return [
 					{ kind: "member", id: user.id, scope: guild_id, previous, payload },
 				];
+			}
+			case E.VoiceStateUpdate: {
+				const voice = payload.d;
+				if (!voice.guild_id) break;
+				if (
+					voice.channel_id &&
+					this.allows("voiceState", voice.user_id, voice.guild_id, voice)
+				)
+					this.voiceStates.put(voice.guild_id, voice.user_id, voice);
+				else this.voiceStates.delete(voice.guild_id, voice.user_id);
+				break;
 			}
 			case E.MessageCreate:
 				this.putMessage(payload.d, payload.d.guild_id);

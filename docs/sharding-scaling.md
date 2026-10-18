@@ -1,197 +1,118 @@
-# Automatic shard deployment
+# Automatic shard scaling
 
-Automatic scaling is **off by default**. Without `scaling`, `shardCount` and
-`workers[].shards` remain fixed and metadata is fetched only at startup or when
-the identify allowance expires. Enable scaling on the coordinator; hosts run
-the same `ShardManager` and bot entrypoint.
+[Docs](README.md) / [Sharding](sharding.md) / Scaling ·
+[Policy implementation](../src/sharding/coordinator/scaling.ts)
 
-## Coordinator configuration
+Scaling is **off by default**. To enable it, add this to coordinator options:
 
 ```ts
-import { ShardCoordinator } from "virello/sharding";
-
-const coordinator = new ShardCoordinator({
-	shardCount: 2,
-	workers: [
-		{
-			id: "a",
-			token: process.env.HOST_A_SECRET!,
-			shards: [0],
-			maxShards: 4,
-			weight: 2,
-		},
-		{
-			id: "b",
-			token: process.env.HOST_B_SECRET!,
-			shards: [1],
-			maxShards: 2,
-			weight: 1,
-		},
-	],
-	botToken: process.env.DISCORD_TOKEN!,
-	scaling: {
-		minShards: 2,
-		maxShards: 6,
-		targetGuildsPerShard: 1000,
-		pollIntervalMs: 300000,
-		cooldownMs: 1800000,
-		confirmations: 3,
-		allowDownscale: true,
-		rebalanceThreshold: 0.25,
-		sessionReserve: 10,
-		drainTimeoutMs: 30000,
-		readyTimeoutMs: 300000,
-	},
-});
-await coordinator.start();
+scaling: {
+	minShards: 2,
+	maxShards: 4,
+	targetGuildsPerShard: 1000,
+},
 ```
 
-Keep credentials in your environment. Remote hosts need the normal TLS
-configuration. This policy uses only configured hosts that are already running;
-it never provisions machines, changes server settings or purchases capacity.
-Every automatic host needs `maxShards`, including standby hosts with `shards: []`.
-Initial assignments must cover `0..shardCount-1` exactly once and fit host capacity.
+Also set `maxShards` on **every** worker, keep all configured hosts running,
+and supply `botToken`. The [example environment setup](../examples/README.md#environment-reference)
+shows the same configuration without editing TypeScript.
 
-On startup, fresh Discord metadata, bounds and capacities determine the initial
-assignment before hosts connect. `shardCount` is an initial configuration seed,
-not a fixed count in automatic mode. No previous topology, guild counts,
-confirmation history, cooldown or allowance is restored from disk. Set
-`minShards` to retain an operational floor across coordinator restarts.
+> [!NOTE]
+> Scaling uses capacity on existing hosts. It does not create machines.
+> Every topology change drains and restarts all shards, including a change that
+> only moves shards between hosts. Expect a temporary interruption.
 
-| Setting                | Default        | Meaning                                                                |
-| ---------------------- | -------------- | ---------------------------------------------------------------------- |
-| `maxShards`            | Required       | Global ceiling, 1–4096, also bounded by summed host capacity           |
-| `minShards`            | `1`            | Minimum total, at most `maxShards`                                     |
-| `targetGuildsPerShard` | Disabled (`0`) | Optional average target, 1–2500; requires accurate guild caches        |
-| `pollIntervalMs`       | `300000`       | Metadata polling interval, 60000–86400000 ms                           |
-| `cooldownMs`           | `1800000`      | Minimum interval between transition attempts, 60000–604800000 ms       |
-| `confirmations`        | `3`            | Consecutive matching plans before a running deployment changes, 1–100  |
-| `allowDownscale`       | `true`         | Allow fewer shards after confirmation and cooldown                     |
-| `rebalanceThreshold`   | `0.25`         | Required improvement in peak weighted host guild load, 0.05–1          |
-| `sessionReserve`       | `0`            | Unspent identify allowance to retain beyond the transition requirement |
-| `drainTimeoutMs`       | `30000`        | Time for every host to confirm old process exits, 100–300000 ms        |
-| `readyTimeoutMs`       | `300000`       | Time for the new deployment to become gateway-ready, 100–3600000 ms    |
-| Host `maxShards`       | Required       | Maximum shard processes on this host, 1–4096                           |
-| Host `weight`          | `1`            | Relative resource capacity, 0.01–1000; set it from your host sizing    |
+## Policy options
 
-## What Discord controls
+| `scaling` key          | Default   | Constraint / meaning                                            |
+| ---------------------- | --------- | --------------------------------------------------------------- |
+| `maxShards`            | Required  | Global ceiling, `1..4096`, bounded by total host capacity       |
+| `minShards`            | `1`       | At most maxShards                                               |
+| `targetGuildsPerShard` | `0` (off) | Optional average target, up to `2500`; uses cached guild counts |
+| `pollIntervalMs`       | `300000`  | Metadata poll; `60000..86400000` ms                             |
+| `cooldownMs`           | `1800000` | Between transition attempts; `60000..604800000` ms              |
+| `confirmations`        | `3`       | Matching decisions required; `1..100`                           |
+| `allowDownscale`       | `true`    | Allows fewer shards inside this opt-in mode                     |
+| `rebalanceThreshold`   | `0.25`    | Required peak weighted-load improvement; `0.05..1`              |
+| `sessionReserve`       | `0`       | Unspent IDENTIFY allowance beyond transition needs              |
+| `drainTimeoutMs`       | `30000`   | Confirm old process exits; `100..300000` ms                     |
+| `readyTimeoutMs`       | `300000`  | New gateway readiness; `100..3600000` ms                        |
 
-Discord does not send a push event requesting a particular scale-up or
-scale-down. The coordinator polls `GET /gateway/bot` for the recommended shard
-count and fresh session-start metadata. Discord assigns guilds by
-`(guild_id >> 22) % num_shards`; the framework cannot choose individual guilds or
-move one guild to another shard independently. See the official
-[Gateway sharding and session-start documentation](https://docs.discord.com/developers/events/gateway#sharding).
+Each worker's `maxShards` is `1..4096`; optional `weight` defaults to `1`
+(range `0.01..1000`). Weight describes relative host capacity.
 
-The desired count is the maximum of the recommendation, configured minimum and
-`ceil(totalCachedGuilds / targetGuildsPerShard)` when that target is enabled.
-Counts round up to multiples of the current recommendation, a conservative
-choice compatible with Discord's large-bot shard-count multiple requirement.
-This can overprovision compared with using arbitrary shard totals. The largest
-legal count within configured capacity is used if the guild target cannot fit;
-a recommendation or minimum that cannot fit blocks the change with
-`SCALING_CAPACITY`. The recommendation is a floor, not an automatic instruction
-to remove a particular existing shard.
+Initial assignments must still cover the configured `shardCount` once.
+In automatic mode that count is a seed: fresh metadata and policy determine
+startup placement. No previous topology, cooldown or confirmation history is
+restored. Use `minShards` for a floor across restarts.
 
-Guild targets are averages, not a guarantee that every shard has that many
-guilds. Discord's per-shard limit still applies. Uneven guild sizes, unavailable
-guilds and custom caches affect the usefulness of guild counts. Keep the Guilds
-intent and a complete guild cache if using guild targets. This is not CPU,
-memory, member-count or event-volume monitoring.
+## How a count is chosen
 
-For an unchanged total, allocation greedily places entire shards using observed
-guild counts and host weights, while respecting per-host process limits.
-Existing owners win equal-load ties. An allocation-only change requires the
-configured improvement in peak weighted load. For a new total, individual shard
-guild counts are unknown until login, so allocation uses equal estimated loads.
-A later poll can rebalance hosts if the measured distribution warrants it.
+```text
++ Discord's recommended shard count
++ configured minimum
++ ceil(total cached guilds / target), when enabled
+  → take the maximum
+  → round up to a multiple of Discord's recommendation
+  → check global and host capacity
+```
 
-## Transition and recovery
+If only the guild target cannot fit, the largest legal count within capacity is
+used. A recommendation or minimum that cannot fit blocks with `SCALING_CAPACITY`.
 
-1. Fetch fresh metadata and apply the existing conservative identify accounting.
-   All configured hosts must be connected, including standby hosts. Shrinking,
-   guild-target changes and allocation-only balancing require every shard to
-   report gateway readiness and metrics no older than 15 seconds. A larger
-   Discord recommendation may grow an unready topology to repair insufficient
-   sharding. A degraded committed deployment must recover before another change.
-2. Require repeated matching plans and the cooldown. Before disrupting children,
-   require unexpired remaining session starts of at least
-   `max(currentCount, proposedCount) + sessionReserve`. The larger count covers
-   either deployment or a pre-commit rollback. Insufficient budget defers the
-   change without stopping healthy children.
-3. Reject pending/new shard RPC and identify work with `RESHARDING`. Ask all hosts
-   to drain. Each host cancels scheduled restarts, requests graceful shutdown,
-   escalates only its own children if necessary, and confirms actual process
-   exits. This interrupts bot availability and cancels in-flight work; application
-   jobs must tolerate restarts. Even allocation-only changes restart all shards.
-4. If a host disconnects or draining times out before commit, retain the old
-   total and assignment. Still-connected hosts receive that assignment after
-   their drains finish; reconnecting hosts receive it in their welcome. An
-   unconfirmed child exit cannot authorize a replacement.
-5. Once every old process is confirmed stopped, commit the new count and
-   assignment in memory and start fresh children. After this point recovery
-   moves forward: reconnecting hosts receive the committed topology. There is
-   no rollback to a different total while new children are running.
-6. Wait for gateway readiness. Failed startup/readiness leaves status
-   `degraded`; ordinary configured process retries and host reconnection continue.
-   Once all shards recover, status becomes `idle` automatically. Exhausted
-   restart attempts, disabled restart, or application errors require correction
-   and replacement/restart of the affected supervisor. No state-file cleanup is
-   required.
+Discord owns [guild-to-shard assignment](https://docs.discord.com/developers/events/gateway#sharding):
+`(guild_id >> 22) % num_shards`. Virello moves whole shards between hosts.
+Guild targets are averages, not per-shard guarantees. Keep the Guilds intent and
+a complete guild cache for useful counts; CPU, memory and event volume do not
+drive this policy.
 
-Every IDENTIFY still uses the central `shardId % max_concurrency` bucket and
-5.5-second cooldown. Permits are charged before delivery and never refunded.
-Fresh metadata cannot increase an unexpired in-memory allowance. RESUME remains
-discord.js behavior; this feature does not bypass Discord rate limits or alter
-retry policy. Crashes during startup can consume additional session starts and
-leave the deployment waiting for a fresh allowance. Choose host
-`identifyTimeoutMs` and coordinator `readyTimeoutMs` for your total, concurrency,
-startup time and possible retries; a large serial deployment can exceed defaults.
+For the same total, measured guild counts and host weights guide placement;
+current owners win equal-load ties. A new total initially uses equal estimated
+loads, then later polls can rebalance.
 
-Automatic totals must also fit `limits.maxPending` (default 256) so the control
-plane has room for startup identifies. Welcome and assignment frames must fit
-`limits.maxBytes`; these checks happen before draining. Increase these bounded
-limits deliberately when sizing a larger deployment. Host `identifyTimeoutMs`
-is capped at 300000 ms. If the serial login queue cannot fit that deadline with
-the bot's Discord concurrency, this deployment model cannot start the whole
-topology reliably; more machines do not increase Discord concurrency.
+## What a transition does
 
-Closing the coordinator aborts metadata requests and transition waits, closes
-connections, and cancels polling. Surviving children keep Discord open in
-maintenance while their hosts reconnect and reconcile individual leases. A
-changed total closes the old gateway before a new session opens, even for the
-same ID. Rejected IDs become dormant. Explicit scaling transitions still confirm
-child exits and release leases before committing the new topology; reservations
-belonging to disconnected instances block that transition.
+1. Fetch fresh metadata. Require all configured hosts, including standby hosts.
+   Downscaling, guild targets and rebalancing also require ready shards with
+   metrics no older than 15 seconds. A larger Discord recommendation may repair
+   an unready topology.
+2. Confirm the plan and cooldown. Require remaining session starts of at least
+   `max(currentCount, proposedCount) + sessionReserve` before disrupting children.
+3. Return `RESHARDING` for shard RPC/IDENTIFY work. Ask every host to drain and
+   confirm actual child exits.
+4. Commit the new topology only after all old processes stop. Start new children
+   and wait for gateway readiness.
 
-The [process lifetime limitations](sharding-recovery.md) still apply: run one
-coordinator per bot and supervise host process trees. There is no global grace
-period on coordinator restart. A partitioned old Discord session can overlap a
-replacement until it reconnects or reaches the configured outage cutoff.
+| Failure point                                  | Recovery                                                                    |
+| ---------------------------------------------- | --------------------------------------------------------------------------- |
+| Capacity/budget/readiness check                | Defer change; keep current children                                         |
+| Host disconnect or drain timeout before commit | Retain old topology; unconfirmed exits cannot authorize replacements        |
+| Startup failure after commit                   | Keep committed topology and mark `degraded`; normal host recovery continues |
+| All new shards recover                         | Return to `idle`                                                            |
+| Child restart attempts exhausted               | Fix the cause and replace/restart the affected supervisor                   |
 
-## Observability and compatibility
+There is no rollback to a different total after new children have started.
+A degraded deployment must recover before another scale change.
 
-`coordinator.shardCount` exposes the current committed total.
-`coordinator.scalingStatus` is a copied snapshot with `phase`
-(`disabled`, `idle`, `draining`, `starting` or `degraded`), `shardCount`, and optional
-`reason`/`targetShards`. `await coordinator.checkScaling()` requests one immediate
-evaluation; simultaneous calls share one promise and still respect confirmation,
-cooldown, readiness and allowance checks. Periodic checks continue automatically.
+## Inspect a decision
 
-Structured logs emit `scaling_status`, `scaling_failed` and host `reassigned`
-events. Ordinary waiting/stable reasons are logged only when status changes.
-Use `VIRELLO_LOG_FORMAT=json` for full context. Logs contain counts and host IDs,
-not guild IDs, tokens or application payloads.
+For an existing coordinator:
 
-Upgrade coordinator, hosts and children together. The internal transport adds
-drain, assignment and bounded metrics frames; mixed framework versions are not
-supported. Metrics distinguish IPC boot from actual gateway readiness.
-Public logger customization, fixed totals and existing message APIs remain
-available. Initial host placements are preferences; per-process leases control
-ownership. In automatic mode, callers must tolerate `RESHARDING` and total-count
-changes during requests/broadcasts. No ownership database, directory or lock is
-introduced.
+```ts
+console.log(coordinator.shardCount);
+console.log(coordinator.scalingStatus);
+await coordinator.checkScaling();
+```
 
-See [the runnable example configuration](../examples/README.md#automatic-scaling).
-Regression tests use synthetic gateway metadata and real local Bun processes;
-they never log in to Discord.
+Status phases are `disabled`, `idle`, `draining`, `starting`, `degraded`,
+with optional `reason` and `targetShards`. Manual checks still respect
+confirmations, cooldown and safety conditions; simultaneous checks share a promise.
+
+Size `limits.maxPending` (default 256) for startup IDENTIFY work and
+`limits.maxBytes` for assignment frames. These checks run before draining.
+The 5.5-second IDENTIFY bucket spacing and the host's maximum 300-second
+`identifyTimeoutMs` still apply. More hosts do not increase Discord concurrency.
+
+[Recovery limitations](sharding-recovery.md#restart-tradeoffs) also apply during
+coordinator restarts. [Logs](console-logging.md) expose `scaling_status`,
+`scaling_failed` and host `reassigned` events.

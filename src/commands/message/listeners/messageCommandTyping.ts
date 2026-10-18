@@ -1,4 +1,5 @@
-import { ChannelType, type Message } from "discord.js";
+import { ChannelType } from "discord-api-types/v10";
+import type { MessageContext as Message } from "../../../discord/MessageContext";
 import { Events, type MessageCommandRunPayload } from "../../../events/events";
 import { Listener } from "../../../events/listener";
 import { isStageChannel } from "../../../utilities/discord/index";
@@ -21,12 +22,12 @@ export class MessageCommandTypingListener extends Listener<
 			return;
 		}
 
-		if (message.channel.type === ChannelType.GroupDM) {
+		if (message.channel?.type === ChannelType.GroupDM) {
 			return;
 		}
 
 		try {
-			await message.channel.sendTyping();
+			await message.client.sendTyping(message.channelId);
 		} catch (error) {
 			message.client.emit(Events.MessageCommandTypingError, error as Error, {
 				...payload,

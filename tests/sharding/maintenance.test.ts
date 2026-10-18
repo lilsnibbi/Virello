@@ -44,30 +44,34 @@ test("same-ID total changes retire the old gateway and dormant assignments have 
 	);
 	const events: string[] = [];
 	try {
-		Reflect.set(client.ws, "connect", async () => {
-			events.push("connect:2");
+		let connectedCount: number | undefined;
+		const reassign = client.reassignGateway.bind(client);
+		Reflect.set(client, "openGateway", async () => {
+			connectedCount = client.options.gateway!.shard![1];
+			events.push(`connect:${connectedCount}`);
+			return "offline-placeholder";
 		});
-		Reflect.set(client.ws, "destroy", async () => {
-			events.push("close:2");
-		});
+		Reflect.set(
+			client,
+			"reassignGateway",
+			(shard: readonly [number, number] | null) => {
+				if (connectedCount !== undefined)
+					events.push(`close:${connectedCount}`);
+				connectedCount = undefined;
+				reassign(shard);
+			},
+		);
 		await gateway.reconcile(0, 2);
 		await gateway.start("offline-placeholder");
 		await gateway.reconcile(0, 2);
 		expect(events).toEqual(["connect:2"]);
 		await gateway.reconcile(0, 3);
 		expect(events).toEqual(["connect:2", "close:2"]);
-		expect(client.options.shardCount).toBe(3);
-		expect(client.options.shards).toEqual([0]);
-		Reflect.set(client.ws, "connect", async () => {
-			events.push("connect:3");
-		});
-		Reflect.set(client.ws, "destroy", async () => {
-			events.push("close:3");
-		});
+		expect(client.options.gateway?.shard).toEqual([0, 3]);
 		await gateway.start("offline-placeholder");
 		await gateway.reconcile(null, 3);
 		expect(events).toEqual(["connect:2", "close:2", "connect:3", "close:3"]);
-		expect(client.options.shards).toEqual([]);
+		expect(client.options.gateway?.shard).toBeUndefined();
 	} finally {
 		gateway.stop();
 		await client.destroy();

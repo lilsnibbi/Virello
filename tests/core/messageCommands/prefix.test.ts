@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { ChannelType, DMChannel, Message } from "discord.js";
+import { dm, message as nativeMessage } from "../../fixtures/discord";
 import { Command, Events, VirelloClient } from "virello";
 import { PrefixedMessageListener } from "../../../src/commands/message/listeners/prefixedMessage";
 import { PreMessageParserListener } from "../../../src/commands/message/listeners/preMessageParser";
@@ -41,27 +41,21 @@ for (const regexPrefix of [/^!/g, /^!/y]) {
 		client.on(Events.PreMessageCommandRun, (payload) => {
 			parameters.push(payload.parameters);
 		});
-		const channel = Reflect.construct(DMChannel, [
-			client,
-			{ id: "123456789012345678", type: ChannelType.DM },
-		]) as DMChannel;
-		client.channels.cache.set(channel.id, channel);
+		const channel = dm(client);
 		for (const suffix of ["first", "second", "third"]) {
-			const message = Reflect.construct(Message, [
-				client,
-				{
-					id: "123456789012345679",
-					channel_id: channel.id,
-					content: `!ping ${suffix}`,
-					timestamp: new Date().toISOString(),
-					author: {
-						id: "123456789012345680",
-						username: "tester",
-						discriminator: "0",
-						avatar: null,
-					},
+			const message = nativeMessage(client, {
+				id: "123456789012345679",
+				channel_id: channel.id,
+				content: `!ping ${suffix}`,
+				timestamp: new Date().toISOString(),
+				author: {
+					id: "123456789012345680",
+					username: "tester",
+					global_name: null,
+					discriminator: "0",
+					avatar: null,
 				},
-			]) as Message;
+			});
 			await preParser.run(message);
 		}
 		expect(parameters).toEqual(["first", "second", "third"]);

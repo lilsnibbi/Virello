@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { ChannelType } from "discord.js";
+import { ChannelType } from "discord-api-types/v10";
 import type { PreconditionContainerSingle } from "../../../src/commands/checks/containers/Entry";
 import { PreconditionContainerArray } from "../../../src/commands/checks/containers/Group";
 import { parseConstructorPreConditionsRunIn } from "../../../src/commands/checks/resolvers/runIn";

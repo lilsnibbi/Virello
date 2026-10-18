@@ -1,11 +1,9 @@
-import {
-	type ChatInputCommandInteraction,
-	type CommandInteraction,
-	type ContextMenuCommandInteraction,
-	type Message,
-	TimestampStyles,
-	time,
-} from "discord.js";
+import type {
+	ChatInputCommandInteraction,
+	CommandInteraction,
+	ContextMenuCommandInteraction,
+} from "../../../discord/InteractionContext";
+import type { MessageContext as Message } from "../../../discord/MessageContext";
 import { Command } from "../../../commands/Command";
 import type { CooldownPreconditionContext } from "../../../commands/checks/builtins/Cooldown";
 import { AllFlowsPrecondition } from "../../../commands/checks/Precondition";
@@ -114,10 +112,7 @@ export class SubcommandCooldownCheck extends AllFlowsPrecondition {
 		if (rateLimit.limited) {
 			const remaining = rateLimit.remainingTime;
 
-			const nextAvailable = time(
-				Math.floor(rateLimit.expires / 1000),
-				TimestampStyles.RelativeTime,
-			);
+			const nextAvailable = `<t:${Math.floor(rateLimit.expires / 1000)}:R>`;
 			return this.error({
 				identifier: SubcommandIdentifiers.SubcommandPreconditionCooldown,
 				message: `There is a cooldown in effect for this ${commandType} subcommand. It'll be available ${nextAvailable}.`,
@@ -153,15 +148,16 @@ export class SubcommandCooldownCheck extends AllFlowsPrecondition {
 		context: SubcommandCooldownPreconditionContext,
 	) {
 		const subcommandIdentifier = this.getSubcommandMappingName(context);
+		const channelId = interaction.channelId ?? interaction.user.id;
 		switch (context.scope) {
 			case BucketScope.Global:
 				return `global.${subcommandIdentifier}`;
 			case BucketScope.Channel:
-				return `${interaction.channelId}.${subcommandIdentifier}`;
+				return `${channelId}.${subcommandIdentifier}`;
 			case BucketScope.Guild:
 				return interaction.guildId
 					? `${interaction.guildId}.${subcommandIdentifier}`
-					: `${interaction.channelId}.${subcommandIdentifier}`;
+					: `${channelId}.${subcommandIdentifier}`;
 			default:
 				return `${interaction.user.id}.${subcommandIdentifier}`;
 		}

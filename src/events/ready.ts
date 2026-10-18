@@ -19,8 +19,8 @@ export class ReadyListener extends Listener {
 			context: {
 				shard: this.container.client.sharding.id,
 				commands: this.container.modules.require("commands").size,
-				guilds: this.container.client.guilds.cache.size,
-				shards: this.container.client.ws.shards.size,
+				guilds: this.container.client.cache.guilds.size,
+				shards: 1,
 			},
 		});
 	}

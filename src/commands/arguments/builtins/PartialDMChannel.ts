@@ -1,4 +1,5 @@
-import type { DMChannel, PartialDMChannel } from "discord.js";
+import type { APIDMChannel as DMChannel } from "discord-api-types/v10";
+import type { PartialDMChannel } from "../../../discord/entities";
 import { Argument } from "../Argument";
 import { resolvePartialDMChannel } from "../resolvers/partialDMChannel";
 

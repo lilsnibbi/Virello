@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.2.0](https://github.com/lilsnibbi/Virello/compare/v0.1.2...v0.2.0) (2026-10-18)
+
+
+### ⚠ BREAKING CHANGES
+
+* integrate native Discord runtime and developer guides ([#25](https://github.com/lilsnibbi/Virello/issues/25))
+
+### Features
+
+* integrate native Discord runtime and developer guides ([#25](https://github.com/lilsnibbi/Virello/issues/25)) ([228b893](https://github.com/lilsnibbi/Virello/commit/228b893ad10b6a8496438223336930afb145c31b))
+
+
+### Bug Fixes
+
+* **ci:** run npm publish after skipped validation ([#23](https://github.com/lilsnibbi/Virello/issues/23)) ([96af253](https://github.com/lilsnibbi/Virello/commit/96af253dd07a67baeb4a32d06889d15d3b800be8))
+
 ## [0.1.2](https://github.com/lilsnibbi/Virello/compare/v0.1.1...v0.1.2) (2026-10-17)
 
 

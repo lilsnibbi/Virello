@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2](https://github.com/lilsnibbi/Virello/compare/v0.1.1...v0.1.2) (2026-10-17)
+
+
+### Bug Fixes
+
+* **examples:** wait for host reconciliation before offline RPC ([#21](https://github.com/lilsnibbi/Virello/issues/21)) ([173ef1c](https://github.com/lilsnibbi/Virello/commit/173ef1c5960cf723fddc0d64111fdcb4648c6af3))
+
 ## [0.1.1](https://github.com/lilsnibbi/Virello/compare/v0.1.0...v0.1.1) (2026-10-17)
 
 

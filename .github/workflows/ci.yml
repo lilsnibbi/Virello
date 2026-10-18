@@ -175,7 +175,7 @@ jobs:
     name: Publish to npm
     needs: [release]
     if: ${{ !cancelled() && needs.release.result == 'success' &&
-          needs.release.outputs.release_created == 'true' }}
+      needs.release.outputs.release_created == 'true' }}
     # Release Please uses GITHUB_TOKEN, so its release event cannot start a workflow.
     permissions:
       contents: read

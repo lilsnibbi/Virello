@@ -8,6 +8,12 @@ on:
         description: Release tag created by Release Please
         required: true
         type: string
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: Published GitHub release tag to recover
+        required: true
+        type: string
 permissions: {}
 concurrency:
   group: npm-publish-${{ inputs.tag_name || github.event.release.tag_name }}
@@ -15,6 +21,8 @@ concurrency:
 jobs:
   publish:
     name: Publish package
+    if: ${{ github.event_name != 'workflow_dispatch' ||
+      github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     environment: prod
@@ -22,6 +30,19 @@ jobs:
       contents: read
       id-token: write
     steps:
+      - name: Verify manually selected published release
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ inputs.tag_name }}
+        run: |
+          encoded_tag=$(jq -rn --arg tag "$RELEASE_TAG" '$tag | @uri')
+          release=$(gh api "repos/$GH_REPO/releases/tags/$encoded_tag")
+          test "$(jq -r .tag_name <<<"$release")" = "$RELEASE_TAG"
+          test "$(jq -r .draft <<<"$release")" = false
+          published_at=$(jq -r .published_at <<<"$release")
+          test -n "$published_at" && test "$published_at" != null
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1, Node 24
         with:
           ref: ${{ inputs.tag_name || github.event.release.tag_name }}

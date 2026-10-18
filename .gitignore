@@ -1,0 +1,11 @@
+node_modules/
+coverage/
+.env
+.env.*
+!.env.example
+*.tgz
+# Legacy sharding state is unused; keep existing local files out of commits.
+sharding.sqlite*
+
+.engine-validation/
+.virello-sharding/

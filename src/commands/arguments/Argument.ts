@@ -1,4 +1,4 @@
-import type { Message } from "discord.js";
+import type { MessageContext as Message } from "../../discord/MessageContext";
 import { AliasModule } from "../../core/modules/index";
 import type { Awaitable } from "../../utilities/index";
 import type { Result } from "../../utilities/result/index";

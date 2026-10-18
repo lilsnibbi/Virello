@@ -1,4 +1,4 @@
-import type { ChannelType } from "discord.js";
+import type { ChannelType } from "discord-api-types/v10";
 import { isNullish } from "../../../utilities/index";
 import { Command } from "../../Command";
 import { CommandPreConditions } from "../../enums";

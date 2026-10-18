@@ -1,14 +1,18 @@
 import type {
-	BaseInteraction,
-	Guild,
-	Interaction,
+	APIChannel,
+	APIGuild,
 	Locale,
 	LocalizationMap,
-	Message,
-	StageChannel,
-	User,
-	VoiceChannel,
-} from "discord.js";
+	APIUser as User,
+} from "discord-api-types/v10";
+import type {
+	InteractionContext as BaseInteraction,
+	InteractionContext as Interaction,
+} from "../../discord/InteractionContext";
+import type { MessageContext as Message } from "../../discord/MessageContext";
+import type { GuildReference } from "../../discord/entities";
+import type { $Patch } from "../../engine/cache/types";
+type Guild = $Patch<APIGuild> & GuildReference;
 import type { InitOptions } from "i18next";
 import type { Awaitable } from "../../utilities/index";
 
@@ -84,10 +88,10 @@ export interface InternationalizationOptions {
 }
 
 /** Text-capable channel type used by a Discord message. */
-export type TextBasedDiscordChannel = Message["channel"];
+export type TextBasedDiscordChannel =
+	APIChannel | NonNullable<Interaction["channel"]>;
 /** Message text channel, stage channel, or voice channel accepted as a locale context. */
-export type DiscordChannel =
-	TextBasedDiscordChannel | StageChannel | VoiceChannel;
+export type DiscordChannel = TextBasedDiscordChannel;
 
 /** Context for {@link LocaleManager.fetchLanguage} functions. This context enables implementation of per-guild, per-channel, and per-user localization. */
 export interface InternationalizationContext {

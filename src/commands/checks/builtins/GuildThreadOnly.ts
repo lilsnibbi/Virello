@@ -1,8 +1,9 @@
 import type {
 	ChatInputCommandInteraction,
 	ContextMenuCommandInteraction,
-	Message,
-} from "discord.js";
+} from "../../../discord/InteractionContext";
+import type { MessageContext as Message } from "../../../discord/MessageContext";
+import { isThreadChannel } from "../../../utilities/discord/type-guards";
 import { Identifiers } from "../../errors/Identifiers";
 import { AllFlowsPrecondition } from "../Precondition";
 
@@ -27,7 +28,7 @@ export class GuildThreadOnlyCheck extends AllFlowsPrecondition {
 		interaction: ChatInputCommandInteraction,
 	): AllFlowsPrecondition.AsyncResult {
 		const channel = await this.fetchChannelFromInteraction(interaction);
-		return channel.isThread() ? this.ok() : this.makeSharedError();
+		return isThreadChannel(channel) ? this.ok() : this.makeSharedError();
 	}
 
 	/**
@@ -38,7 +39,7 @@ export class GuildThreadOnlyCheck extends AllFlowsPrecondition {
 		interaction: ContextMenuCommandInteraction,
 	): AllFlowsPrecondition.AsyncResult {
 		const channel = await this.fetchChannelFromInteraction(interaction);
-		return channel.isThread() ? this.ok() : this.makeSharedError();
+		return isThreadChannel(channel) ? this.ok() : this.makeSharedError();
 	}
 
 	private makeSharedError(): AllFlowsPrecondition.Result {

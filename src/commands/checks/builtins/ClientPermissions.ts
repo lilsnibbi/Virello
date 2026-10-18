@@ -1,163 +1,83 @@
-import {
-	BaseInteraction,
+import type {
 	ChatInputCommandInteraction,
 	ContextMenuCommandInteraction,
-	type Message,
-	PermissionFlagsBits,
-	PermissionsBitField,
-	type PermissionsString,
-	type TextBasedChannel,
-} from "discord.js";
-import { isNullish } from "../../../utilities/index";
+} from "../../../discord/InteractionContext";
+import type { MessageContext as Message } from "../../../discord/MessageContext";
+import {
+	Permissions as PermissionsBitField,
+	directMessagePermissions,
+	type PermissionName as PermissionsString,
+} from "../../../discord/permissions";
 import type { Command } from "../../Command";
 import { Identifiers } from "../../errors/Identifiers";
 import { AllFlowsPrecondition } from "../Precondition";
 
-/** Permissions required by a bot or user permission check. */
 export interface PermissionPreconditionContext
 	extends AllFlowsPrecondition.RunContext {
-	/** Required bitfield. Omit to require no additional permissions. */
 	permissions?: PermissionsBitField;
 }
 
-/** Require the bot’s configured permissions. Available through CorePreconditions. */
+/** Require the bot's channel permissions. Interactions use Discord's supplied app_permissions snapshot. */
 export class ClientPermissionsCheck extends AllFlowsPrecondition {
-	private readonly dmChannelPermissions = new PermissionsBitField(
-		~new PermissionsBitField([
-			//
-			PermissionFlagsBits.AddReactions,
-			PermissionFlagsBits.AttachFiles,
-			PermissionFlagsBits.EmbedLinks,
-			PermissionFlagsBits.ReadMessageHistory,
-			PermissionFlagsBits.SendMessages,
-			PermissionFlagsBits.UseExternalEmojis,
-			PermissionFlagsBits.ViewChannel,
-		]).bitfield & PermissionsBitField.All,
-	).freeze();
-
-	/**
-	 * Check a message invocation. Require the bot’s configured permissions.
-	 * @returns Ok to allow or a precondition error to deny. Any failed Discord fetch rejects.
-	 */
 	public async messageRun(
 		message: Message,
 		_: Command,
 		context: PermissionPreconditionContext,
 	): AllFlowsPrecondition.AsyncResult {
-		const required = context.permissions ?? new PermissionsBitField();
-		const { channel } = message;
-
-		if (!message.client.id) {
+		if (!message.client.id)
 			return this.error({
 				identifier: Identifiers.PreconditionClientPermissionsNoClient,
 				message: "There was no client to validate the permissions for.",
 			});
-		}
-
-		const permissions = await this.getPermissionsForChannel(channel, message);
-
-		return this.sharedRun(required, permissions, "message");
+		return this.sharedRun(
+			context.permissions ?? new PermissionsBitField(),
+			await message.permissionsFor(message.client.id),
+			"message",
+		);
 	}
-
-	/**
-	 * Check a slash invocation. Require the bot’s configured permissions.
-	 * @returns Ok to allow or a precondition error to deny. Any failed Discord fetch rejects.
-	 */
-	public async chatInputRun(
+	public chatInputRun(
 		interaction: ChatInputCommandInteraction,
 		_: Command,
 		context: PermissionPreconditionContext,
-	): AllFlowsPrecondition.AsyncResult {
-		const required = context.permissions ?? new PermissionsBitField();
-
-		const availablePermissions =
-			await this.getAvailablePermissions(interaction);
-
-		return this.sharedRun(required, availablePermissions, "chat input");
+	): AllFlowsPrecondition.Result {
+		return this.sharedRun(
+			context.permissions ?? new PermissionsBitField(),
+			interaction.appPermissions ??
+				(interaction.guildId ? null : directMessagePermissions),
+			"chat input",
+		);
 	}
-
-	/**
-	 * Check a context-menu invocation. Require the bot’s configured permissions.
-	 * @returns Ok to allow or a precondition error to deny. Any failed Discord fetch rejects.
-	 */
-	public async contextMenuRun(
+	public contextMenuRun(
 		interaction: ContextMenuCommandInteraction,
 		_: Command,
 		context: PermissionPreconditionContext,
-	): AllFlowsPrecondition.AsyncResult {
-		const required = context.permissions ?? new PermissionsBitField();
-
-		const availablePermissions =
-			await this.getAvailablePermissions(interaction);
-
-		return this.sharedRun(required, availablePermissions, "context menu");
+	): AllFlowsPrecondition.Result {
+		return this.sharedRun(
+			context.permissions ?? new PermissionsBitField(),
+			interaction.appPermissions ??
+				(interaction.guildId ? null : directMessagePermissions),
+			"context menu",
+		);
 	}
-
-	private async getPermissionsForChannel(
-		channel: TextBasedChannel,
-		messageOrInteraction: Message | BaseInteraction,
-	) {
-		let permissions: PermissionsBitField | null = this.dmChannelPermissions;
-
-		if (messageOrInteraction.inGuild() && !channel.isDMBased()) {
-			if (isNullish(messageOrInteraction.applicationId)) {
-				const me = await messageOrInteraction.guild?.members.fetchMe();
-				if (me) {
-					permissions = channel.permissionsFor(me);
-				}
-			} else {
-				permissions = channel.permissionsFor(
-					messageOrInteraction.applicationId,
-				);
-				if (isNullish(permissions)) {
-					const me = await messageOrInteraction.guild?.members.fetchMe();
-					if (me) {
-						permissions = channel.permissionsFor(me);
-					}
-				}
-			}
-		}
-
-		return permissions;
-	}
-
 	private sharedRun(
-		requiredPermissions: PermissionsBitField,
-		availablePermissions: PermissionsBitField | null,
+		required: PermissionsBitField,
+		available: PermissionsBitField | null,
 		commandType: string,
-	) {
-		if (!availablePermissions) {
+	): AllFlowsPrecondition.Result {
+		if (!available)
 			return this.error({
 				identifier: Identifiers.PreconditionClientPermissionsNoPermissions,
 				message: `I was unable to resolve my permissions in the ${commandType} command invocation channel.`,
 			});
-		}
-
-		const missing = availablePermissions.missing(requiredPermissions);
+		const missing = available.missing(required);
 		return missing.length === 0
 			? this.ok()
 			: this.error({
 					identifier: Identifiers.PreconditionClientPermissions,
-					message: `I am missing the following permissions to run this command: ${missing
-						.map((perm) => ClientPermissionsCheck.readablePermissions[perm])
-						.join(", ")}`,
+					message: `I am missing the following permissions to run this command: ${missing.map((name) => ClientPermissionsCheck.readablePermissions[name] ?? name).join(", ")}`,
 					context: { missing },
 				});
 	}
-
-	private async getAvailablePermissions(
-		interaction: ChatInputCommandInteraction | ContextMenuCommandInteraction,
-	) {
-		if (interaction.channel) {
-			if (interaction.channel.isDMBased()) return this.dmChannelPermissions;
-
-			const channel = await this.fetchChannelFromInteraction(interaction);
-			return this.getPermissionsForChannel(channel, interaction);
-		}
-
-		return interaction.appPermissions;
-	}
-
 	/** Readable labels used when reporting missing Discord permissions. */
 	public static readonly readablePermissions: Record<
 		PermissionsString,

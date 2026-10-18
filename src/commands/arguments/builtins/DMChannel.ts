@@ -1,4 +1,4 @@
-import type { DMChannel } from "discord.js";
+import type { APIDMChannel as DMChannel } from "discord-api-types/v10";
 import { Argument } from "../Argument";
 import { resolveDMChannel } from "../resolvers/dmChannel";
 

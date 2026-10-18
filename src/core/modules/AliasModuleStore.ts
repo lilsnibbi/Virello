@@ -1,4 +1,3 @@
-import { Collection } from "@discordjs/collection";
 import type { AliasModule } from "./AliasModule";
 import type { ModuleKind } from "./ModuleRegistry";
 import { ModuleStore } from "./ModuleStore";
@@ -9,7 +8,7 @@ export class AliasModuleStore<
 	StoreName extends ModuleKind = ModuleKind,
 > extends ModuleStore<T, StoreName> {
 	/** The aliases referencing to pieces. */
-	public readonly aliases = new Collection<string, T>();
+	public readonly aliases = new Map<string, T>();
 
 	/** Looks up the name by the store, falling back to an alias lookup. */
 	public override get(key: string): T | undefined {

@@ -1,4 +1,5 @@
-import type { Guild, StageChannel } from "discord.js";
+import type { APIGuildStageVoiceChannel as StageChannel } from "discord-api-types/v10";
+import type { GuildReference as Guild } from "../../../discord/entities";
 import { isStageChannel } from "../../../utilities/discord/index";
 import type { Result } from "../../../utilities/result/index";
 import { Identifiers } from "../../errors/Identifiers";

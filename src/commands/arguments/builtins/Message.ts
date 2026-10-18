@@ -1,4 +1,4 @@
-import type { Message } from "discord.js";
+import type { MessageContext as Message } from "../../../discord/MessageContext";
 import { Argument } from "../Argument";
 import type { MessageArgumentContext } from "../contexts";
 import { resolveMessage } from "../resolvers/message";

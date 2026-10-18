@@ -1,4 +1,4 @@
-import type { ContextMenuCommandInteraction } from "discord.js";
+import type { ContextMenuCommandInteraction } from "../../../discord/InteractionContext";
 import { Events } from "../../../events/events";
 import { Listener } from "../../../events/listener";
 import type { ContextMenuCommand } from "../../types";

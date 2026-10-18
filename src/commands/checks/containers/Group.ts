@@ -1,9 +1,8 @@
-import {
-	type ChatInputCommandInteraction,
-	Collection,
-	type ContextMenuCommandInteraction,
-	type Message,
-} from "discord.js";
+import type {
+	ChatInputCommandInteraction,
+	ContextMenuCommandInteraction,
+} from "../../../discord/InteractionContext";
+import type { MessageContext as Message } from "../../../discord/MessageContext";
 import type {
 	ChatInputCommand,
 	ContextMenuCommand,
@@ -226,7 +225,7 @@ export class PreconditionContainerArray implements IPreconditionContainer {
 	}
 
 	/** The preconditions to be run. Extra ones can be added by augmenting {@link PreconditionRunCondition} and then inserting {@link IPreconditionCondition}s. */
-	public static readonly conditions = new Collection<
+	public static readonly conditions = new Map<
 		PreconditionRunCondition,
 		IPreconditionCondition
 	>([

@@ -1,4 +1,4 @@
-import type { Guild } from "discord.js";
+import { Routes, type APIGuild as Guild } from "discord-api-types/v10";
 import { container } from "../../../core/modules/index";
 import { SnowflakeRegex } from "../../../utilities/discord/constants/index";
 import { Result } from "../../../utilities/result/index";
@@ -14,7 +14,9 @@ export async function resolveGuild(
 ): Promise<Result<Guild, Identifiers.ArgumentGuildError>> {
 	const guildId = SnowflakeRegex.exec(parameter)?.groups?.id;
 	const guild = guildId
-		? await container.client.guilds.fetch(guildId).catch(() => null)
+		? await container.client.rest
+				.request<Guild>({ method: "GET", path: Routes.guild(guildId) })
+				.catch(() => null)
 		: null;
 
 	if (guild) {

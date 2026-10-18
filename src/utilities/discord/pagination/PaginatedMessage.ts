@@ -1,30 +1,29 @@
 import {
-	type APIEmbed,
-	type BaseMessageOptions,
 	ButtonBuilder,
-	ButtonStyle,
 	ChannelSelectMenuBuilder,
-	type Collection,
-	ComponentType,
 	EmbedBuilder,
-	GatewayIntentBits,
-	IntentsBitField,
-	InteractionCollector,
+	MentionableSelectMenuBuilder,
+	RoleSelectMenuBuilder,
+	StringSelectMenuBuilder,
+	UserSelectMenuBuilder,
+	type MessageActionRowComponentBuilder,
+} from "@discordjs/builders";
+import {
+	type APIEmbed,
+	ButtonStyle,
+	ComponentType,
 	InteractionType,
+	MessageFlags,
+	type Snowflake,
+	type APIUser as User,
+} from "discord-api-types/v10";
+import { InteractionCollector } from "../../../discord/Collector";
+import type { MessageContext as Message } from "../../../discord/MessageContext";
+import {
 	isJSONEncodable,
 	type JSONEncodable,
-	MentionableSelectMenuBuilder,
-	type Message,
-	type MessageActionRowComponentBuilder,
-	MessageFlags,
-	Partials,
-	RoleSelectMenuBuilder,
-	type Snowflake,
-	StringSelectMenuBuilder,
-	type User,
-	UserSelectMenuBuilder,
-	userMention,
-} from "discord.js";
+	type MessageBody as BaseMessageOptions,
+} from "../../../discord/payloads";
 import {
 	type Awaitable,
 	deepClone,
@@ -34,12 +33,7 @@ import {
 } from "../../index";
 import { Time } from "../../time/duration/index";
 import { MessageBuilder } from "../builders/MessageBuilder";
-import {
-	isAnyInteraction,
-	isGuildBasedChannel,
-	isMessageInstance,
-	isTextBasedChannel,
-} from "../type-guards";
+import { isAnyInteraction } from "../type-guards";
 import type { AnyInteractableInteraction } from "../utility-types";
 import type {
 	EmbedResolvable,
@@ -53,7 +47,6 @@ import type {
 	PaginatedMessagePage,
 	PaginatedMessageResolvedPage,
 	PaginatedMessageSelectMenuOptionsFunction,
-	PaginatedMessageStopReasons,
 	PaginatedMessageWriteableEmbedResolvable,
 	PaginatedMessageWrongUserInteractionReplyFunction,
 } from "./PaginatedMessageTypes";
@@ -76,7 +69,7 @@ export class PaginatedMessage {
 	/** The default actions of this handler. */
 	public static defaultActions: PaginatedMessageAction[] = [
 		{
-			customId: "virello/pagination.goToPage",
+			custom_id: "virello/pagination.goToPage",
 			type: ComponentType.StringSelect,
 			options: [],
 			run: ({ handler, interaction }) =>
@@ -84,16 +77,16 @@ export class PaginatedMessage {
 				(handler.index = parseInt(interaction.values[0], 10)),
 		},
 		{
-			customId: "virello/pagination.firstPage",
+			custom_id: "virello/pagination.firstPage",
 			style: ButtonStyle.Primary,
-			emoji: "⏪",
+			emoji: { name: "⏪" },
 			type: ComponentType.Button,
 			run: ({ handler }) => (handler.index = 0),
 		},
 		{
-			customId: "virello/pagination.previousPage",
+			custom_id: "virello/pagination.previousPage",
 			style: ButtonStyle.Primary,
-			emoji: "◀️",
+			emoji: { name: "◀️" },
 			type: ComponentType.Button,
 			run: ({ handler }) => {
 				if (handler.index === 0) {
@@ -104,9 +97,9 @@ export class PaginatedMessage {
 			},
 		},
 		{
-			customId: "virello/pagination.nextPage",
+			custom_id: "virello/pagination.nextPage",
 			style: ButtonStyle.Primary,
-			emoji: "▶️",
+			emoji: { name: "▶️" },
 			type: ComponentType.Button,
 			run: ({ handler }) => {
 				if (handler.index === handler.pages.length - 1) {
@@ -117,16 +110,16 @@ export class PaginatedMessage {
 			},
 		},
 		{
-			customId: "virello/pagination.goToLastPage",
+			custom_id: "virello/pagination.goToLastPage",
 			style: ButtonStyle.Primary,
-			emoji: "⏩",
+			emoji: { name: "⏩" },
 			type: ComponentType.Button,
 			run: ({ handler }) => (handler.index = handler.pages.length - 1),
 		},
 		{
-			customId: "virello/pagination.stop",
+			custom_id: "virello/pagination.stop",
 			style: ButtonStyle.Danger,
-			emoji: "⏹️",
+			emoji: { name: "⏹️" },
 			type: ComponentType.Button,
 			run: ({ collector }) => {
 				collector.stop();
@@ -134,21 +127,17 @@ export class PaginatedMessage {
 		},
 	];
 
-	/**
-	 * Warn when a missing channel suggests DM partials are unconfigured. Defaults to true. Use Partials.Channel, and
-	 * GatewayIntentBits.DirectMessages for message commands.
-	 */
-	public static emitPartialDMChannelWarning = true;
-
 	/** A list of `customId` that are bound to actions that will stop the {@link PaginatedMessage}
 	 * @default ['virello/pagination.stop'] */
 	public static stopPaginatedMessageCustomIds = ["virello/pagination.stop"];
 
-	/** The reasons sent by {@linkplain https://discord.js.org/docs/packages/discord.js/main/InteractionCollector:Class#end InteractionCollector#end} event when the message (or its owner) has been deleted. */
+	/** Collector stop reasons that prevent further message edits. */
 	public static deletionStopReasons = [
 		"messageDelete",
 		"channelDelete",
 		"guildDelete",
+		"threadDelete",
+		"clientDestroyed",
 	];
 
 	/** Default text before the page number, initially empty. A nonempty prefix gets one trailing space. */
@@ -171,9 +160,9 @@ export class PaginatedMessage {
 	/** Shared callback for replies to other users. Defaults to an ephemeral warning with user and role mentions disabled. */
 	public static wrongUserInteractionReply: PaginatedMessageWrongUserInteractionReplyFunction =
 		(targetUser: User) => ({
-			content: `Please stop interacting with the components on this message. They are only for ${userMention(targetUser.id)}.`,
+			content: `Please stop interacting with the components on this message. They are only for <@${targetUser.id}>.`,
 			flags: MessageFlags.Ephemeral,
-			allowedMentions: { users: [], roles: [] },
+			allowed_mentions: { users: [], roles: [] },
 		});
 	// #endregion
 
@@ -186,8 +175,8 @@ export class PaginatedMessage {
 			return {};
 		}
 
-		if (isJSONEncodable(template)) {
-			return { embeds: [template.toJSON()] };
+		if (isJSONEncodable<APIEmbed | BaseMessageOptions>(template)) {
+			return { embeds: [(template as JSONEncodable<APIEmbed>).toJSON()] };
 		}
 
 		return template;
@@ -200,6 +189,7 @@ export class PaginatedMessage {
 
 	/** The response message used to edit on page changes. */
 	public response: Message | AnyInteractableInteraction | null = null;
+	private responseMessageId?: string;
 
 	/** The collector used for handling component interactions. */
 	public collector: InteractionCollector<PaginatedMessageInteractionUnion> | null =
@@ -234,9 +224,6 @@ export class PaginatedMessage {
 	public stopPaginatedMessageCustomIds =
 		PaginatedMessage.stopPaginatedMessageCustomIds;
 
-	/** Enable the missing-DM-channel warning for this instance. Defaults to the static emitPartialDMChannelWarning. */
-	public emitPartialDMChannelWarning =
-		PaginatedMessage.emitPartialDMChannelWarning;
 	// #endregion
 
 	// #region protected class properties
@@ -252,10 +239,6 @@ export class PaginatedMessage {
 	/** Tracks whether a warning was already emitted for this {@link PaginatedMessage} concerning the maximum amount of pages in the {@link SelectMenu}.
 	 * @default false */
 	protected hasEmittedMaxPageWarning = false;
-
-	/** Tracks whether a warning was already emitted for this {@link PaginatedMessage} concerning the {@link PaginatedMessage} being called in a `DMChannel` without the client having the `'Channel'` partial.
-	 * @default false */
-	protected hasEmittedPartialDMChannelWarning = false;
 
 	/** Add page numbers to embed footers. The separator is unused when this is false.
 	 * @default true */
@@ -331,14 +314,6 @@ export class PaginatedMessage {
 		return this;
 	}
 
-	/** Set the {@link PaginatedMessage.emitPartialDMChannelWarning} for this instance of {@link PaginatedMessage}. This will only apply to this one instance and no others. */
-	public setEmitPartialDMChannelWarning(
-		emitPartialDMChannelWarning: boolean,
-	): this {
-		this.emitPartialDMChannelWarning = emitPartialDMChannelWarning;
-		return this;
-	}
-
 	/** Set the handler's current page/message index. */
 	public setIndex(index: number): this {
 		this.index = index;
@@ -386,7 +361,7 @@ export class PaginatedMessage {
 		if (actionIsLinkButton(action)) {
 			this.actions.set(action.url, action);
 		} else if (actionIsButtonOrMenu(action)) {
-			this.actions.set(action.customId, action);
+			this.actions.set(action.custom_id, action);
 		}
 
 		return this;
@@ -656,7 +631,7 @@ export class PaginatedMessage {
 		if (actionIsLinkButton(action)) {
 			pageActionAtIndex.set(action.url, action);
 		} else if (actionIsButtonOrMenu(action)) {
-			pageActionAtIndex.set(action.customId, action);
+			pageActionAtIndex.set(action.custom_id, action);
 		}
 
 		this.pageActions[index] = pageActionAtIndex;
@@ -670,80 +645,6 @@ export class PaginatedMessage {
 		messageOrInteraction: Message | AnyInteractableInteraction,
 		target?: User,
 	): Promise<this> {
-		// If there is no channel then exit early and potentially emit a warning
-		if (!messageOrInteraction.channel) {
-			const isInteraction = isAnyInteraction(messageOrInteraction);
-			let shouldEmitWarning = this.emitPartialDMChannelWarning;
-
-			// If we are to emit a warning,
-			//   then check if a warning was already emitted,
-			//   in which case we don't want to emit a warning.
-			if (shouldEmitWarning && this.hasEmittedPartialDMChannelWarning) {
-				shouldEmitWarning = false;
-			}
-
-			// If we are to emit a warning,
-			//   then check if the interaction is an interaction based command,
-			//   and check if the client has the Partials.Channel partial,
-			//   in which case we don't want to emit a warning.
-			if (
-				shouldEmitWarning &&
-				isInteraction &&
-				messageOrInteraction.client.options.partials?.includes(Partials.Channel)
-			) {
-				shouldEmitWarning = false;
-			}
-
-			// IF we are to emit a warning,
-			//   then check if the interaction is a message based command,
-			//   and check if the client has the Partials.Channel partial,
-			//   and check if the client has the 'DIRECT_MESSAGE' intent',
-			//   in which case we don't want to emit a warning.
-			if (
-				shouldEmitWarning &&
-				!isInteraction &&
-				messageOrInteraction.client.options.partials?.includes(
-					Partials.Channel,
-				) &&
-				new IntentsBitField(messageOrInteraction.client.options.intents).has(
-					GatewayIntentBits.DirectMessages,
-				)
-			) {
-				shouldEmitWarning = false;
-			}
-
-			// If we should emit a warning then do so.
-			if (shouldEmitWarning) {
-				process.emitWarning(
-					[
-						"PaginatedMessage was initiated in a DM channel without the client having the required partial configured.",
-						'If you want PaginatedMessage to work in DM channels then make sure you start your client with "CHANNEL" added to "client.options.partials".',
-						'Furthermore if you are using message based commands (as opposed to application commands) then you will also need to add the "DIRECT_MESSAGE" intent to "client.options.intents"',
-						'If you do not want to be alerted about this in the future then you can disable this warning by setting "PaginatedMessage.emitPartialDMChannelWarning" to "false", or use "setEmitPartialDMChannelWarning(false)" before calling "run".',
-					].join("\n"),
-					{
-						type: "PaginatedMessageRunsInNonpartialDMChannel",
-						code: "PAGINATED_MESSAGE_RUNS_IN_NON_PARTIAL_DM_CHANNEL",
-					},
-				);
-				this.hasEmittedPartialDMChannelWarning = true;
-			}
-
-			await safelyReplyToInteraction({
-				messageOrInteraction,
-				interactionEditReplyContent: this.#thisMazeWasNotMeantForYouContent,
-				interactionReplyContent: {
-					...this.#thisMazeWasNotMeantForYouContent,
-					flags: MessageFlags.Ephemeral,
-				},
-				componentUpdateContent: this.#thisMazeWasNotMeantForYouContent,
-				messageMethod: "reply",
-				messageMethodContent: this.#thisMazeWasNotMeantForYouContent,
-			});
-
-			return this;
-		}
-
 		// Assign the target based on whether a Message or CommandInteraction was passed in
 		target ??= isAnyInteraction(messageOrInteraction)
 			? messageOrInteraction.user
@@ -780,7 +681,7 @@ export class PaginatedMessage {
 		await this.setUpMessage(messageOrInteraction);
 		this.setUpCollector(messageOrInteraction, target);
 
-		const messageId = this.response!.id;
+		const messageId = this.responseMessageId!;
 
 		if (this.collector) {
 			this.collector.once("end", () => {
@@ -872,6 +773,7 @@ export class PaginatedMessage {
 		clone.actions = this.actions;
 		clone.pageActions = this.pageActions;
 		clone.response = this.response;
+		clone.responseMessageId = this.responseMessageId;
 		clone.template = this.template;
 		return clone;
 	}
@@ -888,60 +790,53 @@ export class PaginatedMessage {
 		return isFunction(page) ? page(index, this.pages, this) : page;
 	}
 
-	/** Set up the message. */
+	/** Send or edit the current page and retain its message scope. */
 	protected async setUpMessage(
-		messageOrInteraction: Message | AnyInteractableInteraction,
+		target: Message | AnyInteractableInteraction,
 	): Promise<void> {
-		// Get the current page
-		let page = this.messages[this.index]!;
-
-		// Merge in the advanced options
-		page = { ...page, ...(this.paginatedMessageData ?? {}) };
-
-		if (this.response) {
-			if (isAnyInteraction(this.response)) {
-				if (this.response.replied || this.response.deferred) {
-					await this.response.editReply(page);
-				} else {
-					await this.response.reply({
-						...page,
-						content: page.content ?? undefined,
-					});
-				}
-			} else if (isMessageInstance(this.response)) {
-				await this.response.edit(page);
-			}
-		} else if (isAnyInteraction(messageOrInteraction)) {
-			if (messageOrInteraction.replied || messageOrInteraction.deferred) {
-				const editReplyResponse = await messageOrInteraction.editReply(page);
-				this.response = messageOrInteraction.ephemeral
-					? messageOrInteraction
-					: editReplyResponse;
-			} else {
-				this.response = await messageOrInteraction.reply({
+		const page = {
+			...this.messages[this.index]!,
+			...(this.paginatedMessageData ?? {}),
+		};
+		const destination = this.response ?? target;
+		if (isAnyInteraction(destination)) {
+			let message: Message;
+			if (destination.replied || destination.deferred)
+				message = await destination.editReply(page);
+			else {
+				await destination.reply({
 					...page,
 					content: page.content ?? undefined,
-					fetchReply: true,
-					ephemeral: false,
+					allowed_mentions: page.allowed_mentions ?? undefined,
+					attachments: page.attachments ?? undefined,
 				});
+				message = await destination.fetchReply();
 			}
-		} else if (isTextBasedChannel(messageOrInteraction.channel)) {
-			this.response = await messageOrInteraction.channel.send({
-				...page,
-				content: page.content ?? undefined,
-			});
+			// Webhook replies retain their token for edits, including ephemeral messages.
+			this.response = destination;
+			this.responseMessageId = message.id;
+		} else {
+			this.response = this.response
+				? await destination.edit(page)
+				: await destination.client.send(destination.channelId, {
+						...page,
+						content: page.content ?? undefined,
+						allowed_mentions: page.allowed_mentions ?? undefined,
+						attachments: page.attachments ?? undefined,
+					});
+			this.responseMessageId = this.response.id;
 		}
 	}
 
 	/** Set up the message's collector. */
 	protected setUpCollector(
-		messageOrInteraction: Message<boolean> | AnyInteractableInteraction,
+		messageOrInteraction: Message | AnyInteractableInteraction,
 		targetUser: User,
 	): void {
 		if (this.pages.length > 1) {
 			this.collector =
 				new InteractionCollector<PaginatedMessageInteractionUnion>(
-					targetUser.client,
+					messageOrInteraction.client,
 					{
 						filter: (interaction) => {
 							if (
@@ -971,19 +866,13 @@ export class PaginatedMessage {
 
 						time: this.idle,
 
-						guild: isGuildBasedChannel(messageOrInteraction.channel)
-							? messageOrInteraction.channel.guild
-							: undefined,
+						guild: messageOrInteraction.guildId ?? undefined,
 
-						channel: messageOrInteraction.channel as Message["channel"],
+						channel: messageOrInteraction.channelId ?? undefined,
 
 						interactionType: InteractionType.MessageComponent,
 
-						...(!isNullish(this.response) && !isAnyInteraction(this.response)
-							? {
-									message: this.response,
-								}
-							: {}),
+						message: this.responseMessageId,
 					},
 				)
 					.on(
@@ -991,7 +880,7 @@ export class PaginatedMessage {
 						this.handleCollect.bind(
 							this,
 							targetUser,
-							messageOrInteraction.channel as Message["channel"],
+							messageOrInteraction.channel,
 						),
 					)
 					.on("end", this.handleEnd.bind(this));
@@ -1025,63 +914,64 @@ export class PaginatedMessage {
 		targetUser: User,
 	): Promise<MessageActionRowComponentBuilder[]> {
 		return Promise.all(
-			actions.map<Promise<MessageActionRowComponentBuilder>>(
-				async (interaction) => {
-					if (isMessageButtonInteractionData(interaction)) {
-						return new ButtonBuilder(interaction);
-					}
+			actions.map<Promise<MessageActionRowComponentBuilder>>(async (action) => {
+				// Callback functions are framework metadata, never builder payload data.
+				const interaction =
+					"run" in action ? (({ run: _run, ...data }) => data)(action) : action;
+				if (isMessageButtonInteractionData(interaction)) {
+					return new ButtonBuilder(interaction);
+				}
 
-					if (isMessageUserSelectInteractionData(interaction)) {
-						return new UserSelectMenuBuilder(interaction);
-					}
+				if (isMessageUserSelectInteractionData(interaction)) {
+					return new UserSelectMenuBuilder(interaction);
+				}
 
-					if (isMessageRoleSelectInteractionData(interaction)) {
-						return new RoleSelectMenuBuilder(interaction);
-					}
+				if (isMessageRoleSelectInteractionData(interaction)) {
+					return new RoleSelectMenuBuilder(interaction);
+				}
 
-					if (isMessageMentionableSelectInteractionData(interaction)) {
-						return new MentionableSelectMenuBuilder(interaction);
-					}
+				if (isMessageMentionableSelectInteractionData(interaction)) {
+					return new MentionableSelectMenuBuilder(interaction);
+				}
 
-					if (isMessageChannelSelectInteractionData(interaction)) {
-						return new ChannelSelectMenuBuilder(interaction);
-					}
+				if (isMessageChannelSelectInteractionData(interaction)) {
+					return new ChannelSelectMenuBuilder(interaction);
+				}
 
-					if (isMessageStringSelectInteractionData(interaction)) {
-						return new StringSelectMenuBuilder({
-							...interaction,
-							...(interaction.customId === "virello/pagination.goToPage" && {
-								options: await Promise.all(
-									this.pages.map(async (_, index) => {
-										return {
-											...(await this.selectMenuOptions(
-												index + 1,
-												this.resolvePaginatedMessageInternationalizationContext(
-													messageOrInteraction,
-													targetUser,
-												),
-											)),
-											value: index.toString(),
-										};
-									}),
-								),
-								placeholder: this.selectMenuPlaceholder,
-							}),
-						});
-					}
+				if (isMessageStringSelectInteractionData(interaction)) {
+					return new StringSelectMenuBuilder({
+						...interaction,
+						...(interaction.custom_id === "virello/pagination.goToPage" && {
+							options: await Promise.all(
+								this.pages.map(async (_, index) => {
+									return {
+										...(await this.selectMenuOptions(
+											index + 1,
+											this.resolvePaginatedMessageInternationalizationContext(
+												messageOrInteraction,
+												targetUser,
+											),
+										)),
+										value: index.toString(),
+									};
+								}),
+							),
+							placeholder: this.selectMenuPlaceholder,
+						}),
+					});
+				}
 
-					throw new Error(
-						"Unsupported message component type detected. Validate your code and if you're sure this is a bug in Virello make a report in the server",
-					);
-				},
-			),
+				throw new Error(
+					"Unsupported message component type detected. Validate your code and if you're sure this is a bug in Virello make a report in the server",
+				);
+			}),
 		);
 	}
 
 	/** Handles the `collect` event from the collector. */
 	protected async handleCollect(
 		targetUser: User,
-		channel: Message["channel"],
+		channel: PaginatedMessageInternationalizationContext["channel"],
 		interaction: PaginatedMessageInteractionUnion,
 	): Promise<void> {
 		if (interaction.user.id === targetUser.id) {
@@ -1105,7 +995,7 @@ export class PaginatedMessage {
 					collector: this.collector!,
 				});
 
-				if (!this.stopPaginatedMessageCustomIds.includes(action.customId)) {
+				if (!this.stopPaginatedMessageCustomIds.includes(action.custom_id)) {
 					const newIndex =
 						previousIndex === this.index ? previousIndex : this.index;
 					const updateOptions = await this.resolvePage(
@@ -1141,7 +1031,7 @@ export class PaginatedMessage {
 					: {
 							content: interactionReplyOptions,
 							flags: MessageFlags.Ephemeral,
-							allowedMentions: { users: [], roles: [] },
+							allowed_mentions: { users: [], roles: [] },
 						},
 			);
 		}
@@ -1149,8 +1039,8 @@ export class PaginatedMessage {
 
 	/** Handles the `end` event from the collector. */
 	protected async handleEnd(
-		_: Collection<Snowflake, PaginatedMessageInteractionUnion>,
-		reason: PaginatedMessageStopReasons,
+		_: Map<Snowflake, PaginatedMessageInteractionUnion>,
+		reason: string,
 	): Promise<void> {
 		// Ensure no race condition can occur where interacting with the message when the paginated message closes would otherwise result in a DiscordAPIError
 		if (
@@ -1159,7 +1049,7 @@ export class PaginatedMessage {
 			isAnyInteraction(this.response) &&
 			this.response.isMessageComponent()
 		) {
-			this.response.message = await this.response.fetchReply();
+			await this.response.fetchReply();
 		}
 
 		// Remove all listeners from the collector:
@@ -1170,7 +1060,7 @@ export class PaginatedMessage {
 			this.response &&
 			!PaginatedMessage.deletionStopReasons.includes(reason)
 		) {
-			void safelyReplyToInteraction({
+			await safelyReplyToInteraction({
 				messageOrInteraction: this.response,
 				interactionEditReplyContent: { components: [] },
 				interactionReplyContent: {
@@ -1238,9 +1128,7 @@ export class PaginatedMessage {
 		const context: PaginatedMessageInternationalizationContext = {
 			user: targetUser,
 			channel: messageOrInteraction.channel,
-			guild: isGuildBasedChannel(messageOrInteraction.channel)
-				? messageOrInteraction.channel.guild
-				: null,
+			guild: messageOrInteraction.guild,
 			interactionGuildLocale: isAnyInteraction(messageOrInteraction)
 				? messageOrInteraction.guildLocale
 				: undefined,

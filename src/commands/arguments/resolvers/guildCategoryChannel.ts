@@ -1,4 +1,5 @@
-import type { CategoryChannel, Guild } from "discord.js";
+import type { APIGuildCategoryChannel as CategoryChannel } from "discord-api-types/v10";
+import type { GuildReference as Guild } from "../../../discord/entities";
 import { isCategoryChannel } from "../../../utilities/discord/index";
 import type { Result } from "../../../utilities/result/index";
 import { Identifiers } from "../../errors/Identifiers";

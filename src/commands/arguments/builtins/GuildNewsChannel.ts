@@ -1,4 +1,4 @@
-import type { NewsChannel } from "discord.js";
+import type { APINewsChannel as NewsChannel } from "discord-api-types/v10";
 import { Identifiers } from "../../errors/Identifiers";
 import { Argument } from "../Argument";
 import { resolveGuildNewsChannel } from "../resolvers/guildNewsChannel";

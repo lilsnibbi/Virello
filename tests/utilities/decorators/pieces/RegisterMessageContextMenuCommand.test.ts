@@ -4,7 +4,7 @@ import {
 	ApplicationIntegrationType,
 	InteractionContextType,
 	type RESTPostAPIContextMenuApplicationCommandsJSONBody,
-} from "discord.js";
+} from "discord-api-types/v10";
 import {
 	type ApplicationCommandRegistry,
 	Command,

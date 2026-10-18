@@ -1,19 +1,14 @@
-import type {
-	ApplicationEmoji,
-	EmojiIdentifierResolvable,
-	GuildEmoji,
-	Message,
-	ReactionEmoji,
-} from "discord.js";
+import type { MessageContext as Message } from "../../../discord/MessageContext";
+import type { Reaction } from "../../../discord/Collector";
 import type { MessagePrompterMessage } from "./constants";
 import type { MessagePrompterBaseStrategy } from "./strategies/MessagePrompterBaseStrategy";
 
 /** Prompt and collected-reaction metadata returned in explicit mode. */
 export interface IMessagePrompterExplicitReturnBase {
 	/** Collected Discord emoji, present for reaction-based strategies. */
-	emoji?: GuildEmoji | ReactionEmoji | ApplicationEmoji;
+	emoji?: Reaction["emoji"];
 	/** Matching configured reaction value, when found. */
-	reaction?: string | EmojiIdentifierResolvable;
+	reaction?: string;
 	/** Strategy instance that handled the prompt. */
 	strategy: MessagePrompterBaseStrategy;
 	/** Sent or edited prompt message. */

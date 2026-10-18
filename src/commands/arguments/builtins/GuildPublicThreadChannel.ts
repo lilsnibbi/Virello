@@ -1,4 +1,4 @@
-import type { ThreadChannel } from "discord.js";
+import type { APIPublicThreadChannel as ThreadChannel } from "discord-api-types/v10";
 import { Identifiers } from "../../errors/Identifiers";
 import { Argument } from "../Argument";
 import { resolveGuildPublicThreadChannel } from "../resolvers/guildPublicThreadChannel";

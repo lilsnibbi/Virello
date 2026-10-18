@@ -1,4 +1,4 @@
-import type { StageChannel } from "discord.js";
+import type { APIGuildStageVoiceChannel as StageChannel } from "discord-api-types/v10";
 import { Identifiers } from "../../errors/Identifiers";
 import { Argument } from "../Argument";
 import { resolveGuildStageVoiceChannel } from "../resolvers/guildStageVoiceChannel";

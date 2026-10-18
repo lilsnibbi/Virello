@@ -1,12 +1,14 @@
 import type {
 	ChannelType,
+	APIChannel as TextBasedChannel,
+} from "discord-api-types/v10";
+import type {
 	ChatInputCommandInteraction,
 	CommandInteraction,
 	ContextMenuCommandInteraction,
-	Message,
-	PermissionsBitField,
-	TextBasedChannel,
-} from "discord.js";
+} from "../../discord/InteractionContext";
+import type { MessageContext as Message } from "../../discord/MessageContext";
+import type { Permissions as PermissionsBitField } from "../../discord/permissions";
 import { Module } from "../../core/modules/index";
 import type { Awaitable } from "../../utilities/index";
 import { Result } from "../../utilities/result/index";
@@ -108,15 +110,17 @@ export class Precondition<
 	protected async fetchChannelFromInteraction(
 		interaction: CommandInteraction,
 	): Promise<TextBasedChannel> {
-		const channel = (await interaction.client.channels.fetch(
-			interaction.channelId,
-			{
-				cache: false,
-				allowUnknownGuild: true,
-			},
-		)) as TextBasedChannel;
-
-		return channel;
+		if (!interaction.channelId)
+			throw new Error("This interaction has no channel.");
+		return interaction.client.engine.fetchChannel(interaction.channelId);
+	}
+	/** Resolve a full message channel even when channel caching is disabled. */
+	protected async fetchChannelFromMessage(
+		message: Message,
+	): Promise<TextBasedChannel> {
+		return (
+			message.channel ?? message.client.engine.fetchChannel(message.channelId)
+		);
 	}
 }
 

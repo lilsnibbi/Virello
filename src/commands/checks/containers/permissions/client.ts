@@ -1,4 +1,7 @@
-import { type PermissionResolvable, PermissionsBitField } from "discord.js";
+import {
+	type PermissionInput as PermissionResolvable,
+	Permissions as PermissionsBitField,
+} from "../../../../discord/permissions";
 import type { PreconditionSingleResolvableDetails } from "../Entry";
 
 /** Create a contextful permissions precondition requirement. */

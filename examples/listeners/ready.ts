@@ -14,7 +14,7 @@ export default class ReadyListener extends Listener<typeof Events.ClientReady> {
 			component: "bot",
 			event: "cache_ready",
 			message: "Shard gateway cache is available to example handlers.",
-			context: { shard: client.sharding.id, guilds: client.guilds.cache.size },
+			context: { shard: client.sharding.id, guilds: client.cache.guilds.size },
 		});
 	}
 }

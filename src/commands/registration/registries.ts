@@ -1,7 +1,5 @@
-import {
-	type ApplicationCommandManager,
-	ApplicationCommandType,
-} from "discord.js";
+import { ApplicationCommandType } from "discord-api-types/v10";
+import type { ApplicationCommands as ApplicationCommandManager } from "../../discord/ApplicationCommands";
 import type { RESTPostAPIApplicationCommandsJSONBody } from "discord-api-types/v10";
 import { container } from "../../core/modules/index";
 import { Events } from "../../events/events";

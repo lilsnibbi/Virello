@@ -1,4 +1,3 @@
-import { Collection } from "@discordjs/collection";
 import {
 	type AbstractConstructor,
 	type Constructor,
@@ -43,7 +42,7 @@ export type ModuleStoreLogger = (value: string) => void;
 export class ModuleStore<
 	T extends Module,
 	StoreName extends ModuleKind = ModuleKind,
-> extends Collection<string, T> {
+> extends Map<string, T> {
 	/** Module registry constructor. */
 	public static readonly Registry = ModuleRegistry;
 	/** Base class accepted by this store. */

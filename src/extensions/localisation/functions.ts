@@ -1,10 +1,9 @@
 import {
 	type APIApplicationCommandOptionChoice,
-	BaseInteraction,
 	ChannelType,
-	Guild,
-	Message,
-} from "discord.js";
+} from "discord-api-types/v10";
+import { InteractionContext as BaseInteraction } from "../../discord/InteractionContext";
+import { MessageContext as Message } from "../../discord/MessageContext";
 import type {
 	AppendKeyPrefix,
 	DefaultNamespace,
@@ -55,7 +54,7 @@ export function fetchLanguage(target: Target): Promise<string> {
 	}
 
 	// Handle Guild:
-	if (target instanceof Guild) {
+	if (!("type" in target)) {
 		return resolveLanguage({ user: null, channel: null, guild: target });
 	}
 
@@ -65,7 +64,13 @@ export function fetchLanguage(target: Target): Promise<string> {
 	}
 
 	// Handle any other channel:
-	return resolveLanguage({ user: null, channel: target, guild: target.guild });
+	const guildId =
+		("guild_id" in target ? target.guild_id : undefined) ??
+		container.client?.cache.guildForChannel(target.id);
+	const guild = guildId
+		? { ...container.client?.cache.guilds.get(guildId)?.data, id: guildId }
+		: null;
+	return resolveLanguage({ user: null, channel: target, guild });
 }
 
 /** Get the language-assigned function from i18next designated to a target's preferred language code. */
@@ -180,7 +185,7 @@ async function resolveLanguage(
 	const preferred =
 		lang ??
 		context.interactionLocale ??
-		context.guild?.preferredLocale ??
+		context.guild?.preferred_locale ??
 		container.i18n.options.defaultName ??
 		"en-US";
 	return container.i18n.languages.has(preferred)

@@ -1,10 +1,8 @@
 import type {
 	CollectorFilter,
-	EmojiIdentifierResolvable,
-	EmojiResolvable,
-	MessageReaction,
-	User,
-} from "discord.js";
+	Reaction as MessageReaction,
+} from "../../../../discord/Collector";
+import type { APIUser as User } from "discord-api-types/v10";
 import type {
 	MessagePrompterChannelTypes,
 	MessagePrompterMessage,
@@ -19,7 +17,7 @@ export class MessagePrompterReactionStrategy
 	implements MessagePrompterReactionStrategy
 {
 	/** The emojis used */
-	public reactions: EmojiIdentifierResolvable[];
+	public reactions: string[];
 
 	/** Constructor for the {@link MessagePrompterReactionStrategy} class */
 	public constructor(
@@ -35,7 +33,7 @@ export class MessagePrompterReactionStrategy
 	public async run(
 		channel: MessagePrompterChannelTypes,
 		authorOrFilter: User | CollectorFilter<[MessageReaction, User]>,
-	): Promise<IMessagePrompterExplicitReturnBase | string | EmojiResolvable> {
+	): Promise<IMessagePrompterExplicitReturnBase | string> {
 		if (!this.reactions?.length)
 			throw new TypeError("There are no reactions provided.");
 

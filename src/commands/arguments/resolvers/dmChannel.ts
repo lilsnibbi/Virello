@@ -1,4 +1,6 @@
-import type { CommandInteraction, DMChannel, Message } from "discord.js";
+import type { APIDMChannel as DMChannel } from "discord-api-types/v10";
+import type { CommandInteraction } from "../../../discord/InteractionContext";
+import type { MessageContext as Message } from "../../../discord/MessageContext";
 import { isDMChannel } from "../../../utilities/discord/index";
 import { Result } from "../../../utilities/result/index";
 import { Identifiers } from "../../errors/Identifiers";
@@ -19,7 +21,7 @@ export function resolveDMChannel(
 > {
 	const result = resolveChannel(parameter, messageOrInteraction);
 	return result.mapInto((value) => {
-		if (isDMChannel(value) && !value.partial) {
+		if (isDMChannel(value)) {
 			return Result.ok(value);
 		}
 

@@ -1,4 +1,4 @@
-import type { Role } from "discord.js";
+import type { APIRole as Role } from "discord-api-types/v10";
 import { Identifiers } from "../../errors/Identifiers";
 import { Argument } from "../Argument";
 import { resolveRole } from "../resolvers/role";

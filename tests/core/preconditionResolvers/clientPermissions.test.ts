@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { PermissionFlagsBits } from "discord.js";
+import { PermissionFlagsBits } from "discord-api-types/v10";
 import type { PermissionPreconditionContext } from "../../../src/commands/checks/builtins/ClientPermissions";
 import type { PreconditionContainerSingle } from "../../../src/commands/checks/containers/Entry";
 import { PreconditionContainerArray } from "../../../src/commands/checks/containers/Group";

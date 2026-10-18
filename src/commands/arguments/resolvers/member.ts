@@ -1,4 +1,10 @@
-import type { Guild, GuildMember, Snowflake } from "discord.js";
+import {
+	Routes,
+	type APIGuildMember as GuildMember,
+	type Snowflake,
+} from "discord-api-types/v10";
+import type { GuildReference as Guild } from "../../../discord/entities";
+import { container } from "../../../core/Container";
 import {
 	SnowflakeRegex,
 	UserOrMemberMentionRegex,
@@ -39,7 +45,9 @@ async function resolveById(
 	const memberId =
 		UserOrMemberMentionRegex.exec(argument) ?? SnowflakeRegex.exec(argument);
 	return memberId
-		? guild.members.fetch(memberId[1] as Snowflake).catch(() => null)
+		? container.client.engine
+				.fetchMember(guild.id, memberId[1] as Snowflake)
+				.catch(() => null)
 		: null;
 }
 
@@ -52,8 +60,11 @@ async function resolveByQuery(
 			? argument.slice(0, -5)
 			: argument;
 
-	const members = await guild.members
-		.fetch({ query: argument, limit: 1 })
+	const members = await container.client.rest
+		.request<GuildMember[]>({
+			method: "GET",
+			path: `${Routes.guildMembersSearch(guild.id)}?query=${encodeURIComponent(argument)}&limit=1`,
+		})
 		.catch(() => null);
-	return members?.first() ?? null;
+	return members?.[0] ?? null;
 }

@@ -1,4 +1,7 @@
-import type { ApplicationCommand, Collection, Snowflake } from "discord.js";
+import type {
+	APIApplicationCommand as ApplicationCommand,
+	Snowflake,
+} from "discord-api-types/v10";
 import { writeEvent } from "../../../core/logging/diagnostics";
 import { Events } from "../../../events/events";
 import { Listener } from "../../../events/listener";
@@ -11,7 +14,7 @@ export class BulkOverwriteListener extends Listener<
 	}
 
 	public run(
-		result: Collection<Snowflake, ApplicationCommand>,
+		result: Map<Snowflake, ApplicationCommand>,
 		guildId: string | null,
 	) {
 		writeEvent(this.container.logger, "notif", {

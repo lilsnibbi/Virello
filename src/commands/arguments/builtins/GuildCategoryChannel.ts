@@ -1,4 +1,4 @@
-import type { CategoryChannel } from "discord.js";
+import type { APIGuildCategoryChannel as CategoryChannel } from "discord-api-types/v10";
 import { Identifiers } from "../../errors/Identifiers";
 import { Argument } from "../Argument";
 import { resolveGuildCategoryChannel } from "../resolvers/guildCategoryChannel";

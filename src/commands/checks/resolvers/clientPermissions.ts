@@ -1,4 +1,7 @@
-import { type PermissionResolvable, PermissionsBitField } from "discord.js";
+import {
+	type PermissionInput as PermissionResolvable,
+	Permissions as PermissionsBitField,
+} from "../../../discord/permissions";
 import { CommandPreConditions } from "../../enums";
 import type { PreconditionContainerArray } from "../containers/Group";
 

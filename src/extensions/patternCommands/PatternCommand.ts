@@ -1,4 +1,5 @@
-import type { Awaitable, Message } from "discord.js";
+import type { Awaitable } from "../../utilities/index";
+import type { MessageContext as Message } from "../../discord/MessageContext";
 import { Args } from "../../commands/arguments/Args";
 import { Command } from "../../commands/Command";
 import { type MessageCommand } from "../../commands/types";

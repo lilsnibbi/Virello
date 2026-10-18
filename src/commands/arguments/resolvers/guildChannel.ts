@@ -1,4 +1,6 @@
-import type { Guild, Snowflake } from "discord.js";
+import type { GuildReference as Guild } from "../../../discord/entities";
+import { container } from "../../../core/Container";
+import { isGuildBasedChannel } from "../../../utilities/discord/type-guards";
 import {
 	ChannelMentionRegex,
 	SnowflakeRegex,
@@ -33,11 +35,13 @@ function resolveById(
 ): GuildBasedChannelTypes | null {
 	const channelId =
 		ChannelMentionRegex.exec(argument) ?? SnowflakeRegex.exec(argument);
-	return channelId
-		? ((guild.channels.cache.get(
-				channelId[1] as Snowflake,
-			) as GuildBasedChannelTypes) ?? null)
-		: null;
+	if (
+		!channelId ||
+		container.client.cache.guildForChannel(channelId[1]) !== guild.id
+	)
+		return null;
+	const entry = container.client.cache.channels.get(channelId[1]);
+	return entry?.complete && isGuildBasedChannel(entry.data) ? entry.data : null;
 }
 
 function resolveByQuery(
@@ -45,9 +49,13 @@ function resolveByQuery(
 	guild: Guild,
 ): GuildBasedChannelTypes | null {
 	const lowerCaseArgument = argument.toLowerCase();
-	return (
-		(guild.channels.cache.find(
-			(channel) => channel.name.toLowerCase() === lowerCaseArgument,
-		) as GuildBasedChannelTypes) ?? null
-	);
+	for (const [id, entry] of container.client.cache.channels)
+		if (
+			entry.complete &&
+			container.client.cache.guildForChannel(id) === guild.id &&
+			isGuildBasedChannel(entry.data) &&
+			entry.data.name?.toLowerCase() === lowerCaseArgument
+		)
+			return entry.data;
+	return null;
 }

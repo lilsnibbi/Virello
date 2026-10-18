@@ -92,12 +92,10 @@
 	},
 	"dependencies": {
 		"@discordjs/builders": "^1.13.0",
-		"@discordjs/collection": "^2.1.1",
 		"@lilsnibbi/logger": "1.2.0",
 		"arktype": "^2.2.8",
 		"cron-parser": "5.10.2",
 		"discord-api-types": "0.38.56",
-		"discord.js": "^14.27.0",
 		"i18next": "^26.4.5"
 	},
 	"devDependencies": {

@@ -1,4 +1,4 @@
-import type { CacheType, Message } from "discord.js";
+import type { MessageContext as Message } from "../../discord/MessageContext";
 import { type Args } from "../../commands/arguments/Args";
 import { Command } from "../../commands/Command";
 import { PreconditionContainerArray } from "../../commands/checks/containers/Group";
@@ -700,16 +700,12 @@ export declare namespace Subcommand {
 	/** Shorthand for {@link Command.RunInTypes}. */
 	export type RunInTypes = Command.RunInTypes;
 	/** Shorthand for {@link Command.ChatInputCommandInteraction}. */
-	export type ChatInputCommandInteraction<
-		Cached extends CacheType = CacheType,
-	> = Command.ChatInputCommandInteraction<Cached>;
+	export type ChatInputCommandInteraction = Command.ChatInputCommandInteraction;
 	/** Shorthand for {@link Command.ContextMenuCommandInteraction}. */
-	export type ContextMenuCommandInteraction<
-		Cached extends CacheType = CacheType,
-	> = Command.ContextMenuCommandInteraction<Cached>;
+	export type ContextMenuCommandInteraction =
+		Command.ContextMenuCommandInteraction;
 	/** Shorthand for {@link Command.AutocompleteInteraction}. */
-	export type AutocompleteInteraction<Cached extends CacheType = CacheType> =
-		Command.AutocompleteInteraction<Cached>;
+	export type AutocompleteInteraction = Command.AutocompleteInteraction;
 	/** Shorthand for {@link Command.Registry}. */
 	export type Registry = Command.Registry;
 }

@@ -1,9 +1,8 @@
 import type {
 	CollectorFilter,
-	EmojiIdentifierResolvable,
-	MessageReaction,
-	User,
-} from "discord.js";
+	Reaction as MessageReaction,
+} from "../../../../discord/Collector";
+import type { APIUser as User } from "discord-api-types/v10";
 import type {
 	MessagePrompterChannelTypes,
 	MessagePrompterMessage,
@@ -18,7 +17,7 @@ export class MessagePrompterNumberStrategy
 	implements IMessagePrompterNumberStrategyOptions
 {
 	/** The available number emojis */
-	public numberEmojis: EmojiIdentifierResolvable[];
+	public numberEmojis: string[];
 	/** The available number emojis */
 	public start: number;
 	/** The available number emojis */
@@ -60,7 +59,9 @@ export class MessagePrompterNumberStrategy
 		);
 
 		const emojiIndex = emojis.findIndex(
-			(emoji) => (response?.emoji?.id ?? response?.emoji?.name) === emoji,
+			(emoji) =>
+				(response?.emoji?.id ?? response?.emoji?.name) ===
+				this.reactionKey(emoji),
 		);
 		const number = numbers[emojiIndex];
 

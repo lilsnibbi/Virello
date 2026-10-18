@@ -1,179 +1,91 @@
-import {
-	type Message,
-	PermissionFlagsBits,
-	type Snowflake,
-	type User,
-} from "discord.js";
-import { container } from "../../../core/modules/index";
+import { PermissionFlagsBits } from "discord-api-types/v10";
+import { MessageContext as Message } from "../../../discord/MessageContext";
+import { permissionsFor } from "../../../discord/permissions";
 import {
 	ChannelMessageRegex,
 	MessageLinkRegex,
 	SnowflakeRegex,
-} from "../../../utilities/discord/constants/index";
+} from "../../../utilities/discord/constants/regexes";
 import {
-	type AnyInteraction,
-	type GuildBasedChannelTypes,
 	isAnyInteraction,
-	isGuildBasedChannel,
-	isNewsChannel,
-	isStageChannel,
 	isTextBasedChannel,
-	isTextChannel,
-	type TextBasedChannelTypes,
-} from "../../../utilities/discord/index";
-import type { Awaitable } from "../../../utilities/index";
+} from "../../../utilities/discord/type-guards";
+import type {
+	AnyInteraction,
+	TextBasedChannelTypes,
+} from "../../../utilities/discord/utility-types";
 import { Result } from "../../../utilities/result/index";
 import { Identifiers } from "../../errors/Identifiers";
 
 /** Invocation and lookup settings for resolveMessage. */
 export interface MessageResolverOptions {
-	/** Channel to resolve the message in.
-	 * @default message.channel */
+	/** Explicit channel. Overrides scan. */
 	channel?: TextBasedChannelTypes;
-	/** Base {@link Message} or {@link AnyInteraction} to resolve the message from (e.g. pick the channel if not given). */
 	messageOrInteraction: Message | AnyInteraction;
-	/** Whether to scan the entire guild cache for the message. If channel is given with this option, this option is ignored.
-	 * @default false */
+	/** Search cached messages in this guild before fetching from the invocation channel. */
 	scan?: boolean;
 }
 
-/**
- * Resolve a message ID, message link, or channel/message pair. Links must belong to the invoking guild; cross-channel
- * lookups check visibility.
- * @param parameter - Message lookup text.
- * @param options - Invocation, channel override, and cache-scan settings.
- * @returns The message, or ArgumentMessageError for an unresolved input.
- * @throws If an attempted Discord message fetch rejects.
- */
+/** Resolve an ID, same-guild link, or channel/message pair. Cross-channel lookups require user and bot visibility. */
 export async function resolveMessage(
 	parameter: string,
 	options: MessageResolverOptions,
 ): Promise<Result<Message, Identifiers.ArgumentMessageError>> {
-	const message =
-		(await resolveById(parameter, options)) ??
-		(await resolveByLink(parameter, options)) ??
-		(await resolveByChannelAndMessage(parameter, options));
-
-	if (message) {
-		return Result.ok(message);
-	}
-
-	return Result.err(Identifiers.ArgumentMessageError);
-}
-
-function resolveById(
-	parameter: string,
-	options: MessageResolverOptions,
-): Awaitable<Message | null> {
-	if (
-		!SnowflakeRegex.test(parameter) ||
-		isStageChannel(options.messageOrInteraction.channel)
-	) {
-		return null;
-	}
-
-	if (options.channel && !isStageChannel(options.channel)) {
-		return options.channel.messages.fetch(parameter as Snowflake);
-	}
-
-	if (
-		options.scan &&
-		isGuildBasedChannel(options.messageOrInteraction.channel)
-	) {
-		for (const channel of options.messageOrInteraction.channel.guild.channels.cache.values()) {
-			if (!isTextBasedChannel(channel) || isStageChannel(channel)) {
-				continue;
+	const invocation = options.messageOrInteraction;
+	const client = invocation.client;
+	let channelId: string | null = null;
+	let messageId: string | null = null;
+	if (SnowflakeRegex.test(parameter)) {
+		messageId = parameter;
+		channelId = options.channel?.id ?? invocation.channelId;
+		if (options.scan && !options.channel && invocation.guildId) {
+			for (const scope of client.cache.messages.scopeIds()) {
+				if (client.cache.guildForChannel(scope) !== invocation.guildId)
+					continue;
+				const cached = client.cache.messages.get(scope, parameter);
+				if (cached?.complete && (await visible(scope, options)))
+					return Result.ok(new Message(client, cached.data));
 			}
-
-			const message = channel.messages.cache.get(parameter);
-			if (message) {
-				return message;
+		}
+	} else {
+		const link = MessageLinkRegex.exec(parameter);
+		if (link && invocation.guildId && link[1] === invocation.guildId) {
+			channelId = link[2];
+			messageId = link[3];
+		} else if (!link) {
+			const pair = ChannelMessageRegex.exec(parameter)?.groups;
+			if (pair) {
+				channelId = pair.channelId;
+				messageId = pair.messageId;
 			}
 		}
 	}
+	if (!channelId || !messageId || !(await visible(channelId, options)))
+		return Result.err(Identifiers.ArgumentMessageError);
+	const data = await client.engine.fetchMessage(channelId, messageId);
+	return Result.ok(new Message(client, data));
+}
 
+async function visible(
+	channelId: string,
+	options: MessageResolverOptions,
+): Promise<boolean> {
+	const invocation = options.messageOrInteraction;
+	const client = invocation.client;
+	if (channelId === invocation.channelId) return true;
+	const entry = client.cache.channels.get(channelId);
+	if (!entry?.complete || !isTextBasedChannel(entry.data)) return false;
+	const guildId = client.cache.guildForChannel(channelId);
+	if (!guildId || guildId !== invocation.guildId || !client.user) return false;
+	const userId = isAnyInteraction(invocation)
+		? invocation.user.id
+		: invocation.author.id;
+	const [user, bot] = await Promise.all([
+		permissionsFor(client, guildId, channelId, userId),
+		permissionsFor(client, guildId, channelId, client.user.id),
+	]);
 	return (
-		options.messageOrInteraction.channel?.messages.fetch(
-			parameter as Snowflake,
-		) ?? null
+		user.has(PermissionFlagsBits.ViewChannel) &&
+		bot.has(PermissionFlagsBits.ViewChannel)
 	);
-}
-
-async function resolveByLink(
-	parameter: string,
-	options: MessageResolverOptions,
-): Promise<Message | null> {
-	if (!options.messageOrInteraction.guild) {
-		return null;
-	}
-
-	const matches = MessageLinkRegex.exec(parameter);
-	if (!matches) {
-		return null;
-	}
-
-	const [, guildId, channelId, messageId] = matches;
-
-	const guild = container.client.guilds.cache.get(guildId as Snowflake);
-	if (guild !== options.messageOrInteraction.guild) {
-		return null;
-	}
-
-	return getMessageFromChannel(
-		channelId,
-		messageId,
-		isAnyInteraction(options.messageOrInteraction)
-			? options.messageOrInteraction.user
-			: options.messageOrInteraction.author,
-	);
-}
-
-async function resolveByChannelAndMessage(
-	parameter: string,
-	options: MessageResolverOptions,
-): Promise<Message | null> {
-	const result = ChannelMessageRegex.exec(parameter)?.groups;
-
-	if (!result) {
-		return null;
-	}
-
-	return getMessageFromChannel(
-		result.channelId,
-		result.messageId,
-		isAnyInteraction(options.messageOrInteraction)
-			? options.messageOrInteraction.user
-			: options.messageOrInteraction.author,
-	);
-}
-
-async function getMessageFromChannel(
-	channelId: Snowflake,
-	messageId: Snowflake,
-	originalAuthor: User,
-): Promise<Message | null> {
-	const channel = container.client.channels.cache.get(
-		channelId,
-	) as GuildBasedChannelTypes;
-	if (!channel) {
-		return null;
-	}
-
-	if (!(isNewsChannel(channel) || isTextChannel(channel))) {
-		return null;
-	}
-
-	if (!channel.viewable) {
-		return null;
-	}
-
-	if (
-		!channel
-			.permissionsFor(originalAuthor)
-			?.has(PermissionFlagsBits.ViewChannel)
-	) {
-		return null;
-	}
-
-	return channel.messages.fetch(messageId);
 }

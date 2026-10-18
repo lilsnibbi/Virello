@@ -1,4 +1,5 @@
-import type { Guild, ThreadChannel } from "discord.js";
+import type { APIAnnouncementThreadChannel as ThreadChannel } from "discord-api-types/v10";
+import type { GuildReference as Guild } from "../../../discord/entities";
 import { isNewsThreadChannel } from "../../../utilities/discord/index";
 import type { Result } from "../../../utilities/result/index";
 import { Identifiers } from "../../errors/Identifiers";

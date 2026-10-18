@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { ChannelType } from "discord.js";
+import { ChannelType } from "discord-api-types/v10";
 import {
 	ApplicationCommandOptionType,
 	ApplicationCommandType,

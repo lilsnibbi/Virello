@@ -1,4 +1,4 @@
-import { Locale, type LocalizationMap } from "discord.js";
+import { Locale, type LocalizationMap } from "discord-api-types/v10";
 import {
 	ApplicationCommandType,
 	type RESTPostAPIApplicationCommandsJSONBody,

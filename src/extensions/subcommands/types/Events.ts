@@ -1,5 +1,5 @@
 import type { PreconditionContext } from "../../../commands/checks/Precondition";
-import type { Message } from "discord.js";
+import type { MessageContext as Message } from "../../../discord/MessageContext";
 import { type Args } from "../../../commands/arguments/Args";
 import { type UserError } from "../../../commands/errors/UserError";
 import {
@@ -152,7 +152,7 @@ export interface ChatInputSubcommandSuccessPayload extends ChatInputSubcommandRu
 }
 
 /** Add subcommand event argument tuples to discord.js. */
-declare module "discord.js" {
+declare module "../../../events/events" {
 	/** Arguments passed with SubcommandEvents. */
 	interface ClientEvents {
 		/** The slash subcommand preconditions denied the invocation. */

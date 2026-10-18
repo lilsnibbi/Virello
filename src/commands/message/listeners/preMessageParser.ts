@@ -1,28 +1,18 @@
-import {
-	ChannelType,
-	type Message,
-	PermissionFlagsBits,
-	PermissionsBitField,
-} from "discord.js";
+import type { MessageContext as Message } from "../../../discord/MessageContext";
 import { Events } from "../../../events/events";
 import { Listener } from "../../../events/listener";
-import { isDMChannel } from "../../../utilities/discord/index";
+import { canRunMessageCommand } from "../access";
 
 export class PreMessageParserListener extends Listener<
 	typeof Events.PreMessageParsed
 > {
-	private readonly requiredPermissions = new PermissionsBitField([
-		PermissionFlagsBits.ViewChannel,
-		PermissionFlagsBits.SendMessages,
-	]).freeze();
-
 	public constructor(context: Listener.Context) {
 		super(context, { event: Events.PreMessageParsed });
 	}
 
 	public async run(message: Message) {
 		// If the bot cannot run the command due to lack of permissions, return.
-		const canRun = await this.canRunInChannel(message);
+		const canRun = await canRunMessageCommand(message);
 		if (!canRun) return;
 
 		let prefix: string | null | RegExp = null;
@@ -49,20 +39,6 @@ export class PreMessageParserListener extends Listener<
 		else client.emit(Events.PrefixedMessage, message, prefix);
 	}
 
-	private async canRunInChannel(message: Message): Promise<boolean> {
-		if (message.channel.type === ChannelType.GroupDM) return false;
-		if (isDMChannel(message.channel)) return true;
-
-		const me = await message.guild?.members.fetchMe();
-		if (!me) return false;
-
-		const { channel } = message;
-		const permissionsFor = channel.permissionsFor(me);
-		if (!permissionsFor) return false;
-
-		return permissionsFor.has(this.requiredPermissions, true);
-	}
-
 	private getMentionPrefix(message: Message): string | null {
 		if (this.container.client.disableMentionPrefix) return null;
 		// If the content is shorter than 20 characters, or does not start with `<@` then skip early:
@@ -72,7 +48,16 @@ export class PreMessageParserListener extends Listener<
 		// Calculate the offset and the ID that is being provided
 		const [offset, id] =
 			message.content[2] === "&"
-				? [3, message.guild?.roles.botRoleFor(this.container.client.id!)?.id]
+				? [
+						3,
+						message.guildId
+							? [...message.client.cache.roles.values(message.guildId)].find(
+									(entry) =>
+										entry.complete &&
+										entry.data.tags?.bot_id === this.container.client.id,
+								)?.data.id
+							: undefined,
+					]
 				: [message.content[2] === "!" ? 3 : 2, this.container.client.id];
 
 		if (!id) return null;

@@ -1,8 +1,8 @@
 import type {
 	ChatInputCommandInteraction,
 	ContextMenuCommandInteraction,
-	Message,
-} from "discord.js";
+} from "../../../discord/InteractionContext";
+import type { MessageContext as Message } from "../../../discord/MessageContext";
 import { Identifiers } from "../../errors/Identifiers";
 import { AllFlowsPrecondition } from "../Precondition";
 
@@ -12,10 +12,11 @@ export class NSFWCheck extends AllFlowsPrecondition {
 	 * Check a message invocation. Require the invocation channel’s nsfw field to be true.
 	 * @returns Ok to allow or a precondition error to deny. Any failed Discord fetch rejects.
 	 */
-	public messageRun(message: Message): AllFlowsPrecondition.Result {
+	public async messageRun(message: Message): AllFlowsPrecondition.AsyncResult {
 		// `nsfw` is undefined in DMChannel, doing `=== true`
 		// will result on it returning `false`.
-		return Reflect.get(message.channel, "nsfw") === true
+		return Reflect.get(await this.fetchChannelFromMessage(message), "nsfw") ===
+			true
 			? this.ok()
 			: this.error({
 					identifier: Identifiers.PreconditionNSFW,

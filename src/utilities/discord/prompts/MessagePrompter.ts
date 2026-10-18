@@ -1,10 +1,9 @@
 import type {
 	CollectorFilter,
-	EmojiResolvable,
-	Message,
-	MessageReaction,
-	User,
-} from "discord.js";
+	Reaction as MessageReaction,
+} from "../../../discord/Collector";
+import type { MessageContext as Message } from "../../../discord/MessageContext";
+import type { APIUser as User } from "discord-api-types/v10";
 import type { Ctor } from "../../index";
 import type {
 	MessagePrompterChannelTypes,
@@ -37,7 +36,7 @@ export interface StrategyReturns {
 	/** Numeric emoji selection result. */
 	number: IMessagePrompterExplicitNumberReturn | number;
 	/** Configured reaction selection result. */
-	reaction: IMessagePrompterExplicitReturnBase | string | EmojiResolvable;
+	reaction: IMessagePrompterExplicitReturnBase | string;
 }
 
 /** Configuration accepted by each named prompt strategy. */

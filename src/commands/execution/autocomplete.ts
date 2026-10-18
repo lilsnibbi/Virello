@@ -1,4 +1,4 @@
-import type { AutocompleteInteraction } from "discord.js";
+import type { AutocompleteInteraction } from "../../discord/InteractionContext";
 import { Events } from "../../events/events";
 import { Listener } from "../../events/listener";
 import type { AutocompleteCommand } from "../types";

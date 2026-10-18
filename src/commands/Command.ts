@@ -1,10 +1,10 @@
-import {
-	type AutocompleteInteraction,
-	ChannelType,
+import type {
+	AutocompleteInteraction,
 	ChatInputCommandInteraction,
 	ContextMenuCommandInteraction,
-	type Message,
-} from "discord.js";
+} from "../discord/InteractionContext";
+import type { MessageContext as Message } from "../discord/MessageContext";
+import { ChannelType } from "discord-api-types/v10";
 import { AliasModule } from "../core/modules/index";
 import {
 	type Awaitable,
@@ -404,21 +404,15 @@ export declare namespace Command {
 	export type RunInUnion = CommandRunInUnion;
 	/** Shorthand for {@link CommandSpecificRunIn}. */
 	export type SpecificRunIn = CommandSpecificRunIn;
-	/** Shorthand for the discord.js ChatInputCommandInteraction type, retaining its cache-state parameter. */
-	export type ChatInputCommandInteraction<
-		Cached extends import("discord.js").CacheType =
-			import("discord.js").CacheType,
-	> = import("discord.js").ChatInputCommandInteraction<Cached>;
-	/** Shorthand for the discord.js ContextMenuCommandInteraction type, retaining its cache-state parameter. */
-	export type ContextMenuCommandInteraction<
-		Cached extends import("discord.js").CacheType =
-			import("discord.js").CacheType,
-	> = import("discord.js").ContextMenuCommandInteraction<Cached>;
-	/** Shorthand for the discord.js AutocompleteInteraction type, retaining its cache-state parameter. */
-	export type AutocompleteInteraction<
-		Cached extends import("discord.js").CacheType =
-			import("discord.js").CacheType,
-	> = import("discord.js").AutocompleteInteraction<Cached>;
+	/** Native slash command context and option resolver. */
+	export type ChatInputCommandInteraction =
+		import("../discord/InteractionContext").ChatInputCommandInteraction;
+	/** Native user/message menu context and resolved targets. */
+	export type ContextMenuCommandInteraction =
+		import("../discord/InteractionContext").ContextMenuCommandInteraction;
+	/** Native autocomplete context and focused option resolver. */
+	export type AutocompleteInteraction =
+		import("../discord/InteractionContext").AutocompleteInteraction;
 	/** Shorthand for {@link ApplicationCommandRegistry}. */
 	export type Registry = ApplicationCommandRegistry;
 }

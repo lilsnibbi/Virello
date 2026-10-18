@@ -1,4 +1,4 @@
-import type { Guild } from "discord.js";
+import type { APIGuild as Guild } from "discord-api-types/v10";
 import { Argument } from "../Argument";
 import { resolveGuild } from "../resolvers/guild";
 

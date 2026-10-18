@@ -1,4 +1,4 @@
-import type { ChatInputCommandInteraction } from "discord.js";
+import type { ChatInputCommandInteraction } from "../../../discord/InteractionContext";
 import { Events } from "../../../events/events";
 import { Listener } from "../../../events/listener";
 import type { ChatInputCommand } from "../../types";

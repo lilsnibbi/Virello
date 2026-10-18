@@ -27,9 +27,9 @@ client.sharding.handle("statsUpdate", (input) => {
 	ready = input.ready;
 	delayMs = input.delayMs ?? 0;
 	invalid = input.invalid ?? false;
-	client.guilds.cache.clear();
+	client.cache.guilds.clear();
 	for (let index = 0; index < input.guilds; index++)
-		client.guilds.cache.set(String(index), {} as never);
+		client.cache.guilds.patch(String(index), { id: String(index) });
 	return null;
 });
 client.sharding.handle("statsRead", async ({ shard }) => {

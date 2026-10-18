@@ -1,9 +1,6 @@
-import {
-	type APIEmbed,
-	EmbedBuilder,
-	type EmbedData,
-	isJSONEncodable,
-} from "discord.js";
+import { EmbedBuilder } from "@discordjs/builders";
+import type { APIEmbed, APIEmbed as EmbedData } from "discord-api-types/v10";
+import { isJSONEncodable } from "../../../discord/payloads";
 import { isFunction, isNullish, isNullishOrEmpty } from "../../index";
 import { PaginatedMessage } from "./PaginatedMessage";
 import type { EmbedResolvable } from "./PaginatedMessageTypes";
@@ -85,7 +82,8 @@ export class PaginatedFieldMessageEmbed<T> extends PaginatedMessage {
 				? []
 				: [...template.fields];
 			if (fieldsClone.length > 0) clonedTemplate.setFields();
-			if (isNullish(template.color)) clonedTemplate.setColor("Random");
+			if (isNullish(template.color))
+				clonedTemplate.setColor(Math.floor(Math.random() * 0x1000000));
 
 			const data = this.paginateArray(this.items, i, this.itemsPerPage);
 			this.addPage({
@@ -112,7 +110,9 @@ export class PaginatedFieldMessageEmbed<T> extends PaginatedMessage {
 	): APIEmbed {
 		if (isFunction(template)) template = template(new EmbedBuilder());
 		return (
-			isJSONEncodable(template) ? template : new EmbedBuilder(template)
+			isJSONEncodable<APIEmbed>(template)
+				? template
+				: new EmbedBuilder(template)
 		).toJSON();
 	}
 }

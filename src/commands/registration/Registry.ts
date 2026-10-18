@@ -4,14 +4,13 @@ import type {
 	SlashCommandOptionsOnlyBuilder,
 	SlashCommandSubcommandsOnlyBuilder,
 } from "@discordjs/builders";
-import {
-	type ApplicationCommand,
-	type ApplicationCommandManager,
-	type ChatInputApplicationCommandData,
-	Collection,
-	type MessageApplicationCommandData,
-	type UserApplicationCommandData,
-} from "discord.js";
+import type {
+	APIApplicationCommand as ApplicationCommand,
+	RESTPostAPIChatInputApplicationCommandsJSONBody as ChatInputApplicationCommandData,
+	RESTPostAPIContextMenuApplicationCommandsJSONBody as MessageApplicationCommandData,
+	RESTPostAPIContextMenuApplicationCommandsJSONBody as UserApplicationCommandData,
+} from "discord-api-types/v10";
+import type { ApplicationCommands as ApplicationCommandManager } from "../../discord/ApplicationCommands";
 import {
 	ApplicationCommandType,
 	type RESTPostAPIChatInputApplicationCommandsJSONBody,
@@ -67,16 +66,13 @@ export class ApplicationCommandRegistry {
 
 	/** The guild command ids for this command.
 	 * @deprecated This field will only show the first guild command id registered for this registry per guild. */
-	public readonly guildCommandIds = new Collection<string, string>();
+	public readonly guildCommandIds = new Map<string, string>();
 
 	/** A map of guild ids to a set of registered and valid chat input command ids that point to this registry. */
-	public readonly guildIdToChatInputCommandIds = new Collection<
-		string,
-		Set<string>
-	>();
+	public readonly guildIdToChatInputCommandIds = new Map<string, Set<string>>();
 
 	/** A map of guild ids to a set of registered and valid context menu command ids that point to this registry. */
-	public readonly guildIdToContextMenuCommandIds = new Collection<
+	public readonly guildIdToContextMenuCommandIds = new Map<
 		string,
 		Set<string>
 	>();
@@ -313,8 +309,8 @@ export class ApplicationCommandRegistry {
 	 */
 	protected async runAPICalls(
 		applicationCommands: ApplicationCommandManager,
-		globalCommands: Collection<string, ApplicationCommand>,
-		guildCommands: Map<string, Collection<string, ApplicationCommand>>,
+		globalCommands: Map<string, ApplicationCommand>,
+		guildCommands: Map<string, Map<string, ApplicationCommand>>,
 	) {
 		// Early return for no API calls
 		if (this.apiCalls.length === 0) {
@@ -379,9 +375,10 @@ export class ApplicationCommandRegistry {
 				this.addChatInputCommandIds(id);
 
 				if (guildId) {
-					this.guildIdToChatInputCommandIds
-						.ensure(guildId, () => new Set())
-						.add(id);
+					const ids =
+						this.guildIdToChatInputCommandIds.get(guildId) ?? new Set<string>();
+					ids.add(id);
+					this.guildIdToChatInputCommandIds.set(guildId, ids);
 				} else {
 					this.globalChatInputCommandIds.add(id);
 				}
@@ -391,9 +388,11 @@ export class ApplicationCommandRegistry {
 				this.addContextMenuCommandIds(id);
 
 				if (guildId) {
-					this.guildIdToContextMenuCommandIds
-						.ensure(guildId, () => new Set())
-						.add(id);
+					const ids =
+						this.guildIdToContextMenuCommandIds.get(guildId) ??
+						new Set<string>();
+					ids.add(id);
+					this.guildIdToContextMenuCommandIds.set(guildId, ids);
 				} else {
 					this.globalContextMenuCommandIds.add(id);
 				}
@@ -451,8 +450,8 @@ export class ApplicationCommandRegistry {
 
 	private async handleAPICall(
 		commandsManager: ApplicationCommandManager,
-		globalCommands: Collection<string, ApplicationCommand>,
-		allGuildsCommands: Map<string, Collection<string, ApplicationCommand>>,
+		globalCommands: Map<string, ApplicationCommand>,
+		allGuildsCommands: Map<string, Map<string, ApplicationCommand>>,
 		apiCall: InternalAPICall,
 	) {
 		const { builtData, registerOptions } = apiCall;
@@ -506,7 +505,7 @@ export class ApplicationCommandRegistry {
 		}
 
 		if (!registerOptions.guildIds?.length) {
-			const globalCommand = globalCommands.find(findCallback);
+			const globalCommand = [...globalCommands.values()].find(findCallback);
 
 			if (globalCommand) {
 				this.handleIdAddition(apiCall.type, globalCommand.id);
@@ -547,7 +546,9 @@ export class ApplicationCommandRegistry {
 				continue;
 			}
 
-			const existingGuildCommand = guildCommands.find(findCallback);
+			const existingGuildCommand = [...guildCommands.values()].find(
+				findCallback,
+			);
 
 			if (existingGuildCommand) {
 				this.handleIdAddition(apiCall.type, existingGuildCommand.id, guildId);
@@ -671,7 +672,11 @@ export class ApplicationCommandRegistry {
 
 		// Step 3: if the behavior is to update, update the command
 		try {
-			await applicationCommand.edit(apiData as ChatInputApplicationCommandData);
+			await container.client.application!.commands.edit(
+				applicationCommand.id,
+				apiData,
+				guildId ?? undefined,
+			);
 			this.log(
 				"notif",
 				"command_updated",

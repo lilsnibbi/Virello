@@ -17,7 +17,7 @@ export const TaskEvents = {
 };
 
 /** Add scheduler event argument tuples to discord.js. */
-declare module "discord.js" {
+declare module "../../../events/events" {
 	/** Arguments passed with TaskEvents. */
 	interface ClientEvents {
 		/** A queued job has no enabled task module; receives its name and payload. */

@@ -1,162 +1,61 @@
 # Virello
 
-A modular Discord framework for Bun, written in TypeScript and built on discord.js. Organise your bot into commands, listeners and services, with explicit module loading and shared lifecycle management.
+Build a Discord bot with Bun and TypeScript. Put commands, listeners and services
+in their own files; Virello loads them and handles their lifecycle.
 
-## Features
+```sh
+bun add virello
+```
 
-- Slash commands, context menus, message commands and interaction handlers.
-- Argument parsing, preconditions, permissions and cooldowns.
-- Localisation for replies and application commands through i18next.
-- Scheduled tasks with in-memory or Redis-backed storage.
-- Shard coordination, host supervision, typed messaging and opt-in [automatic scaling](docs/sharding-scaling.md).
-- [Shard maintenance and recovery](docs/sharding-recovery.md), with per-process leases and bounded coordinator outages.
-- [Live shard statistics](docs/sharding-stats.md) through `container.sharding.stats()`, with fresh samples and explicit failures.
-- Pagination, validation, collections, time helpers and other utilities.
+**[Make your first bot →](docs/getting-started.md)** ·
+**[Developer docs](docs/README.md)** ·
+**[Run the examples](examples/README.md)**
 
-## Original engine milestone
+Requires **Bun >=1.4.2**. The package ships TypeScript directly, with no build step
+or Node runtime entrypoint.
 
-The experimental [native Discord engine](docs/engine.md) is available through `virello/engine`. It owns gateway sessions, REST and cache while the existing framework keeps its current runtime. Run `bun examples/engine/offline.ts` for a local connect/reply/resume demonstration with no Discord credentials.
+> [!NOTE]
+> This checkout uses Virello's own gateway, REST, cache and sharding runtime.
+> Payload construction uses `@discordjs/builders`; API definitions use
+> `discord-api-types`. There is no discord.js client underneath.
+>
+> The native migration is **unreleased**. npm `latest` was `0.1.1` on
+> 2026-10-18 and still uses the previous runtime. See the
+> [migration guide](BREAKING_CHANGES.md#native-runtime-unreleased) before using
+> the native APIs documented here.
 
-## Getting started
+## What are you building?
 
-Use **Bun 1.4.3 or newer**. Virello runs TypeScript directly; no compilation step is required.
+| I want to…                                  | Start here                                                                                    |
+| ------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Add slash commands, menus or autocomplete   | [Commands](docs/commands.md)                                                                  |
+| Parse `!commands` or match message patterns | [Message commands](docs/message-commands.md)                                                  |
+| Check permissions and apply cooldowns       | [Checks](docs/checks.md)                                                                      |
+| Handle events, buttons or modals            | [Events and interactions](docs/events.md)                                                     |
+| Share resources or schedule work            | [Services and extensions](docs/extensions.md) · [Tasks](docs/scheduling.md)                   |
+| Translate replies and command labels        | [Localisation](docs/localisation.md)                                                          |
+| Run multiple shard processes                | [Sharding](docs/sharding.md)                                                                  |
+| Understand caches, limits or failures       | [Caching and limits](docs/caching-and-limits.md) · [Troubleshooting](docs/troubleshooting.md) |
+| Find an import or exact option type         | [Public API map](docs/api.md)                                                                 |
 
-From this repository, install dependencies:
+## Try it locally
+
+From a clone of this repository, using the project's Bun canary toolchain:
 
 ```sh
 bun install --frozen-lockfile
+bun examples/offline.ts
 ```
 
-The [example bot](examples/README.md) includes a coordinator, shard host, three slash commands and an [env template](examples/.env.example).
+The offline example loads the bot's modules in two child processes, checks shard
+messaging, then cleans up. It needs no Discord token. For a real bot, follow the
+[example setup](examples/README.md).
 
-Copy `examples/.env.example` to `examples/.env`, fill in your bot token and a generated host secret, then start these in separate terminals:
-
-```sh
-bun --env-file=examples/.env examples/coordinator.ts
-bun --env-file=examples/.env examples/host.ts
-```
-
-The host starts two bot processes by default. Try `/ping`, `/stats` and `/shard`. The example guide covers server setup, secrets and running hosts on separate machines.
-
-### Create your own bot
-
-In a separate Bun project, install your local Virello checkout and discord.js. Replace the path with your checkout location:
-
-```sh
-bun add /absolute/path/to/Virello discord.js
-```
-
-Use this layout:
-
-```text
-my-bot/
-├── commands/
-│   └── ping.ts
-├── .env
-└── index.ts
-```
-
-Create `index.ts`:
-
-```ts
-import { GatewayIntentBits } from "discord.js";
-import { VirelloClient } from "virello";
-
-const token = Bun.env.DISCORD_TOKEN;
-if (!token) throw new Error("Set DISCORD_TOKEN in your .env file.");
-
-const client = new VirelloClient({
-	intents: [GatewayIntentBits.Guilds],
-	root: import.meta.dir,
-	modules: { commands: "commands/**/*.ts" },
-});
-
-process.once("SIGINT", () => {
-	void client.destroy();
-});
-
-await client.login(token);
-```
-
-Create `commands/ping.ts`:
-
-```ts
-import { Command } from "virello";
-
-export default class PingCommand extends Command {
-	static override options: Command.Options = {
-		description: "Check whether the bot is awake.",
-	};
-
-	override registerApplicationCommands(registry: Command.Registry): void {
-		registry.registerChatInputCommand((builder) =>
-			builder.setName(this.name).setDescription(this.description),
-		);
-	}
-
-	override async chatInputRun(
-		interaction: Command.ChatInputCommandInteraction,
-	): Promise<void> {
-		await interaction.reply("Pong!");
-	}
-}
-```
-
-Set `DISCORD_TOKEN` in your bot's `.env`, add `.env` to its `.gitignore`, then run:
-
-```sh
-bun index.ts
-```
-
-The filename supplies the command name. Module paths are explicit glob patterns relative to `root`; folders are not scanned automatically. Restart the process after changing code, module patterns or translations.
-
-## Imports
-
-Import from the package root or a focused entrypoint:
-
-```ts
-import { VirelloClient } from "virello/client";
-import { Command, Precondition } from "virello/commands";
-import { Task } from "virello/scheduling";
-import { Result } from "virello/utilities";
-```
-
-Other entrypoints include `modules`, `events`, `extensions`, `localisation`, `services`, `sharding`, `discord`, `time` and `validation`. Root and category imports share the same classes and state. Keep TypeScript declaration augmentation on `virello`.
-
-## Examples
-
-| Example                              | Demonstrates                                                            |
-| ------------------------------------ | ----------------------------------------------------------------------- |
-| [Example guide](examples/README.md)  | Setup, environment settings, shard roles and running across machines    |
-| [Bot](examples/bot.ts)               | Shared entrypoint for each managed shard                                |
-| [Commands](examples/commands/)       | Local replies, broadcasts and single-shard requests                     |
-| [Offline check](examples/offline.ts) | The same bot modules in two real child processes, without Discord login |
-
-Try `bun examples/offline.ts` without a Discord token.
-
-## Development
-
-Use **Bun canary**, the project's standard toolchain. Install it with `bun upgrade --canary`; CI follows the canary channel through `packageManager` in `package.json`.
-
-| Command           | Purpose                                 |
-| ----------------- | --------------------------------------- |
-| `bun test`        | Run Bun tests                           |
-| `bun check`       | Check TypeScript without emitting files |
-| `bun lint`        | Run Bun's built-in lint rules           |
-| `bun fmt --check` | Check formatting without writing files  |
-| `bun fmt`         | Apply formatting                        |
-
-Redis integration tests require `VIRELLO_TEST_REDIS_URL` pointing to a disposable Redis instance; otherwise those tests are skipped locally.
-
-Run `bun scripts/ci.ts` with that loopback Redis URL for complete validation: zero skipped tests, native Bun type checking, linting, formatting and both offline examples. On the Ubuntu x64 CI runner, `bash scripts/checkActions.sh` also checks the workflow with checksum-pinned actionlint.
-
-See [migration notes](BREAKING_CHANGES.md) when moving from an earlier Virello API.
-
-See [console logging](docs/console-logging.md) for readable text/JSON output,
-redaction, custom logger compatibility and the offline `bun scripts/logging-demo.ts` preview.
-
-Source lives in `src/`, tests in `tests/` and runnable examples in `examples/`. See [Repository Guidelines](AGENTS.md) for contribution conventions.
+Working on Virello itself? See [development](docs/development.md),
+[repository conventions](AGENTS.md) and [migration notes](BREAKING_CHANGES.md).
 
 ## Licence
 
-The package declares `MIT AND Apache-2.0`. See the root [MIT licence](LICENSE), the [sharding Apache-2.0 licence](src/sharding/LICENSE), the shipped [source attribution](docs/source-retention.md) and retained notices alongside individual modules.
+`MIT AND Apache-2.0`. See the [root licence](LICENSE),
+[sharding licence](src/sharding/LICENSE), [debounce licence](src/utilities/function/debounce/LICENSE)
+and attribution comments retained in source files.

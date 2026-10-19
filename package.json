@@ -96,7 +96,7 @@
 		"arktype": "^2.2.8",
 		"cron-parser": "5.10.2",
 		"discord-api-types": "0.38.56",
-		"i18next": "^26.4.5"
+		"i18next": "^26.4.7"
 	},
 	"devDependencies": {
 		"@types/bun": "1.4.3",

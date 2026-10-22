@@ -31,7 +31,7 @@ jobs:
       contents: read
     services:
       redis:
-        image: redis:7.4.11-bookworm@sha256:cd745595f143052dd6a743bc5651d3ce4b03979fe5c99c7fcfab73461f6f217b
+        image: redis:7.4.11-bookworm@sha256:026c880268ce52fb3a63b66150af583108a38c13af7633e325ae82a145f53a87
         ports:
           - 6379/tcp
         options: >-

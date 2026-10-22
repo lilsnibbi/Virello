@@ -1,0 +1,71 @@
+// Adapted from Ovencord (cc6100f8), Apache-2.0.
+// Modified for Virello: local utilities, native payloads and validated serialization.
+// See src/builders/NOTICE and src/builders/LICENSE.
+import {
+	type APIApplicationCommandChannelOption,
+	ChannelType,
+} from "discord-api-types/v10";
+import {
+	normalizeArray,
+	type RestOrArray,
+} from "../../../../util/normalizeArray";
+
+export const ApplicationCommandOptionAllowedChannelTypes = [
+	ChannelType.GuildText,
+	ChannelType.GuildVoice,
+	ChannelType.GuildCategory,
+	ChannelType.GuildAnnouncement,
+	ChannelType.AnnouncementThread,
+	ChannelType.PublicThread,
+	ChannelType.PrivateThread,
+	ChannelType.GuildStageVoice,
+	ChannelType.GuildForum,
+	ChannelType.GuildMedia,
+] as const;
+
+/**
+ * Allowed channel types used for a channel option.
+ */
+export type ApplicationCommandOptionAllowedChannelType =
+	(typeof ApplicationCommandOptionAllowedChannelTypes)[number];
+
+export type ApplicationCommandOptionChannelTypesData = Pick<
+	APIApplicationCommandChannelOption,
+	"channel_types"
+>;
+
+/**
+ * This mixin holds channel type symbols used for options.
+ */
+export class ApplicationCommandOptionChannelTypesMixin {
+	/**
+	 * @internal
+	 */
+	declare protected readonly data: ApplicationCommandOptionChannelTypesData;
+
+	/**
+	 * Adds channel types to this option.
+	 *
+	 * @param channelTypes - The channel types
+	 */
+	public addChannelTypes(
+		...channelTypes: RestOrArray<ApplicationCommandOptionAllowedChannelType>
+	) {
+		this.data.channel_types ??= [];
+		this.data.channel_types.push(...normalizeArray(channelTypes));
+
+		return this;
+	}
+
+	/**
+	 * Sets the channel types for this option.
+	 *
+	 * @param channelTypes - The channel types
+	 */
+	public setChannelTypes(
+		...channelTypes: RestOrArray<ApplicationCommandOptionAllowedChannelType>
+	) {
+		this.data.channel_types = normalizeArray(channelTypes);
+		return this;
+	}
+}

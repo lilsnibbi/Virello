@@ -3,7 +3,7 @@ import {
 	type ModalBuilder,
 	EmbedBuilder,
 	SeparatorBuilder,
-} from "@discordjs/builders";
+} from "virello/builders";
 import {
 	type APIContainerComponent,
 	type APIActionRowComponent,
@@ -169,6 +169,20 @@ function harness(interaction = false) {
 }
 
 describe("list pagination interactions", () => {
+	test("fills an unfinished color-only template before validating the final embed", async () => {
+		const h = harness();
+		const template = new EmbedBuilder().setColor(0);
+		const pagination = track(
+			new Pagination(["Ticket details"], { type: "embed", embed: template }),
+		);
+		await pagination.send(h.target);
+		expect(h.payloads.at(-1)!.embeds[0]).toMatchObject({
+			color: 0,
+			description: "Ticket details",
+		});
+		expect(template.toData().description).toBeUndefined();
+		expect(() => template.toJSON()).toThrow();
+	});
 	test("embed navigation clamps boundaries, uses unique controls, and preserves supplied templates", async () => {
 		const h = harness();
 		const embed = new EmbedBuilder()

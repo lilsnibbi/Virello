@@ -23,14 +23,10 @@ Use **Bun >=1.4.2**. Run the TypeScript files directly with Bun.
 > This branch removes that runtime dependency; its native APIs are unreleased.
 > [Migration details](../BREAKING_CHANGES.md#native-runtime-unreleased).
 
-For your own builder or Discord enum imports, declare the packages directly:
-
-```sh
-bun add @discordjs/builders discord-api-types
-```
-
-Virello supplies builders to command-registration callbacks, so the `/ping`
-example below needs only `virello`.
+Install only `virello`. This checkout includes first-party payload builders at
+`virello/builders` and the `DiscordAPI` namespace at `virello/discord` for native
+types, enums and routes. Command-registration callbacks receive Virello builders.
+See [builders and migration](builders.md) for the unreleased builder surface.
 
 ## Add these two files
 

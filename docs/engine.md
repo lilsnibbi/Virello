@@ -6,7 +6,7 @@
 flowchart LR
     A["Commands, listeners, extensions"] --> B["Virello contexts"]
     B --> C["EngineClient"]
-    D["@discordjs/builders: payload JSON"] --> B
+    D["virello/builders: payload JSON"] --> B
     C --> G["GatewayShard"]
     C --> R["RestClient"]
     G --> K["EngineCache"]
@@ -27,7 +27,9 @@ engine when you want native dispatch handling without modules or command routing
 
 ```ts
 import { EngineClient } from "virello/engine";
-import { GatewayIntentBits } from "discord-api-types/v10";
+import { DiscordAPI } from "virello/discord";
+
+const { GatewayIntentBits } = DiscordAPI;
 
 const token = Bun.env.DISCORD_TOKEN;
 if (!token) throw new Error("Set DISCORD_TOKEN.");

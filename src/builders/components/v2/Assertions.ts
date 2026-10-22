@@ -1,0 +1,98 @@
+// Adapted from Ovencord (cc6100f8), Apache-2.0.
+// Modified for Virello: local utilities, native payloads and validated serialization.
+// See src/builders/NOTICE and src/builders/LICENSE.
+import { ComponentType, SeparatorSpacingSize } from "discord-api-types/v10";
+import { z } from "zod";
+import { idPredicate } from "../../Assertions";
+import { messageActionRowPredicate, buttonPredicate } from "../Assertions";
+
+const unfurledMediaItemPredicate = z.object({
+	url: z
+		.string()
+		.url()
+		.refine(
+			(url) =>
+				url.startsWith("http:") ||
+				url.startsWith("https:") ||
+				url.startsWith("attachment:"),
+			{
+				message: "URL must use http, https, or attachment protocol",
+			},
+		),
+});
+
+export const thumbnailPredicate = z.object({
+	type: z.literal(ComponentType.Thumbnail),
+	id: idPredicate,
+	media: unfurledMediaItemPredicate,
+	description: z.string().min(1).max(1_024).nullish(),
+	spoiler: z.boolean().optional(),
+});
+
+const unfurledMediaItemAttachmentOnlyPredicate = z.object({
+	url: z
+		.string()
+		.url()
+		.refine((url) => url.startsWith("attachment:"), {
+			message: "URL must use attachment protocol",
+		}),
+});
+
+export const filePredicate = z.object({
+	type: z.literal(ComponentType.File),
+	id: idPredicate,
+	file: unfurledMediaItemAttachmentOnlyPredicate,
+	spoiler: z.boolean().optional(),
+});
+
+export const separatorPredicate = z.object({
+	type: z.literal(ComponentType.Separator),
+	id: idPredicate,
+	divider: z.boolean().optional(),
+	spacing: z.nativeEnum(SeparatorSpacingSize).optional(),
+});
+
+export const textDisplayPredicate = z.object({
+	type: z.literal(ComponentType.TextDisplay),
+	id: idPredicate,
+	content: z.string().min(1).max(4_000),
+});
+
+export const mediaGalleryItemPredicate = z.object({
+	id: idPredicate,
+	media: unfurledMediaItemPredicate,
+	description: z.string().min(1).max(1_024).nullish(),
+	spoiler: z.boolean().optional(),
+});
+
+export const mediaGalleryPredicate = z.object({
+	type: z.literal(ComponentType.MediaGallery),
+	id: idPredicate,
+	items: z.array(mediaGalleryItemPredicate).min(1).max(10),
+});
+
+export const sectionPredicate = z.object({
+	type: z.literal(ComponentType.Section),
+	id: idPredicate,
+	components: z.array(textDisplayPredicate).min(1).max(3),
+	accessory: z.union([buttonPredicate, thumbnailPredicate]),
+});
+
+export const containerPredicate = z.object({
+	type: z.literal(ComponentType.Container),
+	id: idPredicate,
+	components: z
+		.array(
+			z.union([
+				messageActionRowPredicate,
+				filePredicate,
+				mediaGalleryPredicate,
+				sectionPredicate,
+				separatorPredicate,
+				textDisplayPredicate,
+			]),
+		)
+		.min(1),
+	spoiler: z.boolean().optional(),
+	accent_color: z.number().int().min(0).max(0xffffff).nullish(),
+});

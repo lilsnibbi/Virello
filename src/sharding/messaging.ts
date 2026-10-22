@@ -1,4 +1,6 @@
 import { statsMap, statsRequest, statsSnapshot } from "./stats";
+import { calculateShardId } from "./guilds";
+import { ShardLifecycle } from "./lifecycle";
 import {
 	type ShardCallOptions,
 	ShardError,
@@ -10,7 +12,11 @@ import {
 } from "./types";
 
 /** Named request API shared by client.sharding and the host supervisor. */
-export abstract class ShardMessenger {
+export abstract class ShardMessenger<
+	Event = unknown,
+> extends ShardLifecycle<Event> {
+	/** Concrete production transports report observer failures through their existing logger. */
+	protected override lifecycleListenerError(_error: unknown): void {}
 	/** Configured total from the latest assignment; zero before a host receives one. */
 	public abstract get shardCount(): number;
 	/**
@@ -33,7 +39,7 @@ export abstract class ShardMessenger {
 	 * @returns The remote handler’s output.
 	 */
 	protected abstract call(
-		target: number,
+		target: number | { guildId: string },
 		name: string,
 		payload: unknown,
 		options: ShardCallOptions,
@@ -55,6 +61,23 @@ export abstract class ShardMessenger {
 		options: ShardCallOptions = {},
 	): Promise<ShardOutput<K>> {
 		return this.call(shard, name, payload, options) as Promise<ShardOutput<K>>;
+	}
+	/** Resolve a guild using the latest reconciled total immediately before sending a named handler request. No code is evaluated remotely. */
+	public requestGuild<K extends ShardRequestName>(
+		guildId: string,
+		name: K,
+		payload: ShardInput<K>,
+		options: ShardCallOptions = {},
+	): Promise<ShardOutput<K>> {
+		return this.call({ guildId }, name, payload, options) as Promise<
+			ShardOutput<K>
+		>;
+	}
+	/** Resolve after prepare so an optional coordinator wait cannot retain a stale topology. */
+	protected resolveTarget(target: number | { guildId: string }): number {
+		return typeof target === "number"
+			? target
+			: calculateShardId(target.guildId, this.shardCount);
 	}
 	/**
 	 * Request fresh live stats from one shard, or every configured ID when omitted. Self requests also use the coordinator.

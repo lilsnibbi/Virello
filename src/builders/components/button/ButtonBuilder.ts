@@ -1,0 +1,78 @@
+// Adapted from Ovencord (cc6100f8), Apache-2.0.
+// Modified for Virello: local utilities, native payloads and validated serialization.
+// See src/builders/NOTICE and src/builders/LICENSE.
+import {
+	type APIButtonComponent,
+	type ButtonStyle,
+	ComponentType,
+} from "discord-api-types/v10";
+import { Mixin } from "ts-mixer";
+import { BaseButtonBuilder } from "./Button";
+import { EmojiOrLabelButtonMixin } from "./mixins/EmojiOrLabelButtonMixin";
+
+/**
+ * A builder that creates API-compatible JSON data for buttons.
+ *
+ * @mixes {@link BaseButtonBuilder}\<{@link discord-api-types/v10#(APIButtonComponent:interface)}\>
+ * @mixes {@link EmojiOrLabelButtonMixin}
+ */
+
+export class ButtonBuilder extends Mixin(
+	BaseButtonBuilder<APIButtonComponent>,
+	EmojiOrLabelButtonMixin,
+) {
+	/**
+	 * @internal
+	 */
+	protected override readonly data: Partial<APIButtonComponent>;
+
+	/**
+	 * Creates a new button builder.
+	 *
+	 * @param data - The API data to create this button with
+	 */
+	public constructor(data: Partial<APIButtonComponent> = {}) {
+		super();
+		this.data = { ...structuredClone(data), type: ComponentType.Button };
+	}
+
+	/**
+	 * Sets the custom id for this button.
+	 *
+	 * @param customId - The custom id to use
+	 */
+	public setCustomId(customId: string) {
+		(this.data as Record<string, unknown>).custom_id = customId;
+		return this;
+	}
+
+	/**
+	 * Sets the style for this button.
+	 *
+	 * @param style - The style to use
+	 */
+	public setStyle(style: ButtonStyle) {
+		(this.data as Record<string, unknown>).style = style;
+		return this;
+	}
+
+	/**
+	 * Sets the URL for this button.
+	 *
+	 * @param url - The URL to use
+	 */
+	public setURL(url: string) {
+		(this.data as Record<string, unknown>).url = url;
+		return this;
+	}
+
+	/**
+	 * Sets the SKU id for this button.
+	 *
+	 * @param skuId - The SKU id to use
+	 */
+	public setSKUId(skuId: string) {
+		(this.data as Record<string, unknown>).sku_id = skuId;
+		return this;
+	}
+}

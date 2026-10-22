@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import { join } from "node:path";
 import * as Root from "virello";
+import * as Builders from "virello/builders";
 import * as Client from "virello/client";
 import * as Commands from "virello/commands";
 import * as Discord from "virello/discord";
@@ -22,6 +23,7 @@ import { container } from "../../src/core/Container";
 import baseline from "../fixtures/public.json";
 
 const categories = {
+	builders: Builders,
 	client: Client,
 	commands: Commands,
 	discord: Discord,
@@ -60,6 +62,7 @@ test("sharding exposes supported APIs without exporting stats transport plumbing
 		"ShardCoordinator",
 		"ShardError",
 		"ShardManager",
+		"calculateShardId",
 	]);
 	for (const name of [
 		"statsRequest",

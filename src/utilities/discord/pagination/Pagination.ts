@@ -1,15 +1,13 @@
 // Inspired by DiscordPagination. Copyright (c) 2026 lilsnibbi. MIT; see ../../../../LICENSE and ../../../../docs/source-retention.md.
 import { randomUUIDv7 } from "bun";
-import {
-	ActionRowBuilder,
-	ButtonBuilder,
-	ContainerBuilder,
-	EmbedBuilder,
-	LabelBuilder,
-	ModalBuilder,
-	TextDisplayBuilder,
-	TextInputBuilder,
-} from "@discordjs/builders";
+import { ActionRowBuilder } from "../../../builders/components/ActionRow";
+import { ButtonBuilder } from "../../../builders/components/button/ButtonBuilder";
+import { ContainerBuilder } from "../../../builders/components/v2/Container";
+import { EmbedBuilder } from "../../../builders/messages/embed/Embed";
+import { LabelBuilder } from "../../../builders/components/label/Label";
+import { ModalBuilder } from "../../../builders/interactions/modals/Modal";
+import { TextDisplayBuilder } from "../../../builders/components/v2/TextDisplay";
+import { TextInputBuilder } from "../../../builders/components/textInput/TextInput";
 import {
 	type APIContainerComponent,
 	ButtonStyle,
@@ -197,7 +195,7 @@ export class Pagination {
 		} else
 			this.mode = {
 				type: "embed",
-				embed: structuredClone((options.embed ?? new EmbedBuilder()).toJSON()),
+				embed: options.embed?.toData() ?? {},
 			};
 		for (let page = 0; page < this.pages; page++) {
 			const content = this.content(page);

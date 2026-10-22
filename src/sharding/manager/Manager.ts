@@ -7,6 +7,8 @@ import { type } from "arktype";
 import { createConsoleLogger } from "../../core/logging/console";
 import { writeEvent } from "../../core/logging/diagnostics";
 import { ShardMessenger } from "../messaging";
+import { freezeSnapshot } from "../lifecycle";
+import { RestartDeadline } from "./RestartDeadline";
 import { Availability } from "../transport/availability";
 import { Pending } from "../transport/pending";
 import {
@@ -29,6 +31,10 @@ import {
 	ShardError,
 	type ShardManagerOptions,
 	type ShardProcessStatus,
+	type ShardManagerStatus,
+	type ShardManagerEvent,
+	type ShardRestartOptions,
+	type ShardRestartStatus,
 } from "../types";
 
 interface Child {
@@ -42,6 +48,8 @@ interface Child {
 	lastSeen: number;
 	intentional: boolean;
 	ready: boolean;
+	gatewayReady: boolean;
+	metricsAt: number;
 	requests: Map<string, AbortController>;
 	controls: Pending;
 	reconciled: boolean;
@@ -56,7 +64,7 @@ interface Inbound {
 }
 
 /** Runs on each deployment host; owns only the Bun children it spawns. */
-export class ShardManager extends ShardMessenger {
+export class ShardManager extends ShardMessenger<ShardManagerEvent> {
 	private readonly options: ShardManagerOptions;
 	private readonly instance: string = crypto.randomUUID();
 	private policy: Limits = limits();
@@ -73,6 +81,8 @@ export class ShardManager extends ShardMessenger {
 	private closed = false;
 	private readonly lifecycle = new AbortController();
 	private readonly children = new Map<number, Child>();
+	private manualRestart?: { slots: Set<number>; abort: AbortController };
+	private latestRestart: ShardRestartStatus | null = null;
 	private readonly statuses = new Map<number, ShardProcessStatus>();
 	private readonly restarts = new Map<number, ReturnType<typeof setTimeout>>();
 	private readonly inbound = new Map<string, Inbound>();
@@ -222,6 +232,201 @@ export class ShardManager extends ShardMessenger {
 		return [...this.statuses.values()]
 			.sort((a, b) => a.slot - b.slot)
 			.map((v) => ({ ...v }));
+	}
+	/** Frozen local status. Registered processes and fresh gateway readiness are reported separately. */
+	public get status(): ShardManagerStatus {
+		return freezeSnapshot({
+			host: this.options.id,
+			connected: this.connected,
+			closed: this.closed,
+			draining: this.draining,
+			shardCount: this.count,
+			processes: this.processes.map((process) => ({
+				...process,
+				gatewayReady: this.gatewayReady(this.children.get(process.slot)),
+			})),
+			restart: this.latestRestart,
+		});
+	}
+	private gatewayReady(child: Child | undefined): boolean {
+		return (
+			!!child &&
+			child.reconciled &&
+			child.gatewayReady &&
+			!child.intentional &&
+			performance.now() - child.metricsAt < 15000
+		);
+	}
+	private publishStatus(): void {
+		this.publishLifecycle({ type: "status", status: this.status });
+	}
+	protected override lifecycleListenerError(error: unknown): void {
+		this.report(
+			"A sharding lifecycle observer failed.",
+			error,
+			"lifecycle_listener_failed",
+		);
+	}
+	/** Restart one stable local process slot; its shard remains coordinator-leased rather than forcibly assigned. */
+	public async restartProcess(
+		slot: number,
+		options: ShardRestartOptions = {},
+	): Promise<Readonly<ShardProcessStatus>> {
+		return (await this.restartProcesses([slot], options))[0];
+	}
+	/** Restart a snapshot of all known local slots sequentially, stopping at the first failure. */
+	public restartAll(
+		options: ShardRestartOptions = {},
+	): Promise<readonly Readonly<ShardProcessStatus>[]> {
+		return this.restartProcesses(
+			this.processes.map(({ slot }) => slot),
+			options,
+		);
+	}
+	/**
+	 * Drain selected owned processes sequentially, confirm their exits and lease releases, then await replacement readiness.
+	 * A single deadline covers the operation. Cancellation stops further spawns; already-started shutdown cleanup continues.
+	 * Concurrent manual operations are rejected. Disconnects and topology changes abort the operation, with no rollback.
+	 */
+	public async restartProcesses(
+		slots: readonly number[],
+		options: ShardRestartOptions = {},
+	): Promise<readonly Readonly<ShardProcessStatus>[]> {
+		if (this.closed) throw new ShardError("CLOSED", "Manager is closed.");
+		if (!this.connected)
+			throw new ShardError("DISCONNECTED", "Manager is not connected.");
+		if (this.draining || this.manualRestart)
+			throw new ShardError(
+				"BUSY",
+				"A restart or topology change is already in progress.",
+			);
+		if (
+			!Array.isArray(slots) ||
+			!slots.length ||
+			new Set(slots).size !== slots.length ||
+			slots.some((slot) => !Number.isInteger(slot) || !this.statuses.has(slot))
+		)
+			throw new ShardError(
+				"TARGET",
+				"Select unique existing local process slots.",
+			);
+		if (slots.some((slot) => this.children.get(slot)?.intentional))
+			throw new ShardError("BUSY", "A selected process is still stopping.");
+		if (
+			options.waitForReady !== undefined &&
+			typeof options.waitForReady !== "boolean"
+		)
+			throw new TypeError("waitForReady must be boolean.");
+		const selected = [...slots];
+		const waitForReady = options.waitForReady !== false;
+		const operation = {
+			slots: new Set(selected),
+			abort: new AbortController(),
+		};
+		const signal = AbortSignal.any([
+			operation.abort.signal,
+			this.lifecycle.signal,
+			...(options.signal ? [options.signal] : []),
+		]);
+		const deadline = new RestartDeadline(options.timeoutMs ?? 300000, signal);
+		deadline.check();
+		this.manualRestart = operation;
+		for (const slot of selected) {
+			clearTimeout(this.restarts.get(slot));
+			this.restarts.delete(slot);
+		}
+		const id = crypto.randomUUID();
+		const startedAt = Date.now();
+		const completed: number[] = [];
+		let currentSlot: number | null = null;
+		const progress = (phase: ShardRestartStatus["phase"], error?: unknown) => {
+			this.latestRestart = freezeSnapshot({
+				id,
+				phase,
+				startedAt,
+				slots: [...selected],
+				completed: [...completed],
+				currentSlot,
+				...(["failed", "completed"].includes(phase)
+					? { finishedAt: Date.now() }
+					: {}),
+				...(error
+					? {
+							error: {
+								code: error instanceof ShardError ? error.code : "RESTART",
+								message:
+									error instanceof Error ? error.message : "Restart failed.",
+							},
+						}
+					: {}),
+			});
+			this.publishLifecycle({ type: "restart", status: this.latestRestart });
+		};
+		const results: Readonly<ShardProcessStatus>[] = [];
+		try {
+			for (const slot of selected) {
+				deadline.check();
+				currentSlot = slot;
+				const child = this.children.get(slot);
+				const preferred =
+					child?.shard ??
+					child?.preferred ??
+					this.statuses.get(slot)!.shard ??
+					slot;
+				progress("draining");
+				if (child) await deadline.wait(this.stopChild(child));
+				deadline.check();
+				progress("releasing");
+				await deadline.wait(this.flushReleases());
+				if (child && this.releases.has(child.generation))
+					await deadline.wait(this.flushReleases());
+				deadline.check();
+				if (
+					child &&
+					(this.children.has(slot) || this.releases.has(child.generation))
+				)
+					throw new ShardError(
+						"OWNERSHIP",
+						"Previous process exit and lease release must be confirmed before replacement.",
+					);
+				progress("starting");
+				this.spawn(slot, 0, preferred, true);
+				const replacement = this.children.get(slot);
+				if (!replacement || replacement === child)
+					throw new ShardError(
+						"SPAWN",
+						"A replacement process could not be started.",
+					);
+				progress("waiting");
+				for (;;) {
+					deadline.check();
+					if (this.children.get(slot) !== replacement)
+						throw new ShardError(
+							"CHILD_EXIT",
+							"The replacement process exited before becoming ready.",
+						);
+					if (
+						replacement.reconciled &&
+						(replacement.shard === null ||
+							!waitForReady ||
+							this.gatewayReady(replacement))
+					)
+						break;
+					await deadline.wait(Bun.sleep(25));
+				}
+				results.push(Object.freeze({ ...replacement.status }));
+				completed.push(slot);
+			}
+			currentSlot = null;
+			progress("completed");
+			return Object.freeze(results);
+		} catch (error) {
+			progress("failed", error);
+			throw error;
+		} finally {
+			if (this.manualRestart === operation) this.manualRestart = undefined;
+			this.publishStatus();
+		}
 	}
 	/**
 	 * Connect and reconcile the host assignment once, then supervise local Bun children.
@@ -427,6 +632,7 @@ export class ShardManager extends ShardMessenger {
 				ended = true;
 				this.connected = false;
 				this.loseControl();
+				this.publishStatus();
 				clearTimeout(startup);
 				clearInterval(heartbeat);
 				socket.removeEventListener("message", onMessage);
@@ -512,6 +718,7 @@ export class ShardManager extends ShardMessenger {
 							},
 						});
 						onWelcome();
+						this.publishStatus();
 						return;
 					}
 					if (message.op === "welcome")
@@ -540,6 +747,13 @@ export class ShardManager extends ShardMessenger {
 			if (this.draining)
 				throw new ShardError("PROTOCOL", "A drain is already in progress.");
 			this.draining = true;
+			this.manualRestart?.abort.abort(
+				new ShardError(
+					"RESHARDING",
+					"Coordinator topology change interrupted the restart.",
+				),
+			);
+			this.publishStatus();
 			this.availability.set(false);
 			for (const timer of this.restarts.values()) clearTimeout(timer);
 			this.restarts.clear();
@@ -610,13 +824,19 @@ export class ShardManager extends ShardMessenger {
 		);
 		this.finishConnection?.();
 	}
-	private spawn(slot: number, restarts: number, preferred = slot): void {
+	private spawn(
+		slot: number,
+		restarts: number,
+		preferred = slot,
+		explicitRestart = false,
+	): void {
 		// Deliberate transitions and disconnected supervisors never spawn replacements.
 		if (
 			!this.connected ||
 			this.closed ||
 			this.draining ||
-			this.children.has(slot)
+			this.children.has(slot) ||
+			(this.manualRestart?.slots.has(slot) && !explicitRestart)
 		)
 			return;
 		const generation = crypto.randomUUID();
@@ -703,11 +923,14 @@ export class ShardManager extends ShardMessenger {
 				lastSeen: performance.now(),
 				intentional: false,
 				ready: false,
+				gatewayReady: false,
+				metricsAt: 0,
 				requests: new Map(),
 				controls: new Pending(1),
 				reconciled: false,
 			};
 			this.children.set(slot, child);
+			this.publishStatus();
 			this.updateAvailability();
 			this.armStartup(child);
 			const owned = child;
@@ -787,6 +1010,12 @@ export class ShardManager extends ShardMessenger {
 		}, this.disconnectedMs);
 	}
 	private loseControl(): void {
+		this.manualRestart?.abort.abort(
+			new ShardError(
+				"DISCONNECTED",
+				"Coordinator connection interrupted the restart.",
+			),
+		);
 		this.availability.set(false);
 		this.requests.close();
 		for (const [id, entry] of this.inbound) {
@@ -928,6 +1157,7 @@ export class ShardManager extends ShardMessenger {
 			child.outage = undefined;
 			this.safeChild(child, frame("healthy", assignment.id));
 			this.updateAvailability();
+			this.publishStatus();
 		})()
 			.catch((error) => {
 				if (
@@ -987,6 +1217,10 @@ export class ShardManager extends ShardMessenger {
 		}
 		if (message.op === "metrics") {
 			if (!child.reconciled || child.shard === null || !this.connected) return;
+			const changed = child.gatewayReady !== message.data.ready;
+			child.gatewayReady = message.data.ready;
+			child.metricsAt = performance.now();
+			if (changed) this.publishStatus();
 			this.send(
 				frame("metrics", message.id, {
 					...message.data,
@@ -1178,12 +1412,13 @@ export class ShardManager extends ShardMessenger {
 	 * @throws If preparation, transport, or the remote handler fails.
 	 */
 	protected override async call(
-		target: number,
+		target: number | { guildId: string },
 		name: string,
 		payload: unknown,
 		options: ShardCallOptions,
 	): Promise<unknown> {
 		options = await this.prepare(options);
+		target = this.resolveTarget(target);
 		if (!Number.isInteger(target) || target < 0 || target >= this.count)
 			throw new ShardError("TARGET", "Shard is outside the configured range.");
 		identifier.assert(name);
@@ -1284,6 +1519,7 @@ export class ShardManager extends ShardMessenger {
 		if (this.connected) void this.flushReleases().catch(() => {});
 		child.status.state = "stopped";
 		this.updateAvailability();
+		this.publishStatus();
 		if (child.intentional || this.closed) return;
 		this.report(
 			"Shard process ended unexpectedly; applying the configured restart policy.",
@@ -1306,15 +1542,22 @@ export class ShardManager extends ShardMessenger {
 	private recover(shard: number, attempts: number, preferred = shard): void {
 		const status = this.statuses.get(shard)!;
 		if (this.closed || this.draining) return;
+		if (this.manualRestart?.slots.has(shard)) {
+			status.state = "failed";
+			this.publishStatus();
+			return;
+		}
 		if (
 			this.options.restart === false ||
 			attempts >= this.recovery.maxRestarts
 		) {
 			status.state = "failed";
+			this.publishStatus();
 			return;
 		}
 		status.state = "backoff";
 		status.restarts = attempts + 1;
+		this.publishStatus();
 		if (!this.connected) return;
 		const delay = Math.min(
 			this.recovery.maxDelayMs,
@@ -1338,6 +1581,7 @@ export class ShardManager extends ShardMessenger {
 	}
 	private stopChild(child: Child): Promise<void> {
 		child.intentional = true;
+		this.updateAvailability();
 		clearTimeout(child.startup);
 		clearTimeout(child.outage);
 		return (child.stop ??= (async () => {
@@ -1411,6 +1655,7 @@ export class ShardManager extends ShardMessenger {
 			this.inbound.clear();
 			await this.loop;
 			await this.ownedLogger?.close();
+			this.closeLifecycle({ type: "status", status: this.status });
 		}
 	}
 	private report(

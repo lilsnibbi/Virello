@@ -68,6 +68,10 @@
 		"./engine": {
 			"types": "./src/public/engine.ts",
 			"bun": "./src/public/engine.ts"
+		},
+		"./builders": {
+			"types": "./src/public/builders.ts",
+			"bun": "./src/public/builders.ts"
 		}
 	},
 	"types": "./src/index.ts",
@@ -91,12 +95,13 @@
 		"engine:test": "bun test tests/engine"
 	},
 	"dependencies": {
-		"@discordjs/builders": "^1.13.0",
 		"@lilsnibbi/logger": "1.2.0",
 		"arktype": "^2.2.8",
 		"cron-parser": "5.10.2",
 		"discord-api-types": "0.38.57",
-		"i18next": "^26.5.3"
+		"i18next": "^26.5.3",
+		"ts-mixer": "^6.0.4",
+		"zod": "^4.5.4"
 	},
 	"devDependencies": {
 		"@types/bun": "1.4.3",

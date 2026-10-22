@@ -46,7 +46,7 @@ export default class GreetCommand extends Command {
 | Prefix command    | No Discord registration                    | [`messageRun(message, args, context)`](message-commands.md) |
 
 A command can implement several handlers. Builders are supplied by the registry;
-you can also pass `@discordjs/builders` instances or native snake_case
+you can also pass `virello/builders` instances or native snake_case
 registration data. Options return native API objects: `user.username` works;
 `user.send()` does not. Use `interaction.options.getTargetMessage()` for a
 message context menu, or `getTargetUser()` for a user menu.

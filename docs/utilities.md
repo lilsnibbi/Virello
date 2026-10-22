@@ -7,7 +7,7 @@
 Inside a slash-command handler:
 
 ```ts
-import { EmbedBuilder } from "@discordjs/builders";
+import { EmbedBuilder } from "virello/builders";
 import { Pagination } from "virello/discord";
 
 await new Pagination(["First item", "Second item", "Third item"], {
@@ -47,7 +47,7 @@ fields such as `custom_id`. Their `idle` setting is a total collector lifetime
 For an existing logged-in client and channel ID:
 
 ```ts
-import { EmbedBuilder } from "@discordjs/builders";
+import { EmbedBuilder } from "virello/builders";
 
 await client.send(channelId, {
 	embeds: [new EmbedBuilder().setDescription("Your export is ready.")],

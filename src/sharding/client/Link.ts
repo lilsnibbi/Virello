@@ -2,6 +2,7 @@ import { type } from "arktype";
 import { writeEvent } from "../../core/logging/diagnostics";
 import type { LoggerLike } from "../../core/logging/LoggerLike";
 import { ShardMessenger } from "../messaging";
+import { freezeSnapshot } from "../lifecycle";
 import { statsRequest } from "../stats";
 import { Availability } from "../transport/availability";
 import { Pending } from "../transport/pending";
@@ -24,6 +25,8 @@ import {
 	type ShardOutput,
 	type ShardRequestName,
 	type ShardStats,
+	type ShardClientStatus,
+	type ShardClientEvent,
 } from "../types";
 
 export interface ShardConfig {
@@ -84,7 +87,7 @@ interface Lifecycle {
 }
 
 /** Typed messaging on one managed VirelloClient. Handlers run local registered code only. */
-export class ShardLink extends ShardMessenger {
+export class ShardLink extends ShardMessenger<ShardClientEvent> {
 	private readonly handlers = new Map<string, Handler>();
 	private readonly active = new Map<string, Active>();
 	private readonly requests: Pending;
@@ -145,6 +148,30 @@ export class ShardLink extends ShardMessenger {
 	/** Number of local outgoing requests still waiting for a reply. */
 	public get pendingCount(): number {
 		return this.requests.size;
+	}
+	/** Detached assignment and RPC status; this is not Discord gateway readiness. */
+	public get status(): ShardClientStatus {
+		return freezeSnapshot({
+			enabled: this.enabled,
+			connected: this.connected,
+			closed: this.closed,
+			shard: this.id,
+			shardCount: this.shardCount,
+			pendingCount: this.pendingCount,
+			activeHandlers: this.active.size,
+		});
+	}
+	private publishStatus(): void {
+		this.publishLifecycle({ type: "status", status: this.status });
+	}
+	protected override lifecycleListenerError(error: unknown): void {
+		if (this.lifecycle)
+			writeEvent(this.lifecycle.logger, "error", {
+				component: "sharding.client",
+				event: "lifecycle_listener_failed",
+				message: "A sharding lifecycle observer failed.",
+				error,
+			});
 	}
 	/**
 	 * Register a local handler. Duplicate names and the built-in stats name are rejected.
@@ -267,12 +294,13 @@ export class ShardLink extends ShardMessenger {
 	 * @throws If preparation, validation, transport, or the remote handler fails.
 	 */
 	protected override async call(
-		target: number,
+		target: number | { guildId: string },
 		name: string,
 		payload: unknown,
 		options: ShardCallOptions,
 	): Promise<unknown> {
 		options = await this.prepare(options);
+		target = this.resolveTarget(target);
 		if (!this.connected)
 			throw new ShardError("DISCONNECTED", "Sharding is not connected.");
 		if (!Number.isInteger(target) || target < 0 || target >= this.shardCount)
@@ -289,7 +317,7 @@ export class ShardLink extends ShardMessenger {
 			options,
 		);
 	}
-	/** Used by discord.js for every IDENTIFY, including re-identification after reconnects. */
+	/** Used by Virello's gateway for every IDENTIFY, including re-identification after reconnects. */
 	public async waitForIdentify(
 		shard: number,
 		signal: AbortSignal,
@@ -418,6 +446,7 @@ export class ShardLink extends ShardMessenger {
 					clearTimeout(this.outage);
 					this.outage = undefined;
 					this.lifecycle?.maintenance(!this.connected);
+					this.publishStatus();
 					if (this.connected) {
 						this.event(
 							"notif",
@@ -501,6 +530,7 @@ export class ShardLink extends ShardMessenger {
 		this.lifecycle?.maintenance(true);
 		this.requests.close();
 		if (this.id !== null) this.armOutage();
+		this.publishStatus();
 		if (wasConnected)
 			this.event(
 				"alert",
@@ -544,6 +574,7 @@ export class ShardLink extends ShardMessenger {
 				await this.lifecycle?.assignment(shard, count);
 				this.config!.shard = shard;
 				this.config!.count = count;
+				this.publishStatus();
 				if (shard === null) {
 					clearTimeout(this.outage);
 					this.outage = undefined;
@@ -731,5 +762,6 @@ export class ShardLink extends ShardMessenger {
 			}
 		}
 		if (this.started && process.connected) process.disconnect?.();
+		this.closeLifecycle({ type: "status", status: this.status });
 	}
 }

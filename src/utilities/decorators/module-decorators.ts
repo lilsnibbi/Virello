@@ -1,10 +1,8 @@
 import { ApplicationCommandType } from "discord-api-types/v10";
-import type {
-	ContextMenuCommandBuilder,
-	SlashCommandBuilder,
-	SlashCommandOptionsOnlyBuilder,
-	SlashCommandSubcommandsOnlyBuilder,
-} from "@discordjs/builders";
+import type { ContextMenuCommandBuilder } from "../../builders/interactions/commands/contextMenu/ContextMenuCommand";
+import type { SlashCommandBuilder } from "../../builders/interactions/commands/chatInput/ChatInputCommand";
+import type { SlashCommandOptionsOnlyBuilder } from "../../builders/interactions/commands/chatInput/ChatInputCommand";
+import type { SlashCommandSubcommandsOnlyBuilder } from "../../builders/interactions/commands/chatInput/ChatInputCommand";
 import { type Command } from "../../commands/Command";
 import { type ApplicationCommandRegistryRegisterOptions } from "../../commands/registration/Registry";
 import { container } from "../../core/Container";

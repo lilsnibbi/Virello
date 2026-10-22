@@ -290,3 +290,76 @@ export interface ShardProcessStatus {
 	/** Consecutive recovery attempts, reset after stable uninterrupted uptime. */
 	restarts: number;
 }
+
+/** Whole-operation settings for an explicitly requested local restart. */
+export interface ShardRestartOptions {
+	/** Budget for all selected slots, including exit, lease release and readiness; default 300000, maximum 3600000 ms. */
+	timeoutMs?: number;
+	/** Stop starting further replacements. Already requested shutdowns finish safely; cancellation is not rollback. */
+	signal?: AbortSignal;
+	/** Await a fresh gateway-ready sample for assigned replacements. Default true; dormant slots only await reconciliation. */
+	waitForReady?: boolean;
+}
+/** Detached progress for the latest explicit restart operation. */
+export interface ShardRestartStatus {
+	readonly id: string;
+	readonly phase:
+		"draining" | "releasing" | "starting" | "waiting" | "completed" | "failed";
+	readonly slots: readonly number[];
+	readonly completed: readonly number[];
+	readonly currentSlot: number | null;
+	readonly startedAt: number;
+	readonly finishedAt?: number;
+	readonly error?: { readonly code: string; readonly message: string };
+}
+/** Local control state; gatewayReady requires a sample received within the last 15 seconds. */
+export interface ShardManagerStatus {
+	readonly host: string;
+	readonly connected: boolean;
+	readonly closed: boolean;
+	readonly draining: boolean;
+	readonly shardCount: number;
+	readonly processes: readonly (Readonly<ShardProcessStatus> & {
+		readonly gatewayReady: boolean;
+	})[];
+	readonly restart: ShardRestartStatus | null;
+}
+/** Safe control-plane snapshot. Registered shards are distinct from gateway-ready shards. */
+export interface ShardCoordinatorStatus {
+	readonly listening: boolean;
+	readonly closed: boolean;
+	readonly shardCount: number;
+	readonly pendingCount: number;
+	readonly leasedShards: readonly number[];
+	readonly gatewayReadyShards: readonly number[];
+	readonly workers: readonly {
+		readonly id: string;
+		readonly connected: boolean;
+		readonly shards: readonly number[];
+	}[];
+	readonly scaling: Readonly<ShardScalingStatus>;
+}
+/** Snapshot of this client's assignment and local RPC activity, without transport credentials. */
+export interface ShardClientStatus {
+	readonly enabled: boolean;
+	readonly connected: boolean;
+	readonly closed: boolean;
+	readonly shard: number | null;
+	readonly shardCount: number;
+	readonly pendingCount: number;
+	readonly activeHandlers: number;
+}
+/** Future manager transitions and explicit restart progress. */
+export type ShardManagerEvent =
+	| { readonly type: "status"; readonly status: ShardManagerStatus }
+	| { readonly type: "restart"; readonly status: ShardRestartStatus };
+/** Future coordinator lifecycle snapshots. Poll status for current request counts and readiness freshness. */
+export interface ShardCoordinatorEvent {
+	readonly type: "status";
+	readonly status: ShardCoordinatorStatus;
+}
+/** Future client assignment, maintenance and closure snapshots. */
+export interface ShardClientEvent {
+	readonly type: "status";
+	readonly status: ShardClientStatus;
+}

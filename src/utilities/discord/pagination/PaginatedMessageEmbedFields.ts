@@ -1,4 +1,4 @@
-import { EmbedBuilder } from "@discordjs/builders";
+import { EmbedBuilder } from "../../../builders/messages/embed/Embed";
 import type {
 	APIEmbed,
 	APIEmbed as EmbedData,
@@ -12,8 +12,8 @@ import type { EmbedResolvable } from "./PaginatedMessageTypes";
 
 /** This is a utility of {@link PaginatedMessage}, except it exclusively paginates the fields of an embed. */
 export class PaginatedMessageEmbedFields extends PaginatedMessage {
-	/** The `embedTemplate` field represents the template for the embed message. It is of type `APIEmbed`. It is initialized with a new `EmbedBuilder` instance converted to JSON. */
-	private embedTemplate: APIEmbed = new EmbedBuilder().toJSON();
+	/** The `embedTemplate` field represents the template for the embed message. It is of type `APIEmbed`. It starts as an empty template and is validated after page content is added. */
+	private embedTemplate: APIEmbed = {};
 
 	/** The `totalPages` field represents the total number of pages in the paginated message. It is of type `number`. It is initialized to 0. */
 	private totalPages: number = 0;
@@ -67,7 +67,7 @@ export class PaginatedMessageEmbedFields extends PaginatedMessage {
 				: [...template.fields];
 			if (fieldsClone.length > 0) clonedTemplate.setFields();
 
-			if (!clonedTemplate.data.color)
+			if (template.color === undefined)
 				clonedTemplate.setColor(Math.floor(Math.random() * 0x1000000));
 
 			const data = this.paginateArray(
@@ -97,10 +97,10 @@ export class PaginatedMessageEmbedFields extends PaginatedMessage {
 			EmbedResolvable | EmbedData | ((embed: EmbedBuilder) => EmbedResolvable),
 	): APIEmbed {
 		if (isFunction(template)) template = template(new EmbedBuilder());
-		return (
-			isJSONEncodable<APIEmbed>(template)
-				? template
-				: new EmbedBuilder(template)
-		).toJSON();
+		return template instanceof EmbedBuilder
+			? template.toData()
+			: isJSONEncodable<APIEmbed>(template)
+				? template.toJSON()
+				: structuredClone(template);
 	}
 }

@@ -110,10 +110,11 @@ In fixed mode, host capacity defaults to its initial shard count; `maxShards`
 can set a larger capacity. `processCount` on the manager sets a minimum local
 pool, including dormant standbys, within capacity.
 
-| Next task                       | Guide                                                              |
-| ------------------------------- | ------------------------------------------------------------------ |
-| Call another shard              | [Typed messaging](shard-messaging.md)                              |
-| Handle coordinator outages      | [Maintenance and recovery](sharding-recovery.md)                   |
-| Understand login permits        | [Caching and limits](caching-and-limits.md#three-different-limits) |
-| Change counts on existing hosts | [Automatic scaling](sharding-scaling.md)                           |
-| Read fresh process statistics   | [Shard statistics](sharding-stats.md)                              |
+| Next task                                | Guide                                                              |
+| ---------------------------------------- | ------------------------------------------------------------------ |
+| Call another shard                       | [Typed messaging](shard-messaging.md)                              |
+| Handle coordinator outages               | [Maintenance and recovery](sharding-recovery.md)                   |
+| Understand login permits                 | [Caching and limits](caching-and-limits.md#three-different-limits) |
+| Change counts on existing hosts          | [Automatic scaling](sharding-scaling.md)                           |
+| Read fresh process statistics            | [Shard statistics](sharding-stats.md)                              |
+| Observe lifecycle or restart local slots | [Operational APIs](sharding-operations.md)                         |

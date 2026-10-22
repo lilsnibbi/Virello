@@ -7,6 +7,7 @@ Already have one? Pick the task below.
 | -------------------------------------------- | ---------------------------------------- |
 | Create a client and choose options           | [Client configuration](client.md)        |
 | Load files and manage their resources        | [Modules and lifecycle](modules.md)      |
+| Build embeds, components, modals and uploads | [Builders](builders.md)                  |
 | Add slash commands, menus and subcommands    | [Commands](commands.md)                  |
 | Read message arguments or match regexes      | [Message commands](message-commands.md)  |
 | Gate commands and handle denials             | [Checks and cooldowns](checks.md)        |
@@ -23,6 +24,7 @@ Already have one? Pick the task below.
 | Recover after disconnects and restarts         | [Maintenance and recovery](sharding-recovery.md) |
 | Change shard counts on existing hosts          | [Automatic scaling](sharding-scaling.md)         |
 | Collect live process and cache metrics         | [Shard statistics](sharding-stats.md)            |
+| Observe lifecycle or restart owned processes   | [Operational APIs](sharding-operations.md)       |
 | Understand memory and rate limits              | [Caching and limits](caching-and-limits.md)      |
 | Read logs or supply a logger                   | [Console logging](console-logging.md)            |
 | Find why something did not load or reply       | [Troubleshooting](troubleshooting.md)            |

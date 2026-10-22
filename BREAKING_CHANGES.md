@@ -1,10 +1,39 @@
 # Breaking changes
 
+## First-party builders (unreleased)
+
+`virello/builders` replaces the `@discordjs/builders` dependency. Developers
+install only `virello`; the root also re-exports the builder category. No separate
+scoped packages are published. Virello's client and sharding architecture are unchanged.
+
+- Registration callbacks now receive Virello builders. The context-menu builder
+  is concrete and supports `setType`; slash options-only/subcommands-only type
+  aliases remain available. Foreign builders can be converted to native JSON.
+- Builder `.data` is internal. Use setters and `toJSON()`, or `EmbedBuilder.toData()`
+  for incomplete templates. Empty/color-only embeds must gain visible content
+  before serialization. Pagination now waits until pages are complete.
+- Serialization validates nested builders and native MessageBuilder inputs.
+  Validation cannot be globally disabled and `toJSON(false)` is not supported.
+- Uploads use named Blobs; `MessageBuilder.toMessage()` and `toFileBody()` include
+  bytes and assign multipart IDs. `toJSON()` contains metadata only. Retain
+  existing attachment snowflake IDs explicitly on edits.
+- This is a selected, maintained surface, not full discord.js or Ovencord parity.
+  Poll builders and RawFile APIs are not exported; native payloads remain supported.
+
+See [migration and examples](docs/builders.md) and the
+[Bamu-style ticket flow](examples/tickets/README.md). No runtime performance
+improvement has been measured or is claimed.
+
+The same release adds `requestGuild`, `calculateShardId`, frozen operational
+status, `onLifecycle` subscriptions and awaited local restart helpers. These are
+additive APIs over Virello's existing authenticated transport and leased process
+model. See [operational semantics and deferred multi-shard process work](docs/sharding-operations.md).
+
 ## Native runtime (unreleased)
 
 Virello now runs its own engine, gateway, REST, cache and sharding.
-`@discordjs/builders` constructs payloads; `discord-api-types` defines their
-shape. There is no discord.js runtime, compatibility client or fallback.
+First-party `virello/builders` constructs payloads; bundled `discord-api-types`
+defines their shape through the `DiscordAPI` namespace. There is no discord.js runtime, compatibility client or fallback.
 
 **Release boundary:** npm `virello@latest` was **0.1.1** on 2026-10-18. That
 published release has discord.js as a regular dependency, with no peer
@@ -15,8 +44,8 @@ published native release.
 
 - [ ] Update all shard hosts/coordinators/bot code together.
 - [ ] Remove direct `discord.js` / `@discordjs/collection` dependencies your bot
-      no longer uses. Keep `@discordjs/builders` and `discord-api-types` for
-      your own imports.
+      no longer uses. Move builder imports to `virello/builders` and API
+      types/enums/routes to `DiscordAPI` from `virello/discord`.
 - [ ] Replace SDK entity methods with native fields and explicit REST calls.
 - [ ] Update event handlers, payload keys, permission helpers and collectors.
 - [ ] Review cache limits and missing/partial data handling.
@@ -34,8 +63,9 @@ import {
 	EmbedBuilder,
 	ActionRowBuilder,
 	ButtonBuilder,
-} from "@discordjs/builders";
-import { GatewayIntentBits, MessageFlags, Routes } from "discord-api-types/v10";
+} from "virello/builders";
+import { DiscordAPI } from "virello/discord";
+const { GatewayIntentBits, MessageFlags, Routes } = DiscordAPI;
 ```
 
 | Previous API                              | Native API                                               |

@@ -1,9 +1,9 @@
-import type {
-	ContextMenuCommandBuilder,
-	SlashCommandBuilder,
-	SlashCommandOptionsOnlyBuilder,
-	SlashCommandSubcommandsOnlyBuilder,
-} from "@discordjs/builders";
+import {
+	type SlashCommandBuilder,
+	type SlashCommandOptionsOnlyBuilder,
+	type SlashCommandSubcommandsOnlyBuilder,
+} from "../../builders/interactions/commands/chatInput/ChatInputCommand";
+import type { ContextMenuCommandBuilder } from "../../builders/interactions/commands/contextMenu/ContextMenuCommand";
 import type {
 	APIApplicationCommand as ApplicationCommand,
 	RESTPostAPIChatInputApplicationCommandsJSONBody as ChatInputApplicationCommandData,

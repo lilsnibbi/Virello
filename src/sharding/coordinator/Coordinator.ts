@@ -7,6 +7,7 @@ import { createConsoleLogger } from "../../core/logging/console";
 import { writeEvent } from "../../core/logging/diagnostics";
 import type { LoggerLike } from "../../core/logging/LoggerLike";
 import { safeContext } from "../../core/logging/redact";
+import { ShardLifecycle, freezeSnapshot } from "../lifecycle";
 import {
 	decode,
 	encode,
@@ -28,6 +29,8 @@ import {
 	type ShardHost,
 	type ShardScalingStatus,
 	type ShardSessionLimit,
+	type ShardCoordinatorStatus,
+	type ShardCoordinatorEvent,
 } from "../types";
 import { IdentifyScheduler, identifyCooldownMs } from "./identify";
 import { type ScalingPlan, ScalingPolicy } from "./scaling";
@@ -90,7 +93,7 @@ const inbound = [
 ] as const;
 
 /** Single authenticated control plane. It never spawns a process on another host. */
-export class ShardCoordinator {
+export class ShardCoordinator extends ShardLifecycle<ShardCoordinatorEvent> {
 	private readonly options: ShardCoordinatorOptions;
 	private readonly policy: Limits;
 	private readonly hosts = new Map<string, ShardHost>();
@@ -137,6 +140,7 @@ export class ShardCoordinator {
 	 * @throws For invalid settings, incomplete or duplicate assignments, or missing session metadata.
 	 */
 	public constructor(options: ShardCoordinatorOptions) {
+		super();
 		this.count = options.shardCount;
 		this.scaleStatus = {
 			phase: options.scaling ? "idle" : "disabled",
@@ -259,6 +263,40 @@ export class ShardCoordinator {
 	/** Copy of the latest scaling status. */
 	public get scalingStatus(): ShardScalingStatus {
 		return { ...this.scaleStatus };
+	}
+	/** Frozen operational status without host credentials, bot tokens, request payloads or process handles. */
+	public get status(): ShardCoordinatorStatus {
+		const gatewayReadyShards: number[] = [];
+		for (const [shard, lease] of this.leases) {
+			const session = this.sessions.get(`${lease.host}/${lease.instance}`);
+			const metrics = session?.metrics.get(shard);
+			if (
+				session?.ready.get(shard) === lease.generation &&
+				metrics?.ready &&
+				performance.now() - metrics.at < 15000
+			)
+				gatewayReadyShards.push(shard);
+		}
+		return freezeSnapshot({
+			listening: this.server !== undefined,
+			closed: this.closed,
+			shardCount: this.count,
+			pendingCount: this.pendingCount,
+			leasedShards: [...this.leases.keys()].sort((a, b) => a - b),
+			gatewayReadyShards: gatewayReadyShards.sort((a, b) => a - b),
+			workers: this.workers,
+			scaling: this.scalingStatus,
+		});
+	}
+	private publishStatus(): void {
+		this.publishLifecycle({ type: "status", status: this.status });
+	}
+	protected override lifecycleListenerError(error: unknown): void {
+		this.report(
+			"A sharding lifecycle observer failed.",
+			error,
+			"lifecycle_listener_failed",
+		);
 	}
 	/**
 	 * Prepare fresh Discord session limits and start the authenticated WebSocket listener once.
@@ -583,14 +621,17 @@ export class ShardCoordinator {
 			case "lease":
 				this.lease(session, message);
 				return;
-			case "metrics":
+			case "metrics": {
 				this.identity(session, d);
+				const changed = session.metrics.get(d.shard)?.ready !== d.ready;
 				session.metrics.set(d.shard, {
 					ready: d.ready,
 					guilds: d.guilds,
 					at: performance.now(),
 				});
+				if (changed) this.publishStatus();
 				return;
+			}
 			case "drained":
 				if (this.transition?.id !== message.id) return;
 				if (
@@ -1633,6 +1674,7 @@ export class ShardCoordinator {
 		if (wasListening)
 			this.activity("notif", "stopped", "Coordinator listener is closed.");
 		await this.ownedLogger?.close();
+		this.closeLifecycle({ type: "status", status: this.status });
 	}
 	private connectionContext(session: Session) {
 		return { host: session.host.id, connectionId: session.connectionId };
@@ -1676,6 +1718,19 @@ export class ShardCoordinator {
 		context?: Record<string, unknown>,
 		error?: unknown,
 	): void {
+		if (
+			[
+				"listening",
+				"host_connected",
+				"host_disconnected",
+				"host_drained",
+				"shard_registered",
+				"shard_offline",
+				"scaling_status",
+				"stopping",
+			].includes(event)
+		)
+			this.publishStatus();
 		writeEvent(this.logger, level, {
 			component: "sharding.coordinator",
 			event,

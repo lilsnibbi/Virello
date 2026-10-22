@@ -17,3 +17,6 @@ export * from "../discord/payloads";
 export * from "../discord/permissions";
 export * from "../discord/entities";
 export { ApplicationCommands } from "../discord/ApplicationCommands";
+
+/** Discord API types, enums and route helpers from the version shipped with Virello. */
+export * as DiscordAPI from "discord-api-types/v10";

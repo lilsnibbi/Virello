@@ -1,0 +1,371 @@
+// Adapted from Ovencord (cc6100f8), Apache-2.0.
+// Modified for Virello: local utilities, native payloads and validated serialization.
+// See src/builders/NOTICE and src/builders/LICENSE.
+import {
+	normalizeArray,
+	type RestOrArray,
+} from "../../../../util/normalizeArray";
+import { resolveBuilder } from "../../../../util/resolveBuilder";
+import type { ApplicationCommandOptionBase } from "../options/ApplicationCommandOptionBase";
+import { ChatInputCommandAttachmentOption } from "../options/attachment";
+import { ChatInputCommandBooleanOption } from "../options/boolean";
+import { ChatInputCommandChannelOption } from "../options/channel";
+import { ChatInputCommandIntegerOption } from "../options/integer";
+import { ChatInputCommandMentionableOption } from "../options/mentionable";
+import { ChatInputCommandNumberOption } from "../options/number";
+import { ChatInputCommandRoleOption } from "../options/role";
+import { ChatInputCommandStringOption } from "../options/string";
+import { ChatInputCommandUserOption } from "../options/user";
+
+export interface SharedChatInputCommandOptionsData {
+	options?: ApplicationCommandOptionBase[];
+}
+
+/**
+ * This mixin holds symbols that can be shared in chat input command options.
+ */
+export class SharedChatInputCommandOptions {
+	/**
+	 * @internal
+	 */
+	declare protected readonly data: SharedChatInputCommandOptionsData;
+
+	/**
+	 * The options within this command.
+	 */
+	public get options(): readonly ApplicationCommandOptionBase[] {
+		this.data.options ??= [];
+		return this.data.options;
+	}
+
+	/**
+	 * Adds boolean options.
+	 *
+	 * @param options - Options to add
+	 */
+	public addBooleanOptions(
+		...options: RestOrArray<
+			| ChatInputCommandBooleanOption
+			| ((
+					builder: ChatInputCommandBooleanOption,
+			  ) => ChatInputCommandBooleanOption)
+		>
+	) {
+		return this.sharedAddOptions(ChatInputCommandBooleanOption, ...options);
+	}
+
+	/**
+	 * Adds a boolean option.
+	 *
+	 * @param option - Option to add
+	 */
+	public addBooleanOption(
+		option:
+			| ChatInputCommandBooleanOption
+			| ((
+					builder: ChatInputCommandBooleanOption,
+			  ) => ChatInputCommandBooleanOption),
+	) {
+		return this.addBooleanOptions(option);
+	}
+
+	/**
+	 * Adds user options.
+	 *
+	 * @param options - Options to add
+	 */
+	public addUserOptions(
+		...options: RestOrArray<
+			| ChatInputCommandUserOption
+			| ((builder: ChatInputCommandUserOption) => ChatInputCommandUserOption)
+		>
+	) {
+		return this.sharedAddOptions(ChatInputCommandUserOption, ...options);
+	}
+
+	/**
+	 * Adds a user option.
+	 *
+	 * @param option - Option to add
+	 */
+	public addUserOption(
+		option:
+			| ChatInputCommandUserOption
+			| ((builder: ChatInputCommandUserOption) => ChatInputCommandUserOption),
+	) {
+		return this.addUserOptions(option);
+	}
+
+	/**
+	 * Adds channel options.
+	 *
+	 * @param options - Options to add
+	 */
+	public addChannelOptions(
+		...options: RestOrArray<
+			| ChatInputCommandChannelOption
+			| ((
+					builder: ChatInputCommandChannelOption,
+			  ) => ChatInputCommandChannelOption)
+		>
+	) {
+		return this.sharedAddOptions(ChatInputCommandChannelOption, ...options);
+	}
+
+	/**
+	 * Adds a channel option.
+	 *
+	 * @param option - Option to add
+	 */
+	public addChannelOption(
+		option:
+			| ChatInputCommandChannelOption
+			| ((
+					builder: ChatInputCommandChannelOption,
+			  ) => ChatInputCommandChannelOption),
+	) {
+		return this.addChannelOptions(option);
+	}
+
+	/**
+	 * Adds role options.
+	 *
+	 * @param options - Options to add
+	 */
+	public addRoleOptions(
+		...options: RestOrArray<
+			| ChatInputCommandRoleOption
+			| ((builder: ChatInputCommandRoleOption) => ChatInputCommandRoleOption)
+		>
+	) {
+		return this.sharedAddOptions(ChatInputCommandRoleOption, ...options);
+	}
+
+	/**
+	 * Adds a role option.
+	 *
+	 * @param option - Option to add
+	 */
+	public addRoleOption(
+		option:
+			| ChatInputCommandRoleOption
+			| ((builder: ChatInputCommandRoleOption) => ChatInputCommandRoleOption),
+	) {
+		return this.addRoleOptions(option);
+	}
+
+	/**
+	 * Adds attachment options.
+	 *
+	 * @param options - Options to add
+	 */
+	public addAttachmentOptions(
+		...options: RestOrArray<
+			| ChatInputCommandAttachmentOption
+			| ((
+					builder: ChatInputCommandAttachmentOption,
+			  ) => ChatInputCommandAttachmentOption)
+		>
+	) {
+		return this.sharedAddOptions(ChatInputCommandAttachmentOption, ...options);
+	}
+
+	/**
+	 * Adds an attachment option.
+	 *
+	 * @param option - Option to add
+	 */
+	public addAttachmentOption(
+		option:
+			| ChatInputCommandAttachmentOption
+			| ((
+					builder: ChatInputCommandAttachmentOption,
+			  ) => ChatInputCommandAttachmentOption),
+	) {
+		return this.addAttachmentOptions(option);
+	}
+
+	/**
+	 * Adds mentionable options.
+	 *
+	 * @param options - Options to add
+	 */
+	public addMentionableOptions(
+		...options: RestOrArray<
+			| ChatInputCommandMentionableOption
+			| ((
+					builder: ChatInputCommandMentionableOption,
+			  ) => ChatInputCommandMentionableOption)
+		>
+	) {
+		return this.sharedAddOptions(ChatInputCommandMentionableOption, ...options);
+	}
+
+	/**
+	 * Adds a mentionable option.
+	 *
+	 * @param option - Option to add
+	 */
+	public addMentionableOption(
+		option:
+			| ChatInputCommandMentionableOption
+			| ((
+					builder: ChatInputCommandMentionableOption,
+			  ) => ChatInputCommandMentionableOption),
+	) {
+		return this.addMentionableOptions(option);
+	}
+
+	/**
+	 * Adds string options.
+	 *
+	 * @param options - Options to add
+	 */
+	public addStringOptions(
+		...options: RestOrArray<
+			| ChatInputCommandStringOption
+			| ((
+					builder: ChatInputCommandStringOption,
+			  ) => ChatInputCommandStringOption)
+		>
+	) {
+		return this.sharedAddOptions(ChatInputCommandStringOption, ...options);
+	}
+
+	/**
+	 * Adds a string option.
+	 *
+	 * @param option - Option to add
+	 */
+	public addStringOption(
+		option:
+			| ChatInputCommandStringOption
+			| ((
+					builder: ChatInputCommandStringOption,
+			  ) => ChatInputCommandStringOption),
+	) {
+		return this.addStringOptions(option);
+	}
+
+	/**
+	 * Adds integer options.
+	 *
+	 * @param options - Options to add
+	 */
+	public addIntegerOptions(
+		...options: RestOrArray<
+			| ChatInputCommandIntegerOption
+			| ((
+					builder: ChatInputCommandIntegerOption,
+			  ) => ChatInputCommandIntegerOption)
+		>
+	) {
+		return this.sharedAddOptions(ChatInputCommandIntegerOption, ...options);
+	}
+
+	/**
+	 * Adds an integer option.
+	 *
+	 * @param option - Option to add
+	 */
+	public addIntegerOption(
+		option:
+			| ChatInputCommandIntegerOption
+			| ((
+					builder: ChatInputCommandIntegerOption,
+			  ) => ChatInputCommandIntegerOption),
+	) {
+		return this.addIntegerOptions(option);
+	}
+
+	/**
+	 * Adds number options.
+	 *
+	 * @param options - Options to add
+	 */
+	public addNumberOptions(
+		...options: RestOrArray<
+			| ChatInputCommandNumberOption
+			| ((
+					builder: ChatInputCommandNumberOption,
+			  ) => ChatInputCommandNumberOption)
+		>
+	) {
+		return this.sharedAddOptions(ChatInputCommandNumberOption, ...options);
+	}
+
+	/**
+	 * Adds a number option.
+	 *
+	 * @param option - Option to add
+	 */
+	public addNumberOption(
+		option:
+			| ChatInputCommandNumberOption
+			| ((
+					builder: ChatInputCommandNumberOption,
+			  ) => ChatInputCommandNumberOption),
+	) {
+		return this.addNumberOptions(option);
+	}
+
+	/**
+	 * Removes, replaces, or inserts options for this command.
+	 *
+	 * @remarks
+	 * This method behaves similarly
+	 * to {@link https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Array/splice | Array.prototype.splice()}.
+	 *
+	 * It's useful for modifying and adjusting order of the already-existing options for this command.
+	 * @example
+	 * Remove the first option:
+	 * ```ts
+	 * actionRow.spliceOptions(0, 1);
+	 * ```
+	 * @example
+	 * Remove the first n options:
+	 * ```ts
+	 * const n = 4;
+	 * actionRow.spliceOptions(0, n);
+	 * ```
+	 * @example
+	 * Remove the last option:
+	 * ```ts
+	 * actionRow.spliceOptions(-1, 1);
+	 * ```
+	 * @param index - The index to start at
+	 * @param deleteCount - The number of options to remove
+	 * @param options - The replacing option objects
+	 */
+	public spliceOptions(
+		index: number,
+		deleteCount: number,
+		...options: ApplicationCommandOptionBase[]
+	): this {
+		this.data.options ??= [];
+		this.data.options.splice(index, deleteCount, ...options);
+		return this;
+	}
+
+	/**
+	 * Where the actual adding magic happens. ✨
+	 *
+	 * @internal
+	 */
+	private sharedAddOptions<OptionBuilder extends ApplicationCommandOptionBase>(
+		Instance: new () => OptionBuilder,
+		...options: RestOrArray<
+			OptionBuilder | ((builder: OptionBuilder) => OptionBuilder)
+		>
+	): this {
+		const normalized = normalizeArray(options);
+		const resolved = normalized.map((option) =>
+			resolveBuilder(option, Instance),
+		);
+
+		this.data.options ??= [];
+		this.data.options.push(...resolved);
+
+		return this;
+	}
+}

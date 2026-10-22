@@ -1,8 +1,6 @@
-import {
-	ActionRowBuilder,
-	ButtonBuilder,
-	type MessageActionRowComponentBuilder,
-} from "@discordjs/builders";
+import { ActionRowBuilder } from "../../../builders/components/ActionRow";
+import { ButtonBuilder } from "../../../builders/components/button/ButtonBuilder";
+import { type MessageActionRowComponentBuilder } from "../../../builders/components/Components";
 import {
 	type APIComponentInMessageActionRow as ActionRowComponentOptions,
 	type APIActionRowComponent,
@@ -108,7 +106,7 @@ export function isMessageChannelSelectInteractionData(
 export function isButtonComponentBuilder(
 	component: MessageActionRowComponentBuilder,
 ): component is ButtonBuilder {
-	return component.data.type === ComponentType.Button;
+	return component.toJSON().type === ComponentType.Button;
 }
 
 /** Check if the given action is a paginated message action button. */
@@ -176,7 +174,7 @@ export function createPartitionedMessageRow(
 	const [actionButtons, linkButtons] = partition(
 		messageButtons,
 		(value) =>
-			(value.data as Partial<APIButtonComponent>).style !== ButtonStyle.Link,
+			(value.toJSON() as APIButtonComponent).style !== ButtonStyle.Link,
 	);
 
 	// Chunk the button components in sets of 5, the maximum of 1 ActionRowBuilder

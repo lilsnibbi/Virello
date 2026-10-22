@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { SlashCommandBuilder } from "@discordjs/builders";
+import { SlashCommandBuilder } from "virello/builders";
 import {
 	ApplicationCommandType,
 	Locale,

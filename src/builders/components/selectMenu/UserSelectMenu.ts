@@ -1,0 +1,92 @@
+// Adapted from Ovencord (cc6100f8), Apache-2.0.
+// Modified for Virello: local utilities, native payloads and validated serialization.
+// See src/builders/NOTICE and src/builders/LICENSE.
+import {
+	type APIUserSelectComponent,
+	ComponentType,
+	SelectMenuDefaultValueType,
+	type Snowflake,
+} from "discord-api-types/v10";
+import { normalizeArray, type RestOrArray } from "../../util/normalizeArray";
+import { validate } from "../../util/validation";
+import { selectMenuUserPredicate } from "../Assertions";
+import { BaseSelectMenuBuilder } from "./BaseSelectMenu";
+
+/**
+ * A builder that creates API-compatible JSON data for user select menus.
+ */
+export class UserSelectMenuBuilder extends BaseSelectMenuBuilder<APIUserSelectComponent> {
+	protected override readonly data: Partial<APIUserSelectComponent>;
+
+	/**
+	 * Creates a new user select menu.
+	 *
+	 * @param data - The API data to create this user select menu with
+	 * @example
+	 * Creating a select menu from an API data object:
+	 * ```ts
+	 * const selectMenu = new UserSelectMenuBuilder({
+	 * 	custom_id: 'a cool select menu',
+	 * 	placeholder: 'select an option',
+	 * 	max_values: 2,
+	 * });
+	 * ```
+	 * @example
+	 * Creating a select menu using setters and API data:
+	 * ```ts
+	 * const selectMenu = new UserSelectMenuBuilder({
+	 * 	custom_id: 'a cool select menu',
+	 * })
+	 * 	.setMinValues(1);
+	 * ```
+	 */
+	public constructor(data: Partial<APIUserSelectComponent> = {}) {
+		super();
+		this.data = { ...structuredClone(data), type: ComponentType.UserSelect };
+	}
+
+	/**
+	 * Adds default users to this auto populated select menu.
+	 *
+	 * @param users - The users to add
+	 */
+	public addDefaultUsers(...users: RestOrArray<Snowflake>) {
+		const normalizedValues = normalizeArray(users);
+
+		this.data.default_values ??= [];
+		this.data.default_values.push(
+			...normalizedValues.map((id) => ({
+				id,
+				type: SelectMenuDefaultValueType.User as const,
+			})),
+		);
+
+		return this;
+	}
+
+	/**
+	 * Sets default users for this auto populated select menu.
+	 *
+	 * @param users - The users to set
+	 */
+	public setDefaultUsers(...users: RestOrArray<Snowflake>) {
+		const normalizedValues = normalizeArray(users);
+
+		this.data.default_values = normalizedValues.map((id) => ({
+			id,
+			type: SelectMenuDefaultValueType.User as const,
+		}));
+
+		return this;
+	}
+
+	/**
+	 * {@inheritDoc ComponentBuilder.toJSON}
+	 */
+	public override toJSON(): APIUserSelectComponent {
+		const clone = structuredClone(this.data);
+		validate(selectMenuUserPredicate, clone);
+
+		return clone as APIUserSelectComponent;
+	}
+}

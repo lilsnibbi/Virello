@@ -49,7 +49,32 @@ for (const result of all) {
 `request()` returns one value or rejects. `broadcast()` returns results in shard
 ID order, including explicit failures. Before dispatch starts, failure to prepare
 the local coordinator connection rejects the whole operation. A connected
-`ShardManager` exposes the same request/broadcast/stats methods.
+`ShardManager` exposes the same request/requestGuild/broadcast/stats methods.
+
+## Route by guild
+
+Use a guild ID when the caller does not know which shard owns that guild:
+
+```ts
+const result = await client.sharding.requestGuild(
+	interaction.guildId!,
+	"guildCount",
+	null,
+	{ timeoutMs: 5000, waitForCoordinator: true },
+);
+```
+
+The same typed handler contract, JSON bounds, cancellation and no-replay rules
+apply. Routing uses the latest reconciled total immediately before dispatch,
+including after an optional coordinator wait. The guild ID selects a shard; it
+does not automatically become handler input or prove guild membership. Include
+the guild ID in your declared input when the handler needs it, and enforce your
+application's permissions there.
+
+`calculateShardId(guildId, shardCount)` from `virello/sharding` is also available
+for diagnostics. It validates positive 64-bit snowflakes and Virello's 1..4096
+shard range and performs the shift and modulo with bigint. Do not cache its
+result across topology changes.
 
 | Contract             | Meaning                                                                              |
 | -------------------- | ------------------------------------------------------------------------------------ |

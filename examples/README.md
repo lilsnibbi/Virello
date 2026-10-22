@@ -12,6 +12,12 @@ bun examples/offline.ts
 That starts a temporary coordinator, host and two bot children, checks module
 loading and shard messages, then cleans up. It needs no Discord token.
 
+## Ticket flow
+
+The [ticket example](tickets/README.md) shows a Components V2 panel, labelled
+modal uploads, a deferred submission, private channel creation and a transcript
+attachment using only Virello. It is opt-in and uses the existing shard setup.
+
 ## Three roles, one bot
 
 ```mermaid

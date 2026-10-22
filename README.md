@@ -16,8 +16,9 @@ or Node runtime entrypoint.
 
 > [!NOTE]
 > This checkout uses Virello's own gateway, REST, cache and sharding runtime.
-> Payload construction uses `@discordjs/builders`; API definitions use
-> `discord-api-types`. There is no discord.js client underneath.
+> Payload construction uses first-party `virello/builders`; API definitions use
+> the bundled `discord-api-types` through `DiscordAPI`. Install only `virello`.
+> See the [builder guide](docs/builders.md) and [ticket flow](examples/tickets/README.md).
 >
 > The native migration is **unreleased**. npm `latest` was `0.1.1` on
 > 2026-10-18 and still uses the previous runtime. See the

@@ -1,13 +1,11 @@
-import {
-	ButtonBuilder,
-	ChannelSelectMenuBuilder,
-	EmbedBuilder,
-	MentionableSelectMenuBuilder,
-	RoleSelectMenuBuilder,
-	StringSelectMenuBuilder,
-	UserSelectMenuBuilder,
-	type MessageActionRowComponentBuilder,
-} from "@discordjs/builders";
+import { ButtonBuilder } from "../../../builders/components/button/ButtonBuilder";
+import { ChannelSelectMenuBuilder } from "../../../builders/components/selectMenu/ChannelSelectMenu";
+import { EmbedBuilder } from "../../../builders/messages/embed/Embed";
+import { MentionableSelectMenuBuilder } from "../../../builders/components/selectMenu/MentionableSelectMenu";
+import { RoleSelectMenuBuilder } from "../../../builders/components/selectMenu/RoleSelectMenu";
+import { StringSelectMenuBuilder } from "../../../builders/components/selectMenu/StringSelectMenu";
+import { UserSelectMenuBuilder } from "../../../builders/components/selectMenu/UserSelectMenu";
+import { type MessageActionRowComponentBuilder } from "../../../builders/components/Components";
 import {
 	type APIEmbed,
 	ButtonStyle,
@@ -1098,26 +1096,43 @@ export class PaginatedMessage {
 			const templateEmbed =
 				this.template.embeds?.[idx] ?? this.template.embeds?.[0];
 			const jsonTemplateEmbed = isJSONEncodable(templateEmbed)
-				? templateEmbed.toJSON()
+				? templateEmbed instanceof EmbedBuilder
+					? templateEmbed.toData()
+					: templateEmbed.toJSON()
 				: templateEmbed;
 
 			if (isJSONEncodable(lastEmbed)) {
-				lastEmbed = lastEmbed.toJSON();
+				lastEmbed =
+					lastEmbed instanceof EmbedBuilder
+						? lastEmbed.toData()
+						: lastEmbed.toJSON();
 				embedsWithFooterApplied[idx] = lastEmbed;
 			}
 
-			lastEmbed.footer ??= { text: jsonTemplateEmbed?.footer?.text ?? "" };
+			if (this.shouldAddFooterToEmbeds || jsonTemplateEmbed?.footer)
+				lastEmbed.footer ??= { text: jsonTemplateEmbed?.footer?.text ?? "" };
 
 			if (this.shouldAddFooterToEmbeds) {
-				lastEmbed.footer.text = `${this.pageIndexPrefix ? `${this.pageIndexPrefix} ` : ""}${index + 1} / ${this.pages.length}${
-					lastEmbed.footer.text
-						? ` ${this.embedFooterSeparator} ${lastEmbed.footer.text}`
+				lastEmbed.footer!.text = `${this.pageIndexPrefix ? `${this.pageIndexPrefix} ` : ""}${index + 1} / ${this.pages.length}${
+					lastEmbed.footer!.text
+						? ` ${this.embedFooterSeparator} ${lastEmbed.footer!.text}`
 						: ""
 				}`;
 			}
 		}
 
-		return { ...message, embeds: embedsWithFooterApplied };
+		return {
+			...message,
+			embeds: embedsWithFooterApplied.map((embed) =>
+				new EmbedBuilder(
+					embed instanceof EmbedBuilder
+						? embed.toData()
+						: isJSONEncodable(embed)
+							? embed.toJSON()
+							: embed,
+				).toJSON(),
+			),
+		};
 	}
 
 	/** Create a {@link PaginatedMessageInternationalizationContext} */
@@ -1174,12 +1189,16 @@ export class PaginatedMessage {
 		const mergedEmbeds: PaginatedMessageWriteableEmbedResolvable = [];
 
 		const jsonTemplate = isJSONEncodable(templateEmbed)
-			? templateEmbed.toJSON()
+			? templateEmbed instanceof EmbedBuilder
+				? templateEmbed.toData()
+				: templateEmbed.toJSON()
 			: templateEmbed;
 
 		for (const pageEmbed of pageEmbeds) {
 			const pageJson = isJSONEncodable(pageEmbed)
-				? pageEmbed.toJSON()
+				? pageEmbed instanceof EmbedBuilder
+					? pageEmbed.toData()
+					: pageEmbed.toJSON()
 				: pageEmbed;
 
 			mergedEmbeds.push({

@@ -1,4 +1,4 @@
-import type { EmbedBuilder } from "@discordjs/builders";
+import type { EmbedBuilder } from "../../../builders/messages/embed/Embed";
 import type {
 	APIActionRowComponent,
 	APIComponentInMessageActionRow,

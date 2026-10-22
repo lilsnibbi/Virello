@@ -1,4 +1,4 @@
-import type { ShardStats } from "virello/sharding";
+import type { ShardStats, ShardClientStatus } from "virello/sharding";
 
 export type StatsReply =
 	| { shard: number; ok: true; value: ShardStats }
@@ -6,6 +6,20 @@ export type StatsReply =
 
 declare module "virello" {
 	interface ShardRequests {
+		guildRelay: {
+			input: { guildId: string; value: number };
+			output: {
+				shard: number;
+				pid: number;
+				value: number;
+				source: number | null;
+			};
+		};
+		operationReady: { input: boolean; output: null };
+		operationInfo: {
+			input: null;
+			output: { status: ShardClientStatus; transitions: ShardClientStatus[] };
+		};
 		statsRead: {
 			input: { shard: number | null };
 			output: [number, StatsReply][];

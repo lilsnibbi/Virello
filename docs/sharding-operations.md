@@ -87,7 +87,7 @@ old process exit never permits an overlapping replacement; retrying a still
 stopping slot gets `BUSY`. Coordinate cross-host maintenance in your deployment
 application; these helpers affect only this manager's owned slots.
 
-## Adoption boundary and next architecture step
+## Architecture boundary
 
 This milestone adopts Ovencord's useful builder surface and the ideas of guild
 routing, lifecycle visibility and awaited process restarts. Virello implements
@@ -95,16 +95,14 @@ the operational APIs on its existing transport and supervisors. It retains
 per-host authentication/TLS, frame bounds, lease generations, outage maintenance,
 fresh session budgets and the existing automatic scaling state machine.
 
-Multi-shard processes are deferred. Today one process owns one client, one
-leased shard and one gateway/cache lifecycle. Sharing a process needs a design
-for per-shard ownership, readiness, failure isolation and cache dispatch; changing
-the process count alone would not implement it. The next step is an offline
-prototype with two leased gateways per process, followed by measurements of RSS,
-event-loop delay, gateway throughput, restart blast radius and IDENTIFY recovery
-against the current one-shard baseline. Keep this opt-in until lease-loss and
-drain tests show that each gateway closes before its ownership changes.
+One managed child process owns at most one Discord shard, one client and one
+gateway/cache lifecycle. A dormant child owns no shard. This is an architectural
+invariant, including during recovery, restarts and scaling. A supervisor can own
+several child processes; it never combines their gateways inside one child.
+Multi-shard processes are not planned. Reliability work must preserve process
+isolation and prove ownership before starting a replacement.
 
-Voice, alternate brokers/transports, arbitrary `broadcastEval`, upstream client
-replacement and separate scoped packages are outside this change. No performance
+Voice, alternate brokers/transports, arbitrary `broadcastEval` and upstream client
+replacement are outside this change. No performance
 benefit has been measured. The ticket flow remains an application example under
 `examples/tickets`, not a framework ticket service.

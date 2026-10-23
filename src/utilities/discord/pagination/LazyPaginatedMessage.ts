@@ -1,4 +1,4 @@
-import { EmbedBuilder } from "../../../builders/messages/embed/Embed";
+import { EmbedBuilder } from "@virello/builders";
 import type { APIUser as User } from "discord-api-types/v10";
 import type { MessageContext as Message } from "../../../discord/MessageContext";
 import { isFunction } from "../../index";

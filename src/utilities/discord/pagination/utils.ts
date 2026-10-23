@@ -1,6 +1,9 @@
-import { ActionRowBuilder } from "../../../builders/components/ActionRow";
-import { ButtonBuilder } from "../../../builders/components/button/ButtonBuilder";
-import { type MessageActionRowComponentBuilder } from "../../../builders/components/Components";
+import {
+	ActionRowBuilder,
+	ButtonBuilder,
+	type MessageActionRowComponentBuilder,
+} from "@virello/builders";
+
 import {
 	type APIComponentInMessageActionRow as ActionRowComponentOptions,
 	type APIActionRowComponent,

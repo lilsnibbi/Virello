@@ -2,8 +2,9 @@ import {
 	SlashCommandBuilder,
 	type SlashCommandOptionsOnlyBuilder,
 	type SlashCommandSubcommandsOnlyBuilder,
-} from "../../builders/interactions/commands/chatInput/ChatInputCommand";
-import { ContextMenuCommandBuilder } from "../../builders/interactions/commands/contextMenu/ContextMenuCommand";
+	ContextMenuCommandBuilder,
+} from "@virello/builders";
+
 import {
 	ApplicationCommandType,
 	type APIApplicationCommand,

@@ -19,6 +19,7 @@ you do not need a local checkout to use the framework.
 
 | Directory                      | Owns                                                            |
 | ------------------------------ | --------------------------------------------------------------- |
+| `packages/builders/`           | Standalone payload builders, validation and retained notices    |
 | `src/core/`                    | Client configuration, modules, lifecycle, logging               |
 | `src/engine/`                  | Native gateway, REST and cache                                  |
 | `src/discord/`                 | Framework message/interaction contexts, collectors, permissions |
@@ -31,7 +32,8 @@ you do not need a local checkout to use the framework.
 
 Use tabs and an 80-column print width. Run `bun fmt` to format; review the diff.
 Internal implementation imports should point to their owning modules, not public
-or root barrels. Keep relative code imports extensionless.
+or root barrels. Cross-package imports use the owning package's supported
+exports. Keep relative code imports extensionless.
 
 ## Check the change you made
 

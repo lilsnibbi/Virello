@@ -1,4 +1,4 @@
-import type { EmbedBuilder } from "../../../builders/messages/embed/Embed";
+import type { EmbedBuilder } from "@virello/builders";
 import type {
 	APIActionRowComponent,
 	APIComponentInMessageActionRow,

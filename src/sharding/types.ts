@@ -193,6 +193,8 @@ export interface ShardScalingStatus {
 }
 /** Coordinator listener, authenticated hosts, and Discord session allowance. */
 export interface ShardCoordinatorOptions {
+	/** Opt-in SQLite runtime recovery. Requires botToken and matching state settings on every host. */
+	state?: ShardStateOptions;
 	/** Initial total Discord shard count (1..4096). Assign each ID exactly once across workers. */
 	shardCount: number;
 	/** Configured supervisor hosts and assignments, not JavaScript Worker threads. */
@@ -227,6 +229,8 @@ export interface ShardRecovery {
 }
 /** Local process supervisor and its connection to one coordinator. */
 export interface ShardManagerOptions {
+	/** Host-local ownership interlocks for a coordinator using state recovery. Keep this directory stable across restarts. */
+	state?: ShardStateOptions;
 	/** Host ID matching a configured coordinator worker. */
 	id: string;
 	/** Coordinator ws(s)://host:port/sharding URL, without credentials, query, or fragment. Remote hosts require wss. */
@@ -326,6 +330,8 @@ export interface ShardManagerStatus {
 }
 /** Safe control-plane snapshot. Registered shards are distinct from gateway-ready shards. */
 export interface ShardCoordinatorStatus {
+	/** Last runtime reconstruction progress, or null before acquiring the process lock and when persistence is disabled. */
+	readonly recovery: Readonly<ShardStateStatus> | null;
 	readonly listening: boolean;
 	readonly closed: boolean;
 	readonly shardCount: number;
@@ -362,4 +368,23 @@ export interface ShardCoordinatorEvent {
 export interface ShardClientEvent {
 	readonly type: "status";
 	readonly status: ShardClientStatus;
+}
+
+/** Local SQLite recovery settings. No external database or backup service is needed. */
+export interface ShardStateOptions {
+	/** Stable deployment ID shared by the coordinator and all hosts. Not a secret or a fencing token. */
+	deployment: string;
+	/** Dedicated local directory on a filesystem supporting SQLite locks. Never share, clone or replace it while owners may be alive. */
+	directory: string;
+}
+/** Recovery never treats elapsed time or saved leases as proof that another process has exited. */
+export interface ShardStateStatus {
+	/** Draining former owners, waiting for fresh limits/storage, or accepting work. */
+	readonly phase: "draining" | "rebuilding" | "active";
+	/** Random coordinator incarnation. Hosts must acknowledge this incarnation before new leases can be issued. */
+	readonly epoch: string;
+	/** Latest diagnostic reason; no credentials or SQLite contents. */
+	readonly reason: string;
+	/** Hosts whose shutdown proof is still missing. A partition does not release ownership. */
+	readonly waitingForHosts: readonly string[];
 }

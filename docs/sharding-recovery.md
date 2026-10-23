@@ -87,6 +87,10 @@ can therefore remain pending.
 
 ## Restart tradeoffs
 
+Enable [SQLite recovery](sqlite-recovery.md) for automatic state reconstruction
+with confirmed host shutdown before replacement. The following tradeoffs apply
+when `state` is omitted; that mode preserves the existing in-memory behavior.
+
 > [!IMPORTANT]
 > Coordination lives in memory. A coordinator restart immediately rebuilds the
 > pool; there is no global reconciliation grace period or durable ownership lock.
@@ -117,6 +121,7 @@ not an ownership grace period. Permits are charged before delivery and never
 refunded. Manual `sessionStartLimit` snapshots need refreshing on restart/expiry;
 elapsed time alone never replenishes them.
 
-No `statePath`, `stateDirectory`, `releaseWorker` or disk cleanup is involved.
+The legacy `statePath`, `stateDirectory` and `releaseWorker` APIs remain absent.
+Only explicit `state` options enable the new marked-directory recovery mode.
 Old state files remain unused. [Migration notes](../BREAKING_CHANGES.md) ·
 [Recovery implementation](../src/sharding/client/gateway.ts)

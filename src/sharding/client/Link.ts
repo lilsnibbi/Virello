@@ -3,6 +3,7 @@ import { writeEvent } from "../../core/logging/diagnostics";
 import type { LoggerLike } from "../../core/logging/LoggerLike";
 import { ShardMessenger } from "../messaging";
 import { freezeSnapshot } from "../lifecycle";
+import { holdChildOwnership, type ChildOwnership } from "../recovery/ownership";
 import { statsRequest } from "../stats";
 import { Availability } from "../transport/availability";
 import { Pending } from "../transport/pending";
@@ -30,6 +31,7 @@ import {
 } from "../types";
 
 export interface ShardConfig {
+	ownership?: ChildOwnership;
 	shard: number | null;
 	count: number;
 	generation: string;
@@ -51,6 +53,7 @@ export function shardConfig(): ShardConfig | undefined {
 	if (Buffer.byteLength(input) > 8192)
 		throw new ShardError("CONFIG", "Invalid managed shard configuration.");
 	const result = type({
+		"ownership?": { path: "string", epoch: identifier, "+": "reject" },
 		shard: "number.integer >= 0 | null",
 		count: "number.integer > 0 & number <= 4096",
 		generation: identifier,
@@ -125,6 +128,7 @@ export class ShardLink extends ShardMessenger<ShardClientEvent> {
 		private readonly statistics?: () => ShardStats,
 	) {
 		super();
+		if (config?.ownership) holdChildOwnership(config.ownership);
 		this.policy = config?.limits ?? limits();
 		this.requests = new Pending(this.policy.maxPending);
 		if (config) this.lifecycle?.maintenance(true);

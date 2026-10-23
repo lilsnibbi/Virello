@@ -22,6 +22,7 @@ Already have one? Pick the task below.
 | Split a bot into coordinator, hosts and shards | [Sharding](sharding.md)                          |
 | Send typed messages between processes          | [Shard messaging](shard-messaging.md)            |
 | Recover after disconnects and restarts         | [Maintenance and recovery](sharding-recovery.md) |
+| Reconstruct disposable SQLite runtime state    | [Fenced automatic recovery](sqlite-recovery.md)  |
 | Change shard counts on existing hosts          | [Automatic scaling](sharding-scaling.md)         |
 | Collect live process and cache metrics         | [Shard statistics](sharding-stats.md)            |
 | Observe lifecycle or restart owned processes   | [Operational APIs](sharding-operations.md)       |

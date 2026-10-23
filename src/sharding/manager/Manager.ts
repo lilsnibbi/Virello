@@ -2,6 +2,7 @@
 
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { setTimeout as wait } from "node:timers/promises";
 import type { Logger } from "@lilsnibbi/logger";
 import { type } from "arktype";
 import { createConsoleLogger } from "../../core/logging/console";
@@ -9,6 +10,12 @@ import { writeEvent } from "../../core/logging/diagnostics";
 import { ShardMessenger } from "../messaging";
 import { freezeSnapshot } from "../lifecycle";
 import { RestartDeadline } from "./RestartDeadline";
+import {
+	HostOwnership,
+	StateDirectory,
+	isBusy,
+	validateState,
+} from "../recovery/ownership";
 import { Availability } from "../transport/availability";
 import { Pending } from "../transport/pending";
 import {
@@ -89,6 +96,9 @@ export class ShardManager extends ShardMessenger<ShardManagerEvent> {
 	private requests = new Pending(256);
 	private readonly availability = new Availability();
 	private readonly releases = new Set<string>();
+	private ownership?: HostOwnership;
+	private recoveryEpoch?: string;
+	private fencing?: Promise<void>;
 	private releasing?: Promise<void>;
 	private heartbeat?: ReturnType<typeof setInterval>;
 	private loop?: Promise<void>;
@@ -119,6 +129,7 @@ export class ShardManager extends ShardMessenger<ShardManagerEvent> {
 	 */
 	public constructor(options: ShardManagerOptions) {
 		super();
+		if (options.state) validateState(options.state);
 		type({
 			"restart?": type({
 				"maxRestarts?": "number",
@@ -159,6 +170,7 @@ export class ShardManager extends ShardMessenger<ShardManagerEvent> {
 			throw new TypeError("Shard script must be a .ts entrypoint.");
 		this.options = {
 			...options,
+			state: options.state && { ...options.state },
 			script: resolve(options.cwd ?? process.cwd(), script),
 			args: [...(options.args ?? [])],
 			env: { ...options.env },
@@ -430,7 +442,7 @@ export class ShardManager extends ShardMessenger<ShardManagerEvent> {
 	}
 	/**
 	 * Connect and reconcile the host assignment once, then supervise local Bun children.
-	 * @returns The shared promise, resolved after authenticated assignment rather than child readiness. Recoverable
+	 * @returns The shared promise, resolved after authenticated assignment (and the optional recovery barrier), before child readiness. Recoverable
 	 * connection failures retry by default.
 	 * @throws If closed, a fatal admission error occurs, or reconnection is disabled and startup fails.
 	 */
@@ -458,6 +470,33 @@ export class ShardManager extends ShardMessenger<ShardManagerEvent> {
 		resolveStart: () => void,
 		rejectStart: (e: unknown) => void,
 	): Promise<void> {
+		if (this.options.state) {
+			const directory = new StateDirectory(
+				this.options.state,
+				`host:${this.options.id}`,
+			);
+			let reported = false;
+			while (!this.closed && !this.ownership) {
+				try {
+					this.ownership = new HostOwnership(directory);
+				} catch (error) {
+					if (!isBusy(error)) throw error;
+					if (!reported) {
+						this.report(
+							"A previous supervisor still holds this host's process lock; waiting without starting children.",
+							error,
+							"ownership_waiting",
+						);
+						reported = true;
+					}
+					try {
+						await wait(1000, undefined, { signal: this.lifecycle.signal });
+					} catch {
+						if (!this.closed) throw error;
+					}
+				}
+			}
+		}
 		let attempt = 0;
 		let first = true;
 		let reportedAt = -Infinity;
@@ -603,6 +642,9 @@ export class ShardManager extends ShardMessenger<ShardManagerEvent> {
 			this.socket = socket;
 			let ended = false;
 			let welcome = false;
+			let recoveryEpoch: string | undefined;
+			let activated = false;
+			let capacity = 0;
 			let lastSeen = performance.now();
 			const startup = setTimeout(
 				() =>
@@ -674,6 +716,7 @@ export class ShardManager extends ShardMessenger<ShardManagerEvent> {
 						"released",
 						"drain",
 						"assignment",
+						"activate",
 					]);
 					lastSeen = performance.now();
 					if (!welcome) {
@@ -689,7 +732,17 @@ export class ShardManager extends ShardMessenger<ShardManagerEvent> {
 						this.policy = limits(d.limits);
 						this.requests = new Pending(this.policy.maxPending);
 						this.count = d.count;
-						this.draining = false;
+						if (
+							!!d.recovery !== !!this.options.state ||
+							(d.recovery &&
+								d.recovery.deployment !== this.options.state?.deployment)
+						)
+							throw new ShardError(
+								"CONFIG",
+								"Coordinator and host must enable state recovery with the same deployment ID.",
+							);
+						this.draining = !!d.recovery;
+						capacity = d.capacity;
 						this.transition = undefined;
 						welcome = true;
 						clearTimeout(startup);
@@ -703,9 +756,18 @@ export class ShardManager extends ShardMessenger<ShardManagerEvent> {
 								"CONFIG",
 								"processCount exceeds the configured host capacity.",
 							);
-						void this.resumeChildren(socket, desired, d.shards).catch((error) =>
-							this.transitionFailed(socket, error),
-						);
+						if (d.recovery) {
+							recoveryEpoch = d.recovery.epoch;
+							void this.prepareRecovery(
+								socket,
+								d.recovery.epoch,
+								d.recovery.resume,
+							).catch((error) => this.transitionFailed(socket, error));
+						} else {
+							void this.resumeChildren(socket, desired, d.shards).catch(
+								(error) => this.transitionFailed(socket, error),
+							);
+						}
 						writeEvent(this.logger, "notif", {
 							component: "sharding.manager",
 							event: "assigned",
@@ -717,12 +779,41 @@ export class ShardManager extends ShardMessenger<ShardManagerEvent> {
 								count: d.count,
 							},
 						});
-						onWelcome();
+						if (!d.recovery) onWelcome();
 						this.publishStatus();
 						return;
 					}
 					if (message.op === "welcome")
 						throw new ShardError("PROTOCOL", "Repeated welcome.");
+					if (message.op === "activate") {
+						const d = message.data;
+						if (
+							!recoveryEpoch ||
+							d.epoch !== recoveryEpoch ||
+							this.recoveryEpoch !== recoveryEpoch ||
+							activated ||
+							new Set(d.shards).size !== d.shards.length ||
+							d.shards.some((shard) => shard >= d.count) ||
+							Math.max(this.options.processCount ?? 0, d.shards.length) >
+								capacity
+						)
+							throw new ShardError(
+								"OWNERSHIP",
+								"Unexpected recovery activation.",
+							);
+						activated = true;
+						this.count = d.count;
+						this.draining = false;
+						this.requests = new Pending(this.policy.maxPending);
+						void this.resumeChildren(
+							socket,
+							Math.max(this.options.processCount ?? 0, d.shards.length),
+							d.shards,
+						).catch((error) => this.transitionFailed(socket, error));
+						onWelcome();
+						this.publishStatus();
+						return;
+					}
 					if (message.op === "drain" || message.op === "assignment") {
 						this.reassign(message, socket);
 						return;
@@ -815,6 +906,48 @@ export class ShardManager extends ShardMessenger<ShardManagerEvent> {
 			})
 			.catch((error) => this.transitionFailed(socket, error));
 	}
+	private async prepareRecovery(
+		socket: NativeSocket,
+		epoch: string,
+		resume: boolean,
+	): Promise<void> {
+		if (!resume || this.recoveryEpoch !== epoch) {
+			this.manualRestart?.abort.abort(
+				new ShardError(
+					"RECOVERING",
+					"Coordinator recovery interrupted the restart.",
+				),
+			);
+			for (const timer of this.restarts.values()) clearTimeout(timer);
+			this.restarts.clear();
+			this.availability.set(false);
+			this.requests.close(
+				new ShardError("RECOVERING", "Host is fencing previous children."),
+			);
+			await (this.fencing ??= (async () => {
+				await Promise.all(
+					[...this.children.values()].map((child) => this.stopChild(child)),
+				);
+				await this.ownership!.fence(this.lifecycle.signal, () =>
+					this.report(
+						"An orphaned child still holds the host ownership gate; waiting for its watchdog or external process supervision to stop it.",
+						new ShardError(
+							"OWNERSHIP_WAIT",
+							"A paused or unresponsive process cannot be replaced safely.",
+						),
+						"child_ownership_waiting",
+					),
+				);
+				this.releases.clear();
+				this.statuses.clear();
+			})().finally(() => {
+				this.fencing = undefined;
+			}));
+		}
+		if (this.closed || this.socket !== socket || !this.connected) return;
+		this.recoveryEpoch = epoch;
+		this.send(frame("fenced", undefined, { epoch }));
+	}
 	private transitionFailed(socket: NativeSocket, error: unknown): void {
 		if (this.socket !== socket) return;
 		this.report(
@@ -871,6 +1004,9 @@ export class ShardManager extends ShardMessenger<ShardManagerEvent> {
 								shutdownTimeoutMs: this.shutdownMs,
 								assignmentPollIntervalMs: this.pollMs,
 								maxDisconnectedLifetimeMs: this.disconnectedMs,
+								...(this.ownership
+									? { ownership: this.ownership.childConfig }
+									: {}),
 							},
 							this.policy.maxBytes,
 						),
@@ -1654,6 +1790,9 @@ export class ShardManager extends ShardMessenger<ShardManagerEvent> {
 			for (const entry of this.inbound.values()) clearTimeout(entry.timer);
 			this.inbound.clear();
 			await this.loop;
+			await this.fencing?.catch(() => {});
+			// Children retain their own OS locks even if supervisor shutdown could not confirm an exit.
+			this.ownership?.close();
 			await this.ownedLogger?.close();
 			this.closeLifecycle({ type: "status", status: this.status });
 		}

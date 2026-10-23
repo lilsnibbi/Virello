@@ -1,5 +1,20 @@
 # Breaking changes
 
+## Optional SQLite recovery (unreleased)
+
+`ShardCoordinator` and `ShardManager` accept matching `state` settings. This is
+opt-in; omitted settings preserve the existing in-memory behavior. Upgrade all
+participants together and stop the old deployment before first enabling it.
+The coordinator requires `botToken` for fresh session limits after the shutdown
+barrier. `manager.start()` waits for recovery activation; start configured hosts
+concurrently. Operational status adds `recovery` (`null` without persistence).
+
+A coordinator restart or runtime-state failure stops and replaces managed
+children after every host confirms fencing. Module startup runs again in these
+new processes. Ordinary reconnection within the same epoch can retain children.
+Legacy `statePath`/`stateDirectory` options remain ignored. No old SQLite files
+are imported. See [recovery guarantees and storage requirements](docs/sqlite-recovery.md).
+
 ## First-party builders (unreleased)
 
 `virello/builders` replaces the `@discordjs/builders` dependency. Developers

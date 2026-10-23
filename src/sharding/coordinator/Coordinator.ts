@@ -8,6 +8,8 @@ import { writeEvent } from "../../core/logging/diagnostics";
 import type { LoggerLike } from "../../core/logging/LoggerLike";
 import { safeContext } from "../../core/logging/redact";
 import { ShardLifecycle, freezeSnapshot } from "../lifecycle";
+import { CoordinatorState } from "../recovery/CoordinatorState";
+import { isBusy, validateState } from "../recovery/ownership";
 import {
 	decode,
 	encode,
@@ -36,6 +38,7 @@ import { IdentifyScheduler, identifyCooldownMs } from "./identify";
 import { type ScalingPlan, ScalingPolicy } from "./scaling";
 
 interface Session {
+	fenced?: boolean;
 	host: ShardHost;
 	instance: string;
 	connectionId: string;
@@ -78,6 +81,7 @@ type DisconnectReason =
 	| "server_shutdown";
 type Outcome = ReturnType<typeof failure> | { ok: true; value: unknown };
 const inbound = [
+	"fenced",
 	"ping",
 	"lease",
 	"ready",
@@ -100,6 +104,9 @@ export class ShardCoordinator extends ShardLifecycle<ShardCoordinatorEvent> {
 	private readonly assignments = new Map<number, string>();
 	// Reserved until the authenticated owner confirms exit/release, or this coordinator ends.
 	private readonly leases = new Map<number, Lease>();
+	private state?: CoordinatorState;
+	private rebuilding?: Promise<void>;
+	private stateCheckAt = 0;
 	private readonly logSecrets: readonly string[];
 	private readonly sessions = new Map<string, Session>();
 	private readonly waiting = new Map<
@@ -141,6 +148,13 @@ export class ShardCoordinator extends ShardLifecycle<ShardCoordinatorEvent> {
 	 */
 	public constructor(options: ShardCoordinatorOptions) {
 		super();
+		if (options.state) {
+			validateState(options.state);
+			if (!options.botToken)
+				throw new TypeError(
+					"SQLite recovery requires botToken to read fresh session limits after old owners stop.",
+				);
+		}
 		this.count = options.shardCount;
 		this.scaleStatus = {
 			phase: options.scaling ? "idle" : "disabled",
@@ -210,7 +224,18 @@ export class ShardCoordinator extends ShardLifecycle<ShardCoordinatorEvent> {
 				Object.freeze({ ...host, shards: Object.freeze([...host.shards]) }),
 			);
 			encode(
-				frame("welcome", undefined, this.welcome(host)),
+				frame("welcome", undefined, {
+					...this.welcome(host),
+					...(options.state
+						? {
+								recovery: {
+									deployment: options.state.deployment,
+									epoch: "00000000-0000-4000-8000-000000000000",
+									resume: false,
+								},
+							}
+						: {}),
+				}),
 				this.policy.maxBytes,
 			);
 		}
@@ -218,6 +243,7 @@ export class ShardCoordinator extends ShardLifecycle<ShardCoordinatorEvent> {
 			throw new TypeError("Assign every shard exactly once.");
 		this.options = {
 			...options,
+			state: options.state && { ...options.state },
 			sessionStartLimit: options.sessionStartLimit && {
 				...options.sessionStartLimit,
 			},
@@ -278,6 +304,7 @@ export class ShardCoordinator extends ShardLifecycle<ShardCoordinatorEvent> {
 				gatewayReadyShards.push(shard);
 		}
 		return freezeSnapshot({
+			recovery: this.state?.status ?? null,
 			listening: this.server !== undefined,
 			closed: this.closed,
 			shardCount: this.count,
@@ -310,13 +337,35 @@ export class ShardCoordinator extends ShardLifecycle<ShardCoordinatorEvent> {
 	}
 	private async open(): Promise<void> {
 		try {
+			if (this.options.state) {
+				let reported = false;
+				while (!this.state) {
+					this.lifecycle.signal.throwIfAborted();
+					try {
+						this.state = new CoordinatorState(this.options.state, [
+							...this.hosts.keys(),
+						]);
+					} catch (error) {
+						if (!isBusy(error)) throw error;
+						if (!reported) {
+							this.report(
+								"A previous coordinator still holds the process lock; waiting before opening the listener.",
+								error,
+								"coordinator_ownership_waiting",
+							);
+							reported = true;
+						}
+						await wait(1000, undefined, { signal: this.lifecycle.signal });
+					}
+				}
+			}
 			this.activity(
 				"debug",
 				"starting",
 				"Preparing the coordinator listener and in-memory identify scheduler.",
 			);
 			this.scheduler = new IdentifyScheduler();
-			if (this.options.botToken) {
+			if (this.options.botToken && !this.state) {
 				this.activity(
 					"notif",
 					"identify_startup_wait",
@@ -329,11 +378,13 @@ export class ShardCoordinator extends ShardLifecycle<ShardCoordinatorEvent> {
 					signal: this.lifecycle.signal,
 				});
 			}
-			const sessionLimit =
-				this.options.sessionStartLimit ?? (await this.fetchLimit());
-			this.scheduler.update(sessionLimit);
-			this.logIdentifyLimits(sessionLimit);
-			if (this.scaling) {
+			if (!this.state) {
+				const sessionLimit =
+					this.options.sessionStartLimit ?? (await this.fetchLimit());
+				this.scheduler.update(sessionLimit);
+				this.logIdentifyLimits(sessionLimit);
+			}
+			if (this.scaling && !this.state) {
 				const plan = this.scaling.plan(
 					this.recommendation!,
 					[...this.hosts.values()],
@@ -382,7 +433,20 @@ export class ShardCoordinator extends ShardLifecycle<ShardCoordinatorEvent> {
 						this.waiting.delete(socket.data.host.id);
 						this.safeSend(
 							socket.data,
-							frame("welcome", undefined, this.welcome(socket.data.host)),
+							frame("welcome", undefined, {
+								...this.welcome(socket.data.host),
+								...(this.state
+									? {
+											recovery: {
+												deployment: this.options.state!.deployment,
+												epoch: this.state.epoch,
+												resume:
+													this.state.owners.get(socket.data.host.id) ===
+													socket.data.instance,
+											},
+										}
+									: {}),
+							}),
 						);
 					},
 					message: (socket, input) => {
@@ -410,6 +474,13 @@ export class ShardCoordinator extends ShardLifecycle<ShardCoordinatorEvent> {
 				},
 			});
 			this.heartbeat = setInterval(() => {
+				if (
+					this.state?.phase === "active" &&
+					performance.now() >= this.stateCheckAt
+				) {
+					this.stateCheckAt = performance.now() + 5000;
+					this.persist(true);
+				}
 				for (const session of this.sessions.values())
 					if (performance.now() - session.lastSeen > 15000) {
 						this.disconnect(session, "heartbeat_timeout");
@@ -419,6 +490,7 @@ export class ShardCoordinator extends ShardLifecycle<ShardCoordinatorEvent> {
 				if (this.scaleStatus.phase === "degraded" && this.gatewayReady())
 					this.setScaleStatus("idle", "recovered");
 				if (
+					(!this.state || this.state.phase === "active") &&
 					this.scheduler?.expired &&
 					this.options.botToken &&
 					!this.refreshing &&
@@ -448,6 +520,8 @@ export class ShardCoordinator extends ShardLifecycle<ShardCoordinatorEvent> {
 					"startup_failed",
 				);
 			this.scheduler = undefined;
+			this.state?.close();
+			this.state = undefined;
 			throw error;
 		}
 	}
@@ -484,9 +558,14 @@ export class ShardCoordinator extends ShardLifecycle<ShardCoordinatorEvent> {
 			const instance = request.headers.get("x-virello-instance");
 			if (!identifier.allows(instance))
 				return new Response(null, { status: 400 });
-			const reason = this.sessions.has(`${host.id}/${instance}`)
-				? "host_already_connected"
-				: "";
+			const reason =
+				this.sessions.has(`${host.id}/${instance}`) ||
+				(this.state &&
+					[...this.sessions.values()].some(
+						(session) => session.host.id === host.id,
+					))
+					? "host_already_connected"
+					: "";
 			return new Response(null, {
 				status: reason ? 409 : 204,
 				headers: { "x-virello-reason": reason },
@@ -534,7 +613,13 @@ export class ShardCoordinator extends ShardLifecycle<ShardCoordinatorEvent> {
 		const instance = request.headers.get("x-virello-instance");
 		if (!identifier.allows(instance))
 			return reject(400, "invalid_identity", "Invalid identity");
-		if (this.sessions.has(`${host.id}/${instance}`))
+		if (
+			this.sessions.has(`${host.id}/${instance}`) ||
+			(this.state &&
+				[...this.sessions.values()].some(
+					(session) => session.host.id === host.id,
+				))
+		)
 			return reject(
 				409,
 				"host_already_connected",
@@ -596,6 +681,30 @@ export class ShardCoordinator extends ShardLifecycle<ShardCoordinatorEvent> {
 			},
 		);
 		const { op, data: d } = message;
+		if (op === "fenced") {
+			this.fenced(session, d.epoch);
+			return;
+		}
+		if (
+			this.state &&
+			(this.state.phase !== "active" || !session.fenced) &&
+			!["ping", "offline", "release"].includes(op)
+		) {
+			this.safeSend(
+				session,
+				frame(
+					"reply",
+					message.id,
+					failure(
+						new ShardError(
+							"RECOVERING",
+							"Coordinator is waiting for confirmed host shutdown and fresh session limits.",
+						),
+					),
+				),
+			);
+			return;
+		}
 		if (
 			this.transition &&
 			(message.op === "identify" ||
@@ -698,6 +807,7 @@ export class ShardCoordinator extends ShardLifecycle<ShardCoordinatorEvent> {
 						this.owns(session, shard, d.generation)
 					)
 						this.removeShard(session, shard, d.generation);
+				if (!this.persist()) return;
 				this.send(
 					session,
 					frame("reply", message.id, { ok: true, value: null }),
@@ -981,7 +1091,13 @@ export class ShardCoordinator extends ShardLifecycle<ShardCoordinatorEvent> {
 		this.safeSend(route.source, frame("reply", route.original, result));
 	}
 	private grantIdentifies(): void {
-		if (!this.scheduler || this.closed || this.transition) return;
+		if (
+			!this.scheduler ||
+			this.closed ||
+			this.transition ||
+			(this.state && this.state.phase !== "active")
+		)
+			return;
 		for (const [id, pending] of this.identifies) {
 			const d = pending.message.data;
 			if (
@@ -990,8 +1106,11 @@ export class ShardCoordinator extends ShardLifecycle<ShardCoordinatorEvent> {
 					d.shard,
 					d.generation,
 				)
-			)
+			) {
+				// Commit the charge before the permit can reach a child. A failed write never refunds a grant.
+				if (!this.persist()) return;
 				this.finishIdentify(id);
+			}
 		}
 	}
 	private finishIdentify(id: string, error?: unknown): void {
@@ -1039,6 +1158,141 @@ export class ShardCoordinator extends ShardLifecycle<ShardCoordinatorEvent> {
 	}
 	private sessionKey(session: Session): string {
 		return `${session.host.id}/${session.instance}`;
+	}
+	private snapshot() {
+		return {
+			version: 1,
+			shardCount: this.count,
+			assignments: [...this.assignments],
+			leases: [...this.leases],
+			remaining: this.scheduler?.remaining ?? 0,
+		};
+	}
+	private persist(verifyOnly = false): boolean {
+		if (!this.state || this.state.phase !== "active") return true;
+		try {
+			if (verifyOnly) this.state.verify();
+			else this.state.write(this.snapshot());
+			return true;
+		} catch (error) {
+			this.state.invalidate(
+				error instanceof ShardError ? error.code : "storage_failed",
+			);
+			this.transition = undefined;
+			this.report(
+				"Runtime state is unavailable; stopping admission and reconciling every host before reconstruction.",
+				error,
+				"state_recovery_started",
+			);
+			for (const session of [...this.sessions.values()]) {
+				this.disconnect(session, "server_shutdown");
+				session.socket?.terminate();
+			}
+			this.publishStatus();
+			return false;
+		}
+	}
+	private fenced(session: Session, epoch: string): void {
+		const state = this.state;
+		if (!state || state.epoch !== epoch)
+			throw new ShardError(
+				"OWNERSHIP",
+				"Unexpected or stale recovery acknowledgment.",
+			);
+		if (session.fenced) return;
+		if (state.owners.get(session.host.id) !== session.instance) {
+			// The authenticated host holds its OS supervisor lock and has exclusively acquired
+			// the children's gate. A disconnected/paused child would still hold a read lock.
+			for (const [shard, lease] of this.leases)
+				if (lease.host === session.host.id) this.leases.delete(shard);
+			state.owners.set(session.host.id, session.instance);
+		}
+		session.fenced = true;
+		this.publishStatus();
+		if (state.phase === "active") {
+			if (this.persist()) this.activate(session);
+		} else if (
+			state.hosts.every((host) => state.owners.has(host)) &&
+			!this.rebuilding
+		) {
+			this.rebuilding = this.rebuildState().finally(() => {
+				this.rebuilding = undefined;
+			});
+		}
+	}
+	private activate(session: Session): void {
+		if (session.fenced && this.state?.phase === "active")
+			this.safeSend(
+				session,
+				frame("activate", undefined, {
+					epoch: this.state.epoch,
+					shards: session.host.shards,
+					count: this.count,
+				}),
+			);
+	}
+	private async rebuildState(): Promise<void> {
+		const state = this.state!;
+		state.phase = "rebuilding";
+		this.publishStatus();
+		try {
+			// No persisted clock or old allowance can shorten the cooldown after the last shutdown proof.
+			await wait(identifyCooldownMs, undefined, {
+				signal: this.lifecycle.signal,
+			});
+			await this.scalePromise;
+			await this.refreshPromise;
+			while (!this.closed) {
+				try {
+					const limit = await this.fetchLimit();
+					this.lifecycle.signal.throwIfAborted();
+					this.scheduler!.update(limit);
+					this.leases.clear();
+					if (this.scaling) {
+						const plan = this.scaling.plan(
+							this.recommendation!,
+							[...this.hosts.values()],
+							this.assignments,
+						);
+						this.validateAssignments(plan);
+						this.commitAssignments(plan);
+					}
+					state.rebuild(this.snapshot());
+					state.phase = "active";
+					state.reason = "reconciled";
+					this.logIdentifyLimits(limit);
+					this.activity(
+						"notif",
+						"state_recovered",
+						"All configured hosts fenced previous children; runtime state was reconstructed with fresh gateway limits.",
+						{ epoch: state.epoch },
+					);
+					for (const session of this.sessions.values()) this.activate(session);
+					this.publishStatus();
+					return;
+				} catch (error) {
+					if (this.closed) return;
+					state.reason =
+						error instanceof ShardError
+							? error.code
+							: "storage_or_metadata_unavailable";
+					this.report(
+						"Recovery is waiting for writable runtime storage and fresh gateway limits; retrying in 30 seconds without starting children.",
+						error,
+						"state_recovery_waiting",
+					);
+					this.publishStatus();
+					await wait(30000, undefined, { signal: this.lifecycle.signal });
+				}
+			}
+		} catch (error) {
+			if (!this.closed)
+				this.report(
+					"Runtime recovery stopped before activation.",
+					error,
+					"state_recovery_failed",
+				);
+		}
 	}
 	private welcome(host: ShardHost) {
 		return {
@@ -1127,6 +1381,7 @@ export class ShardCoordinator extends ShardLifecycle<ShardCoordinatorEvent> {
 			generation,
 		});
 		this.assignments.set(shard, session.host.id);
+		if (!this.persist()) return;
 		this.send(
 			session,
 			frame("reply", message.id, {
@@ -1272,6 +1527,8 @@ export class ShardCoordinator extends ShardLifecycle<ShardCoordinatorEvent> {
 	 */
 	public checkScaling(): Promise<ShardScalingStatus> {
 		if (!this.scaling) return Promise.resolve(this.scalingStatus);
+		if (this.state && this.state.phase !== "active")
+			return Promise.resolve(this.scalingStatus);
 		if (this.closed || !this.server)
 			return Promise.reject(
 				new ShardError("STATE", "Coordinator is not running."),
@@ -1359,10 +1616,16 @@ export class ShardCoordinator extends ShardLifecycle<ShardCoordinatorEvent> {
 	}
 	private async evaluateScaling(): Promise<ShardScalingStatus> {
 		const policy = this.scaling!;
+		const epoch = this.state?.epoch;
 		try {
 			await this.refreshPromise;
 			const limit = await this.fetchLimit();
 			if (this.closed) return this.scalingStatus;
+			if (
+				this.state &&
+				(this.state.phase !== "active" || this.state.epoch !== epoch)
+			)
+				return this.scalingStatus;
 			this.updateSessionLimit(limit);
 			const ready = this.gatewayReady();
 			// A larger Discord recommendation can repair a topology that is too small to log in.
@@ -1433,6 +1696,11 @@ export class ShardCoordinator extends ShardLifecycle<ShardCoordinatorEvent> {
 	): Promise<void> {
 		const deadline = performance.now() + milliseconds;
 		while (!test()) {
+			if (this.state && this.state.phase !== "active")
+				throw new ShardError(
+					"RECOVERING",
+					"Runtime recovery interrupted scaling.",
+				);
 			this.lifecycle.signal.throwIfAborted();
 			if (performance.now() >= deadline)
 				throw new ShardError(
@@ -1526,6 +1794,8 @@ export class ShardCoordinator extends ShardLifecycle<ShardCoordinatorEvent> {
 			throw error;
 		}
 		this.commitAssignments(plan);
+		if (!this.persist())
+			throw new ShardError("RECOVERING", "Topology could not be persisted.");
 		this.transition = undefined;
 		this.setScaleStatus("starting", plan.reason, plan.count);
 		for (const session of transition.participants)
@@ -1564,6 +1834,15 @@ export class ShardCoordinator extends ShardLifecycle<ShardCoordinatorEvent> {
 					...this.welcome(host),
 					shards,
 					count: plan.count,
+					...(this.state
+						? {
+								recovery: {
+									deployment: this.options.state!.deployment,
+									epoch: this.state.epoch,
+									resume: false,
+								},
+							}
+						: {}),
 				}),
 				this.policy.maxBytes,
 			);
@@ -1583,6 +1862,11 @@ export class ShardCoordinator extends ShardLifecycle<ShardCoordinatorEvent> {
 		if (!this.scheduler || this.closed)
 			throw new ShardError("STATE", "Coordinator is not running.");
 		this.scheduler.update(value);
+		if (!this.persist())
+			throw new ShardError(
+				"RECOVERING",
+				"Session allowance could not be persisted.",
+			);
 		this.logIdentifyLimits(value);
 		this.grantIdentifies();
 	}
@@ -1670,7 +1954,9 @@ export class ShardCoordinator extends ShardLifecycle<ShardCoordinatorEvent> {
 		this.server = undefined;
 		await this.refreshPromise;
 		await this.scalePromise;
+		await this.rebuilding;
 		this.scheduler = undefined;
+		this.state?.close();
 		if (wasListening)
 			this.activity("notif", "stopped", "Coordinator listener is closed.");
 		await this.ownedLogger?.close();

@@ -15,6 +15,12 @@ const outcome = type({ ok: "true", value: "unknown", "+": "reject" }).or({
 });
 const schemas = {
 	welcome: type({
+		"recovery?": {
+			deployment: identifier,
+			epoch: identifier,
+			resume: "boolean",
+			"+": "reject",
+		},
 		shards: integer.array(),
 		capacity: "number.integer >= 0 & number <= 4096",
 		count: "number.integer > 0",
@@ -26,6 +32,13 @@ const schemas = {
 		},
 	}),
 	boot: type({}),
+	fenced: type({ epoch: identifier, "+": "reject" }),
+	activate: type({
+		epoch: identifier,
+		shards: integer.array(),
+		count: "number.integer > 0 & number <= 4096",
+		"+": "reject",
+	}),
 	lease: type({
 		previous: integer.or("null"),
 		generation: identifier,
@@ -211,8 +224,10 @@ export function decode<K extends Op>(
 	const data = schema.assert(parsed.data);
 	// ArkType validates values; explicitly reject undeclared keys on every message shape.
 	const keys: Record<Op, readonly string[]> = {
-		welcome: ["shards", "capacity", "count", "limits"],
+		welcome: ["shards", "capacity", "count", "limits", "recovery"],
 		boot: [],
+		fenced: ["epoch"],
+		activate: ["epoch", "shards", "count"],
 		lease: ["previous", "generation", "preferred"],
 		assign: ["shard", "count", "reason"],
 		applied: [],

@@ -227,7 +227,7 @@ describe("CI release boundary", () => {
 		});
 		expect(
 			publishWorkflow.jobs.publish.steps.some((step) =>
-				step.run?.includes("npm publish --access public"),
+				step.run?.includes("bun scripts/release.ts publish"),
 			),
 		).toBe(true);
 	});

@@ -4,6 +4,7 @@ coverage/
 .env.*
 !.env.example
 *.tgz
+.release/
 # Legacy sharding state is unused; keep existing local files out of commits.
 sharding.sqlite*
 

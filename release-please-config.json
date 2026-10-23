@@ -1,12 +1,17 @@
 {
 	"$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+	"draft-pull-request": false,
 	"packages": {
 		".": {
 			"release-type": "node",
 			"initial-version": "0.1.0",
 			"include-component-in-tag": false,
 			"bump-minor-pre-major": true,
-			"changelog-path": "CHANGELOG.md"
+			"changelog-path": "CHANGELOG.md",
+			"extra-files": [
+				"packages/builders/package.json",
+				{ "type": "generic", "path": "bun.lock" }
+			]
 		}
 	}
 }

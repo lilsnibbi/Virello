@@ -48,6 +48,38 @@ npm view "@virello/builders@$version" version --registry=https://registry.npmjs.
 npm view "virello@$version" version --registry=https://registry.npmjs.org
 ```
 
+For **Windows PowerShell**, use this equivalent setup and validation block. Call
+the locked Bun executable directly to avoid shell-shim and quoting differences;
+do not skip either release check. Windows must also have `tar.exe` available;
+check it with `tar --version`.
+
+```powershell
+git switch main
+git pull --ff-only
+if (git status --porcelain) { throw 'Use a clean checkout before bootstrap.' }
+node --version
+npm --version
+npm ci --prefix scripts/release-tools --no-audit --no-fund
+$releaseBun = (Resolve-Path '.\scripts\release-tools\node_modules\bun\bin\bun.exe').Path
+& $releaseBun --revision
+& $releaseBun install --frozen-lockfile --ignore-scripts
+& $releaseBun scripts/release.ts check
+if ($LASTEXITCODE -ne 0) { throw 'Release metadata validation failed.' }
+& $releaseBun scripts/release.ts pack
+if ($LASTEXITCODE -ne 0) { throw 'Package validation failed.' }
+git diff --exit-code
+if ($LASTEXITCODE -ne 0) { throw 'Tracked files changed during validation.' }
+
+npm login --registry=https://registry.npmjs.org
+npm whoami --registry=https://registry.npmjs.org
+$version = (Get-Content -Raw package.json | ConvertFrom-Json).version
+npm view "@virello/builders@$version" version --registry=https://registry.npmjs.org
+npm view "virello@$version" version --registry=https://registry.npmjs.org
+```
+
+Run commands in order and stop if any fails. The dry-run and owner publish
+commands below use the same `$version` variable syntax in PowerShell.
+
 Confirm ownership of `virello` and permission to create public packages under
 `@virello` before publishing. The scope needs to belong to an npm account or
 organization you control, with suitable package publishing permissions. A 404

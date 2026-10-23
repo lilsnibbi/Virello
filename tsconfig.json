@@ -14,6 +14,6 @@
 		"useDefineForClassFields": false,
 		"forceConsistentCasingInFileNames": true
 	},
-	"include": ["src", "tests", "examples", "scripts"],
+	"include": ["src", "tests", "examples", "scripts", "packages"],
 	"exclude": ["node_modules"]
 }

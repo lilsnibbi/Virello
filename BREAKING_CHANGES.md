@@ -3,8 +3,9 @@
 ## First-party builders (unreleased)
 
 `virello/builders` replaces the `@discordjs/builders` dependency. Developers
-install only `virello`; the root also re-exports the builder category. No separate
-scoped packages are published. Virello's client and sharding architecture are unchanged.
+install only `virello`; the root also re-exports the builder category. The
+umbrella depends on `@virello/builders`, which can also be installed independently.
+Virello's native client and one-shard-per-process architecture are unchanged.
 
 - Registration callbacks now receive Virello builders. The context-menu builder
   is concrete and supports `setType`; slash options-only/subcommands-only type
@@ -27,7 +28,7 @@ improvement has been measured or is claimed.
 The same release adds `requestGuild`, `calculateShardId`, frozen operational
 status, `onLifecycle` subscriptions and awaited local restart helpers. These are
 additive APIs over Virello's existing authenticated transport and leased process
-model. See [operational semantics and deferred multi-shard process work](docs/sharding-operations.md).
+model. See [operational semantics and the one-shard process invariant](docs/sharding-operations.md).
 
 ## Native runtime (unreleased)
 

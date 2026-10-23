@@ -28,6 +28,7 @@ Already have one? Pick the task below.
 | Understand memory and rate limits              | [Caching and limits](caching-and-limits.md)      |
 | Read logs or supply a logger                   | [Console logging](console-logging.md)            |
 | Find why something did not load or reply       | [Troubleshooting](troubleshooting.md)            |
+| Plan the Bamu application migration            | [Observed migration gaps](bamu-migration.md)     |
 
 **Reference:** [Public API map](api.md) · [Native engine](engine.md) ·
 [Working examples](../examples/README.md) · [Development](development.md) ·

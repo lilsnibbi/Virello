@@ -14,10 +14,11 @@ when copying or modifying the affected files.
 
 The first-party builders are adapted from Ovencord revision
 `cc6100f8eb01f82509c74b06427a87fea9880911`, including inherited discord.js source.
-See [builder NOTICE](../src/builders/NOTICE), [builder LICENSE](../src/builders/LICENSE),
-[utility LICENSE](../src/builders/util/LICENSE) and
-[upstream root LICENSE](../src/builders/UPSTREAM-LICENSE). These are shipped under
-`src` in the package. Modified files carry adaptation notices. No upstream NOTICE
+See [builder NOTICE](../packages/builders/NOTICE), [builder LICENSE](../packages/builders/LICENSE),
+[utility LICENSE](../packages/builders/src/util/LICENSE) and
+[upstream root LICENSE](../packages/builders/UPSTREAM-LICENSE). These ship with
+`@virello/builders`, alongside [Virello's license](../packages/builders/VIRELLO-LICENSE).
+Modified files carry adaptation notices. No upstream NOTICE
 file was present at the pinned revision. Its private root package.json says MIT,
 but the root and relevant package LICENSE files say Apache-2.0; those full texts
 and copyright notices are retained.

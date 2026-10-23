@@ -1,4 +1,4 @@
-import { EmbedBuilder } from "../../../builders/messages/embed/Embed";
+import { EmbedBuilder } from "@virello/builders";
 import type {
 	APIEmbed,
 	APIEmbed as EmbedData,

@@ -1,0 +1,429 @@
+// Adapted from Ovencord (cc6100f8), Apache-2.0.
+// Modified for Virello: local utilities, native payloads and validated serialization.
+// See NOTICE and LICENSE at the root of @virello/builders.
+import type {
+	APIActionRowComponent,
+	APIButtonComponentWithCustomId,
+	APIButtonComponentWithSKUId,
+	APIButtonComponentWithURL,
+	APIChannelSelectComponent,
+	APIComponentInActionRow,
+	APIMentionableSelectComponent,
+	APIRoleSelectComponent,
+	APIStringSelectComponent,
+	APITextInputComponent,
+	APIUserSelectComponent,
+} from "discord-api-types/v10";
+import { ComponentType } from "discord-api-types/v10";
+import { normalizeArray, type RestOrArray } from "../util/normalizeArray";
+import { resolveBuilder } from "../util/resolveBuilder";
+import { validate } from "../util/validation";
+import { actionRowPredicate } from "./Assertions";
+import {
+	DangerButtonBuilder,
+	PrimaryButtonBuilder,
+	SecondaryButtonBuilder,
+	SuccessButtonBuilder,
+} from "./button/CustomIdButton";
+import { LinkButtonBuilder } from "./button/LinkButton";
+import { PremiumButtonBuilder } from "./button/PremiumButton";
+import { ComponentBuilder } from "./Component";
+import type {
+	AnyActionRowComponentBuilder,
+	MessageComponentBuilder,
+} from "./Components";
+import { createComponentBuilder } from "./Components";
+import { ChannelSelectMenuBuilder } from "./selectMenu/ChannelSelectMenu";
+import { MentionableSelectMenuBuilder } from "./selectMenu/MentionableSelectMenu";
+import { RoleSelectMenuBuilder } from "./selectMenu/RoleSelectMenu";
+import { StringSelectMenuBuilder } from "./selectMenu/StringSelectMenu";
+import { UserSelectMenuBuilder } from "./selectMenu/UserSelectMenu";
+import { TextInputBuilder } from "./textInput/TextInput";
+
+export interface ActionRowBuilderData<
+	T extends AnyActionRowComponentBuilder = AnyActionRowComponentBuilder,
+> extends Partial<
+	Omit<APIActionRowComponent<APIComponentInActionRow>, "components">
+> {
+	components: T[];
+}
+
+/**
+ * A builder that creates API-compatible JSON data for action rows.
+ */
+export class ActionRowBuilder<
+	T extends AnyActionRowComponentBuilder = AnyActionRowComponentBuilder,
+> extends ComponentBuilder<APIActionRowComponent<ReturnType<T["toJSON"]>>> {
+	/**
+	 * @internal
+	 */
+	protected readonly data: ActionRowBuilderData<T>;
+
+	/**
+	 * The components within this action row.
+	 */
+	public get components(): readonly T[] {
+		return this.data.components;
+	}
+
+	/**
+	 * Creates a new action row.
+	 *
+	 * @param data - The API data to create this action row with
+	 * @example
+	 * Creating an action row from an API data object:
+	 * ```ts
+	 * const actionRow = new ActionRowBuilder({
+	 * 	components: [
+	 * 		{
+	 * 			custom_id: "custom id",
+	 * 			label: "Type something",
+	 * 			style: TextInputStyle.Short,
+	 * 			type: ComponentType.TextInput,
+	 * 		},
+	 * 	],
+	 * });
+	 * ```
+	 * @example
+	 * Creating an action row using setters and API data:
+	 * ```ts
+	 * const actionRow = new ActionRowBuilder({
+	 * 	components: [
+	 * 		{
+	 * 			custom_id: "custom id",
+	 * 			label: "Click me",
+	 * 			style: ButtonStyle.Primary,
+	 * 			type: ComponentType.Button,
+	 * 		},
+	 * 	],
+	 * })
+	 * 	.addComponents(button2, button3);
+	 * ```
+	 */
+	public constructor(
+		data: Partial<APIActionRowComponent<APIComponentInActionRow>> = {},
+	) {
+		super();
+
+		const { components = [], ...rest } = data;
+
+		this.data = {
+			...structuredClone(rest),
+			components: components.map((component) =>
+				createComponentBuilder(component),
+			) as T[],
+			type: ComponentType.ActionRow,
+		};
+	}
+
+	/**
+	 * Adds primary button components to this action row.
+	 *
+	 * @param input - The buttons to add
+	 */
+	public addPrimaryButtonComponents(
+		...input: RestOrArray<
+			| APIButtonComponentWithCustomId
+			| PrimaryButtonBuilder
+			| ((builder: PrimaryButtonBuilder) => PrimaryButtonBuilder)
+		>
+	): this {
+		const normalized = normalizeArray(input);
+		const resolved = normalized.map((component) =>
+			resolveBuilder(component, PrimaryButtonBuilder),
+		);
+
+		this.data.components.push(...(resolved as T[]));
+		return this;
+	}
+
+	/**
+	 * Adds secondary button components to this action row.
+	 *
+	 * @param input - The buttons to add
+	 */
+	public addSecondaryButtonComponents(
+		...input: RestOrArray<
+			| APIButtonComponentWithCustomId
+			| SecondaryButtonBuilder
+			| ((builder: SecondaryButtonBuilder) => SecondaryButtonBuilder)
+		>
+	): this {
+		const normalized = normalizeArray(input);
+		const resolved = normalized.map((component) =>
+			resolveBuilder(component, SecondaryButtonBuilder),
+		);
+
+		this.data.components.push(...(resolved as T[]));
+		return this;
+	}
+
+	/**
+	 * Adds success button components to this action row.
+	 *
+	 * @param input - The buttons to add
+	 */
+	public addSuccessButtonComponents(
+		...input: RestOrArray<
+			| APIButtonComponentWithCustomId
+			| SuccessButtonBuilder
+			| ((builder: SuccessButtonBuilder) => SuccessButtonBuilder)
+		>
+	): this {
+		const normalized = normalizeArray(input);
+		const resolved = normalized.map((component) =>
+			resolveBuilder(component, SuccessButtonBuilder),
+		);
+
+		this.data.components.push(...(resolved as T[]));
+		return this;
+	}
+
+	/**
+	 * Adds danger button components to this action row.
+	 */
+	public addDangerButtonComponents(
+		...input: RestOrArray<
+			| APIButtonComponentWithCustomId
+			| DangerButtonBuilder
+			| ((builder: DangerButtonBuilder) => DangerButtonBuilder)
+		>
+	): this {
+		const normalized = normalizeArray(input);
+		const resolved = normalized.map((component) =>
+			resolveBuilder(component, DangerButtonBuilder),
+		);
+
+		this.data.components.push(...(resolved as T[]));
+		return this;
+	}
+
+	/**
+	 * Generically add any type of component to this action row, only takes in an instance of a component builder.
+	 */
+	public addComponents(
+		...input: RestOrArray<AnyActionRowComponentBuilder>
+	): this {
+		const normalized = normalizeArray(input);
+		this.data.components.push(...(normalized as T[]));
+
+		return this;
+	}
+
+	/**
+	 * Sets the components in this action row.
+	 *
+	 * @param input - The components to set
+	 */
+	public setComponents(
+		...input: RestOrArray<AnyActionRowComponentBuilder>
+	): this {
+		const normalized = normalizeArray(input);
+		this.data.components = [...normalized] as T[];
+
+		return this;
+	}
+
+	/**
+	 * Adds SKU id button components to this action row.
+	 *
+	 * @param input - The buttons to add
+	 */
+	public addPremiumButtonComponents(
+		...input: RestOrArray<
+			| APIButtonComponentWithSKUId
+			| PremiumButtonBuilder
+			| ((builder: PremiumButtonBuilder) => PremiumButtonBuilder)
+		>
+	): this {
+		const normalized = normalizeArray(input);
+		const resolved = normalized.map((component) =>
+			resolveBuilder(component, PremiumButtonBuilder),
+		);
+
+		this.data.components.push(...(resolved as T[]));
+		return this;
+	}
+
+	/**
+	 * Adds URL button components to this action row.
+	 *
+	 * @param input - The buttons to add
+	 */
+	public addLinkButtonComponents(
+		...input: RestOrArray<
+			| APIButtonComponentWithURL
+			| LinkButtonBuilder
+			| ((builder: LinkButtonBuilder) => LinkButtonBuilder)
+		>
+	): this {
+		const normalized = normalizeArray(input);
+		const resolved = normalized.map((component) =>
+			resolveBuilder(component, LinkButtonBuilder),
+		);
+
+		this.data.components.push(...(resolved as T[]));
+		return this;
+	}
+
+	/**
+	 * Adds a channel select menu component to this action row.
+	 *
+	 * @param input - A function that returns a component builder or an already built builder
+	 */
+	public addChannelSelectMenuComponent(
+		input:
+			| APIChannelSelectComponent
+			| ChannelSelectMenuBuilder
+			| ((builder: ChannelSelectMenuBuilder) => ChannelSelectMenuBuilder),
+	): this {
+		this.data.components.push(
+			resolveBuilder(input, ChannelSelectMenuBuilder) as T,
+		);
+		return this;
+	}
+
+	/**
+	 * Adds a mentionable select menu component to this action row.
+	 *
+	 * @param input - A function that returns a component builder or an already built builder
+	 */
+	public addMentionableSelectMenuComponent(
+		input:
+			| APIMentionableSelectComponent
+			| MentionableSelectMenuBuilder
+			| ((
+					builder: MentionableSelectMenuBuilder,
+			  ) => MentionableSelectMenuBuilder),
+	): this {
+		this.data.components.push(
+			resolveBuilder(input, MentionableSelectMenuBuilder) as T,
+		);
+		return this;
+	}
+
+	/**
+	 * Adds a role select menu component to this action row.
+	 *
+	 * @param input - A function that returns a component builder or an already built builder
+	 */
+	public addRoleSelectMenuComponent(
+		input:
+			| APIRoleSelectComponent
+			| RoleSelectMenuBuilder
+			| ((builder: RoleSelectMenuBuilder) => RoleSelectMenuBuilder),
+	): this {
+		this.data.components.push(
+			resolveBuilder(input, RoleSelectMenuBuilder) as T,
+		);
+		return this;
+	}
+
+	/**
+	 * Adds a string select menu component to this action row.
+	 *
+	 * @param input - A function that returns a component builder or an already built builder
+	 */
+	public addStringSelectMenuComponent(
+		input:
+			| APIStringSelectComponent
+			| StringSelectMenuBuilder
+			| ((builder: StringSelectMenuBuilder) => StringSelectMenuBuilder),
+	): this {
+		this.data.components.push(
+			resolveBuilder(input, StringSelectMenuBuilder) as T,
+		);
+		return this;
+	}
+
+	/**
+	 * Adds a user select menu component to this action row.
+	 *
+	 * @param input - A function that returns a component builder or an already built builder
+	 */
+	public addUserSelectMenuComponent(
+		input:
+			| APIUserSelectComponent
+			| UserSelectMenuBuilder
+			| ((builder: UserSelectMenuBuilder) => UserSelectMenuBuilder),
+	): this {
+		this.data.components.push(
+			resolveBuilder(input, UserSelectMenuBuilder) as T,
+		);
+		return this;
+	}
+
+	/**
+	 * Adds a text input component to this action row.
+	 *
+	 * @param input - A function that returns a component builder or an already built builder
+	 */
+	public addTextInputComponent(
+		input:
+			| APITextInputComponent
+			| TextInputBuilder
+			| ((builder: TextInputBuilder) => TextInputBuilder),
+	): this {
+		this.data.components.push(resolveBuilder(input, TextInputBuilder) as T);
+		return this;
+	}
+
+	/**
+	 * Removes, replaces, or inserts components for this action row.
+	 *
+	 * @remarks
+	 * This method behaves similarly
+	 * to {@link https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Array/splice | Array.prototype.splice()}.
+	 *
+	 * It's useful for modifying and adjusting order of the already-existing components of an action row.
+	 * @example
+	 * Remove the first component:
+	 * ```ts
+	 * actionRow.spliceComponents(0, 1);
+	 * ```
+	 * @example
+	 * Remove the first n components:
+	 * ```ts
+	 * const n = 4;
+	 * actionRow.spliceComponents(0, n);
+	 * ```
+	 * @example
+	 * Remove the last component:
+	 * ```ts
+	 * actionRow.spliceComponents(-1, 1);
+	 * ```
+	 * @param index - The index to start at
+	 * @param deleteCount - The number of components to remove
+	 * @param components - The replacing component objects
+	 */
+	public spliceComponents(
+		index: number,
+		deleteCount: number,
+		...components: AnyActionRowComponentBuilder[]
+	): this {
+		this.data.components.splice(
+			index,
+			deleteCount,
+			...(components as unknown as T[]),
+		);
+		return this;
+	}
+
+	/**
+	 * {@inheritDoc ComponentBuilder.toJSON}
+	 */
+	public override toJSON(): APIActionRowComponent<ReturnType<T["toJSON"]>> {
+		const { components, ...rest } = this.data;
+
+		const data = {
+			...structuredClone(rest),
+			components: components.map((component) =>
+				(component as MessageComponentBuilder).toJSON(),
+			),
+		};
+
+		validate(actionRowPredicate, data);
+
+		return data as APIActionRowComponent<ReturnType<T["toJSON"]>>;
+	}
+}

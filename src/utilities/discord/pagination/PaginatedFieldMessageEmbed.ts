@@ -1,4 +1,4 @@
-import { EmbedBuilder } from "../../../builders/messages/embed/Embed";
+import { EmbedBuilder } from "@virello/builders";
 import type { APIEmbed, APIEmbed as EmbedData } from "discord-api-types/v10";
 import { isJSONEncodable } from "../../../discord/payloads";
 import { isFunction, isNullish, isNullishOrEmpty } from "../../index";

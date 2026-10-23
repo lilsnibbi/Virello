@@ -1,6 +1,6 @@
 {
 	"name": "virello",
-	"version": "0.1.2",
+	"version": "0.2.0",
 	"description": "A modular Discord framework for Bun, written in TypeScript.",
 	"type": "module",
 	"license": "MIT AND Apache-2.0",

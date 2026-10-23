@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { takeLast } from "../../../src/utilities/iterators/index";
+import { takeLast } from "../../../packages/util/src/iterators/index";
 
 describe("takeLast", () => {
 	test("GIVEN iterable and limit THEN returns last elements of iterable", () => {

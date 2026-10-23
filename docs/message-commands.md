@@ -1,6 +1,6 @@
 # Message commands and arguments
 
-[Docs](README.md) / Message commands · [Args](../src/commands/arguments/Args.ts)
+[Docs](README.md) / Message commands · [Args](../packages/core/src/commands/arguments/Args.ts)
 
 For `!roll 20`, add **`commands/roll.ts`**:
 
@@ -62,7 +62,7 @@ Built-ins include `string`, `integer`, `number`, `float`, `boolean`, `enum`,
 `date`, `url`/`hyperlink`, `user`, `member`, `message`, `role`, `emoji` and
 channel variants. Numeric/date/string bounds are inclusive; string bounds measure
 length. User/member/message resolution can fetch from Discord. Channel resolution
-uses cache. [All names and output types →](../src/commands/arguments/Args.ts)
+uses cache. [All names and output types →](../packages/core/src/commands/arguments/Args.ts)
 
 > [!NOTE]
 > `pickResult` handles resolver error results; an exception thrown by a custom

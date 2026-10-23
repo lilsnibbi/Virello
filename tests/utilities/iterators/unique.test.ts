@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { unique } from "../../../src/utilities/iterators/index";
+import { unique } from "../../../packages/util/src/iterators/index";
 
 describe("unique", () => {
 	test("GIVEN iterable with duplicates THEN returns iterable with duplicates removed", () => {

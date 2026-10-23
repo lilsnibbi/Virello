@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { findIndex } from "../../../src/utilities/iterators/index";
+import { findIndex } from "../../../packages/util/src/iterators/index";
 
 describe("findIndex", () => {
 	test("GIVEN iterable and callback function that returns true for an element THEN returns the index of the element", () => {

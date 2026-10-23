@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, spyOn, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve, sep } from "node:path";
-import { DiscordRuntime } from "../../src/core/client/DiscordRuntime";
+import { DiscordRuntime } from "../../packages/core/src/core/client/DiscordRuntime";
 import {
 	ApplyOptions,
 	Command,

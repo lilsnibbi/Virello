@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { find } from "../../../src/utilities/iterators/index";
+import { find } from "../../../packages/util/src/iterators/index";
 
 describe("find", () => {
 	test("GIVEN iterable with matching element THEN returns the element", () => {

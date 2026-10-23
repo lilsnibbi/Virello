@@ -19,7 +19,7 @@ import {
 	ChatInputInteractionOptionResolver,
 	ContextMenuInteractionOptionResolver,
 	ModalInteractionOptionResolver,
-} from "../../../../../src/utilities/discord/constants/index";
+} from "../../../../../packages/core/src/utilities/discord/constants/index";
 
 describe("chat input interaction", () => {
 	test("it can resolve basic options of all types", () => {

@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { resolveEmoji } from "../../../src/commands/arguments/resolvers/emoji";
-import { Identifiers } from "../../../src/commands/errors/Identifiers";
-import { Result } from "../../../src/utilities/result/index";
+import { resolveEmoji } from "../../../packages/core/src/commands/arguments/resolvers/emoji";
+import { Identifiers } from "../../../packages/core/src/commands/errors/Identifiers";
+import { Result } from "../../../packages/util/src/result/index";
 
 describe("Emoji resolver tests", () => {
 	test("GIVEN an unicode emoji THEN returns emojiObject", () => {

@@ -1,7 +1,7 @@
 # Fresh shard statistics
 
 [Docs](README.md) / [Sharding](sharding.md) / Statistics ·
-[Sample types](../src/sharding/types.ts)
+[Sample types](../packages/sharding/src/types.ts)
 
 From a managed bot command/listener, or a connected host via `manager.stats()`:
 

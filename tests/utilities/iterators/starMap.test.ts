@@ -1,5 +1,5 @@
 import { describe, expect, jest, test } from "bun:test";
-import { starMap } from "../../../src/utilities/iterators/index";
+import { starMap } from "../../../packages/util/src/iterators/index";
 
 describe("starMap", () => {
 	test("GIVEN iterable and callback function THEN returns mapped iterable", () => {

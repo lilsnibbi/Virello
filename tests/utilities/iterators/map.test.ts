@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { map } from "../../../src/utilities/iterators/index";
+import { map } from "../../../packages/util/src/iterators/index";
 
 describe("map", () => {
 	test("GIVEN iterable and callback function THEN returns mapped iterable", () => {

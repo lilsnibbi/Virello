@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { hasAtLeastOneKeyInObject } from "../../../src/utilities/guards/hasAtLeastOneKeyInObject";
+import { hasAtLeastOneKeyInObject } from "../../../packages/util/src/guards/hasAtLeastOneKeyInObject";
 
 describe("hasAtLeastOneKeyInObject", () => {
 	test("should return true if the object has at least one of the keys", () => {

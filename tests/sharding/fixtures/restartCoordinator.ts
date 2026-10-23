@@ -1,5 +1,5 @@
 // Isolated coordinator process: all Discord metadata is synthetic; no external requests are made.
-import { ShardCoordinator } from "../../../src/sharding/coordinator/Coordinator";
+import { ShardCoordinator } from "../../../packages/sharding/src/coordinator/Coordinator";
 import { logger, tokenA } from "../helpers";
 
 const started = performance.now();

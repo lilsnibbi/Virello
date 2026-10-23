@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
-import { ScalingPolicy } from "../../src/sharding/coordinator/scaling";
-import type { ShardHost } from "../../src/sharding/types";
+import { ScalingPolicy } from "../../packages/sharding/src/coordinator/scaling";
+import type { ShardHost } from "../../packages/sharding/src/types";
 
 const hosts: ShardHost[] = [
 	{ id: "a", token: "", shards: [0, 1], maxShards: 4 },

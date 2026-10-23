@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { Cron } from "../../../../../src/utilities/time/cron/index";
+import { Cron } from "../../../../../packages/util/src/time/cron/index";
 
 describe("Cron", () => {
 	test("pre-defined @hourly", () => {

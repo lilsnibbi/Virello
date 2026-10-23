@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { Pointer } from "../../../../../src/utilities/binary/index";
+import { Pointer } from "../../../../../packages/util/src/binary/index";
 
 describe("Pointer", () => {
 	test("GIVEN a pointer THEN it has the correct initial properties", () => {

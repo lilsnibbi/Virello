@@ -6,8 +6,8 @@ import {
 	Parser,
 	PrefixedStrategy,
 	WordParameter,
-} from "../../../../src/utilities/parsing/index";
-import { Option, Result } from "../../../../src/utilities/result/index";
+} from "../../../../packages/util/src/parsing/index";
+import { Option, Result } from "../../../../packages/util/src/result/index";
 
 describe("ArgumentStream", () => {
 	const parser = new Parser(new PrefixedStrategy(["--", "/"], ["=", ":"]));

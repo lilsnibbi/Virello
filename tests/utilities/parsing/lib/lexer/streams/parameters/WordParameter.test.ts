@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { WordParameter } from "../../../../../../../src/utilities/parsing/index";
+import { WordParameter } from "../../../../../../../packages/util/src/parsing/index";
 
 describe("WordParameter", () => {
 	const parameter = new WordParameter([" ", " "], { value: "foo" });

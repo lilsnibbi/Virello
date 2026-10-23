@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { equal } from "../../../src/utilities/iterators/index";
+import { equal } from "../../../packages/util/src/iterators/index";
 
 describe("equal", () => {
 	test("GIVEN two equal iterables THEN returns true", () => {

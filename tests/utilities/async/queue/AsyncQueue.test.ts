@@ -3,7 +3,7 @@ import { getEventListeners } from "node:events";
 import {
 	AsyncQueue,
 	type AsyncQueueWaitOptions,
-} from "../../../../src/utilities/async/queue/index";
+} from "../../../../packages/util/src/async/queue/index";
 
 function genNumbers(queue: AsyncQueue) {
 	let i = 0;

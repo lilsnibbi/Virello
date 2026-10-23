@@ -45,7 +45,7 @@ be shared across shards.
 
 For a connection-backed service, acquire it in `onLoad()` and release it in
 `onUnload()`. Cleanup must tolerate partially completed initialization.
-[Service API →](../src/extensions/services/Service.ts)
+[Service API →](../packages/core/src/extensions/services/Service.ts)
 
 ## Add a client feature
 
@@ -93,5 +93,5 @@ Register cleanup with `client.addDisposer()` inside the hook that acquires the
 resource. Cleanup runs in reverse order and is awaited. An extension's login
 hooks run once per client; managed gateway reassignment does not repeat them.
 
-[Extension contract →](../src/core/lifecycle/Extension.ts) ·
+[Extension contract →](../packages/core/src/core/lifecycle/Extension.ts) ·
 [Startup order →](modules.md#startup-and-shutdown)

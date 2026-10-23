@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { range } from "../../../src/utilities/index";
+import { range } from "../../../packages/util/src/general";
 
 describe("range", () => {
 	test("GIVEN positive min,max,step THEN returns range array", () => {

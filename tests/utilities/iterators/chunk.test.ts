@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { chunk } from "../../../src/utilities/iterators/index";
+import { chunk } from "../../../packages/util/src/iterators/index";
 
 describe("chunk", () => {
 	test("GIVEN iterable and chunk size THEN returns iterable of chunks", () => {

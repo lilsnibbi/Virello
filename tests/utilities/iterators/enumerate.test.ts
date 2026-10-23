@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { enumerate } from "../../../src/utilities/iterators/index";
+import { enumerate } from "../../../packages/util/src/iterators/index";
 
 describe("enumerate", () => {
 	test("GIVEN iterable with elements THEN returns iterable with index-value pairs", () => {

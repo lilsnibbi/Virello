@@ -1,5 +1,5 @@
 import { describe, expect, jest, test } from "bun:test";
-import { inspect, toArray } from "../../../src/utilities/iterators/index";
+import { inspect, toArray } from "../../../packages/util/src/iterators/index";
 
 describe("inspect", () => {
 	test("GIVEN an iterable THEN returns a passthrough iterable of the original", () => {

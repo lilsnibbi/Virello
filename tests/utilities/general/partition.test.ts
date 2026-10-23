@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { partition } from "../../../src/utilities/index";
+import { partition } from "../../../packages/util/src/general";
 
 describe("partition", () => {
 	test("GIVEN input not an array THEN throws TypeError", () => {

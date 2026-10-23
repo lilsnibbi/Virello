@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { cast } from "../../../src/utilities/index";
+import { cast } from "../../../packages/util/src/general";
 
 describe("cast", () => {
 	test("GIVEN single generic type parameter THEN gives cast type back", () => {

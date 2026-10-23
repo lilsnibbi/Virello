@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { clonePayload } from "../../../src/extensions/scheduledTasks/timing";
+import { clonePayload } from "../../../packages/core/src/extensions/scheduledTasks/timing";
 
 test("task payloads reject object and array accessors without invoking them", () => {
 	let reads = 0;

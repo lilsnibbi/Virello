@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import type { APIApplicationCommand as ApplicationCommand } from "discord-api-types/v10";
-import type { ApplicationCommands } from "../../src/discord/ApplicationCommands";
+import type { ApplicationCommands } from "../../packages/core/src/discord/ApplicationCommands";
 import {
 	ApplicationCommandRegistries,
 	ApplicationCommandRegistry,

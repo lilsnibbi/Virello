@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { collectInto } from "../../../src/utilities/iterators/index";
+import { collectInto } from "../../../packages/util/src/iterators/index";
 
 describe("collectInto", () => {
 	test("GIVEN iterable with elements THEN returns the output array updated", () => {

@@ -17,18 +17,19 @@ you do not need a local checkout to use the framework.
 
 ## Where does code belong?
 
-| Directory                      | Owns                                                            |
-| ------------------------------ | --------------------------------------------------------------- |
-| `packages/builders/`           | Standalone payload builders, validation and retained notices    |
-| `src/core/`                    | Client configuration, modules, lifecycle, logging               |
-| `src/engine/`                  | Native gateway, REST and cache                                  |
-| `src/discord/`                 | Framework message/interaction contexts, collectors, permissions |
-| `src/commands/`, `src/events/` | Routing, arguments, checks, registration and listeners          |
-| `src/extensions/`              | Localisation, tasks, patterns, subcommands and services         |
-| `src/sharding/`                | Coordinator, process supervision, transport and recovery        |
-| `src/utilities/`               | Shared helpers and payload/pagination utilities                 |
-| `src/public/`                  | Supported category exports                                      |
-| `tests/`, `examples/`          | Regression fixtures and runnable usage                          |
+| Directory                                     | Owns                                                                        |
+| --------------------------------------------- | --------------------------------------------------------------------------- |
+| `src/`                                        | Aggregate compatibility entrypoints                                         |
+| `packages/core/src/`                          | Framework client, commands, modules, events, extensions and Discord helpers |
+| `packages/engine/src/`                        | Native client, messages and interactions                                    |
+| `packages/rest/src/`, `packages/ws/src/`      | Discord REST and Gateway transports                                         |
+| `packages/cache/src/`                         | Entity stores and gateway cache application                                 |
+| `packages/sharding/src/`                      | Coordinator, process supervision, IPC and fleet REST                        |
+| `packages/util/src/`, `packages/logging/src/` | General helpers and shared logging                                          |
+| `packages/builders/src/`                      | Payload builders and validation                                             |
+| `tests/`, `examples/`                         | Regression fixtures and runnable usage                                      |
+
+See [standalone packages](packages.md) for the dependency graph and public imports.
 
 Use tabs and an 80-column print width. Run `bun fmt` to format; review the diff.
 Internal implementation imports should point to their owning modules, not public

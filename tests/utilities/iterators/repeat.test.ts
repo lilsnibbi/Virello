@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { repeat } from "../../../src/utilities/iterators/index";
+import { repeat } from "../../../packages/util/src/iterators/index";
 
 describe("repeat", () => {
 	test("GIVEN value and count THEN returns iterable with repeated values", () => {

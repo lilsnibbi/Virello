@@ -6,7 +6,7 @@ import {
 	Schema,
 	SchemaStore,
 	UnalignedUint16Array,
-} from "../../../../src/utilities/binary/index";
+} from "../../../../packages/util/src/binary/index";
 
 describe("SchemaStore", () => {
 	test("GIVEN an empty SchemaStore THEN it should be empty", () => {

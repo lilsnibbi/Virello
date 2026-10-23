@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { slice } from "../../../src/utilities/iterators/index";
+import { slice } from "../../../packages/util/src/iterators/index";
 
 describe("slice", () => {
 	test("GIVEN iterable THEN returns full iterable", () => {

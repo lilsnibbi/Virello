@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { resolveString } from "../../../src/commands/arguments/resolvers/string";
-import { Identifiers } from "../../../src/commands/errors/Identifiers";
-import { Result } from "../../../src/utilities/result/index";
+import { resolveString } from "../../../packages/core/src/commands/arguments/resolvers/string";
+import { Identifiers } from "../../../packages/core/src/commands/errors/Identifiers";
+import { Result } from "../../../packages/util/src/result/index";
 
 describe("String resolver tests", () => {
 	test("GIVEN a valid string THEN returns it", () => {

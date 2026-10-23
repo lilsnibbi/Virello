@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { LocaleManager } from "../../../src/extensions/localisation/index";
-import { isClass } from "../../../src/utilities/index";
+import { LocaleManager } from "../../../packages/core/src/extensions/localisation/index";
+import { isClass } from "../../../packages/util/src/general";
 
 function structureTest(i18n: LocaleManager) {
 	expect(i18n.languagesLoaded).toBe(false);

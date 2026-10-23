@@ -35,28 +35,34 @@ Object.assign(globalThis, {
 try {
 	const path = process.argv[2]!;
 	const first = await import(path);
-	const root = await import("virello");
-	const reference =
-		path === "virello/engine" ? await import("virello/engine") : root;
-	for (const [name, value] of Object.entries(first)) {
-		if (value !== Reflect.get(reference, name))
-			throw new Error(`Identity differs: ${path} ${name}`);
+	if (process.argv[3] === "standalone") {
+		if (opened.length)
+			throw new Error(`Import attempted resources: ${opened.join(", ")}`);
+		console.log(`Cold import passed: ${path}`);
+	} else {
+		const root = await import("virello");
+		const reference =
+			path === "virello/engine" ? await import("virello/engine") : root;
+		for (const [name, value] of Object.entries(first)) {
+			if (value !== Reflect.get(reference, name))
+				throw new Error(`Identity differs: ${path} ${name}`);
+		}
+		if (opened.length)
+			throw new Error(`Import attempted resources: ${opened.join(", ")}`);
+		if (
+			root.container.client ||
+			root.container.tasks ||
+			root.container.services ||
+			root.container.i18n
+		)
+			throw new Error("Import constructed client/extension state");
+		if (
+			root.container.modules.size ||
+			root.ApplicationCommandRegistries.registries.size
+		)
+			throw new Error("Import registered modules or commands");
+		console.log(`Cold import passed: ${path}`);
 	}
-	if (opened.length)
-		throw new Error(`Import attempted resources: ${opened.join(", ")}`);
-	if (
-		root.container.client ||
-		root.container.tasks ||
-		root.container.services ||
-		root.container.i18n
-	)
-		throw new Error("Import constructed client/extension state");
-	if (
-		root.container.modules.size ||
-		root.ApplicationCommandRegistries.registries.size
-	)
-		throw new Error("Import registered modules or commands");
-	console.log(`Cold import passed: ${path}`);
 } finally {
 	Object.assign(Bun, {
 		serve: originalServe,

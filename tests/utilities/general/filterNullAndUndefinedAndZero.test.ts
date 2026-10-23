@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { filterNullAndUndefinedAndZero } from "../../../src/utilities/index";
+import { filterNullAndUndefinedAndZero } from "../../../packages/util/src/general";
 
 describe("filterNullAndUndefinedAndZero", () => {
 	test("GIVEN empty array THEN returns same array", () => {

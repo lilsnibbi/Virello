@@ -4,7 +4,7 @@ import {
 	type Token,
 	TokenStream,
 	TokenType,
-} from "../../../../../../../src/utilities/parsing/index";
+} from "../../../../../../../packages/util/src/parsing/index";
 
 describe("TokenStream", () => {
 	describe("default lexer", () => {

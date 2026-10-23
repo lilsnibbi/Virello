@@ -1,6 +1,6 @@
 # Checks and cooldowns
 
-[Docs](README.md) / Checks · [Precondition](../src/commands/checks/Precondition.ts)
+[Docs](README.md) / Checks · [Precondition](../packages/core/src/commands/checks/Precondition.ts)
 
 Add restrictions to a command's `static options`:
 

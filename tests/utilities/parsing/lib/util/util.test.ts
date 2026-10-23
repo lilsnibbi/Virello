@@ -5,7 +5,7 @@ import {
 	type Parameter,
 	QuotedParameter,
 	WordParameter,
-} from "../../../../../src/utilities/parsing/index";
+} from "../../../../../packages/util/src/parsing/index";
 
 describe("util", () => {
 	describe("join", () => {

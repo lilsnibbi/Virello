@@ -6,7 +6,7 @@ import {
 	descNumber,
 	descString,
 	maxBy,
-} from "../../../src/utilities/iterators/index";
+} from "../../../packages/util/src/iterators/index";
 
 describe("maxBy", () => {
 	test("GIVEN iterable with positive numbers by ascending string and asc comparator THEN returns the lexicographic maximum value", () => {

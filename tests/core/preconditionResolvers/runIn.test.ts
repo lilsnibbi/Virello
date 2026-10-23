@@ -1,11 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import { ChannelType } from "discord-api-types/v10";
-import type { PreconditionContainerSingle } from "../../../src/commands/checks/containers/Entry";
-import { PreconditionContainerArray } from "../../../src/commands/checks/containers/Group";
-import { parseConstructorPreConditionsRunIn } from "../../../src/commands/checks/resolvers/runIn";
-import { CommandPreConditions } from "../../../src/commands/enums";
-import type { CommandRunInUnion } from "../../../src/commands/types";
-import { isNullish } from "../../../src/utilities/index";
+import type { PreconditionContainerSingle } from "../../../packages/core/src/commands/checks/containers/Entry";
+import { PreconditionContainerArray } from "../../../packages/core/src/commands/checks/containers/Group";
+import { parseConstructorPreConditionsRunIn } from "../../../packages/core/src/commands/checks/resolvers/runIn";
+import { CommandPreConditions } from "../../../packages/core/src/commands/enums";
+import type { CommandRunInUnion } from "../../../packages/core/src/commands/types";
+import { isNullish } from "../../../packages/util/src/general";
 
 describe("parseConstructorPreConditionsRunIn", () => {
 	test("GIVEN runIn is null THEN returns undefined", () => {

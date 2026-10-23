@@ -10,7 +10,7 @@ import type {
 	ShardResult,
 	ShardStats,
 	ShardStatsResult,
-} from "../../src/index";
+} from "../../packages/core/src/index";
 
 expectTypeOf<ShardStats>().toEqualTypeOf<CategoryStats>();
 expectTypeOf<ShardStatsResult>().toEqualTypeOf<CategoryStatsResult>();

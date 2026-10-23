@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { flat } from "../../../src/utilities/iterators/index";
+import { flat } from "../../../packages/util/src/iterators/index";
 
 describe("flat", () => {
 	test("GIVEN nested iterable THEN returns flattened iterable", () => {

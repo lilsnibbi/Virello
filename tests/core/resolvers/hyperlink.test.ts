@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { URL } from "node:url";
-import { resolveHyperlink } from "../../../src/commands/arguments/resolvers/hyperlink";
-import { Identifiers } from "../../../src/commands/errors/Identifiers";
-import { Result } from "../../../src/utilities/result/index";
+import { resolveHyperlink } from "../../../packages/core/src/commands/arguments/resolvers/hyperlink";
+import { Identifiers } from "../../../packages/core/src/commands/errors/Identifiers";
+import { Result } from "../../../packages/util/src/result/index";
 
 const STRING_URL = "https://example.com";
 const PARSED_URL = new URL(STRING_URL);

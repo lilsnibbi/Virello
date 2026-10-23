@@ -1,5 +1,5 @@
 import { describe, expect, jest, test } from "bun:test";
-import { tryParseJSON } from "../../../src/utilities/index";
+import { tryParseJSON } from "../../../packages/util/src/general";
 
 describe("tryParseJSON", () => {
 	test("GIVEN basic THEN returns expected", () => {

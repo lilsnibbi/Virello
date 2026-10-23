@@ -1,5 +1,5 @@
 import { describe, expect, jest, test } from "bun:test";
-import { sleepSync } from "../../../src/utilities/index";
+import { sleepSync } from "../../../packages/util/src/general";
 
 describe("sleepSync", () => {
 	test("GIVEN a number of ms THEN return after that time", () => {

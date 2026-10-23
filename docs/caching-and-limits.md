@@ -1,6 +1,6 @@
 # Caches and limits
 
-[Docs](README.md) / Caches and limits · [Cache types](../src/engine/cache/types.ts)
+[Docs](README.md) / Caches and limits · [Cache types](../packages/cache/src/types.ts)
 
 For a bot that needs recent messages, add this to its client options:
 

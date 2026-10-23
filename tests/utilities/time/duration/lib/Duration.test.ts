@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
 	Duration,
 	Time,
-} from "../../../../../src/utilities/time/duration/index";
+} from "../../../../../packages/util/src/time/duration/index";
 
 describe("Duration", () => {
 	describe("units", () => {

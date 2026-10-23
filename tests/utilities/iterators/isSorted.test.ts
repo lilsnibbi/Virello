@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { isSorted } from "../../../src/utilities/iterators/index";
+import { isSorted } from "../../../packages/util/src/iterators/index";
 
 describe("isSorted", () => {
 	test("GIVEN iterable with values in ascending THEN returns true", () => {

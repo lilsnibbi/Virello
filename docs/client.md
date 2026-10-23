@@ -1,6 +1,6 @@
 # Client configuration
 
-[Docs](README.md) / Client · [Option types](../src/core/client/VirelloClient.ts)
+[Docs](README.md) / Client · [Option types](../packages/core/src/core/client/VirelloClient.ts)
 
 ```ts
 import { VirelloClient } from "virello/client";

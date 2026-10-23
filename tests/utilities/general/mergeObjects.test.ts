@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { mergeObjects } from "../../../src/utilities/index";
+import { mergeObjects } from "../../../packages/util/src/general";
 
 describe("mergeObjects", () => {
 	test("merges prototype-named JSON keys without changing prototypes", () => {

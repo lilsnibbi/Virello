@@ -1,7 +1,7 @@
 # Modules and lifecycle
 
-[Docs](README.md) / Modules · [Registry](../src/core/modules/ModuleRegistry.ts) ·
-[Loader](../src/core/loading/ModuleLoader.ts)
+[Docs](README.md) / Modules · [Registry](../packages/core/src/core/modules/ModuleRegistry.ts) ·
+[Loader](../packages/core/src/core/loading/ModuleLoader.ts)
 
 ## Choose what loads
 
@@ -113,4 +113,4 @@ startup promise alone does not prove every candidate loaded.
 Use `await module.unload()` for explicit cleanup. Setting `enabled = false`
 alone is not an unload operation. For custom stores, extend `ModuleStore`,
 register it during extension setup and augment `ModuleStores` on `"virello"`.
-[Store contracts →](../src/core/modules/ModuleStore.ts)
+[Store contracts →](../packages/core/src/core/modules/ModuleStore.ts)

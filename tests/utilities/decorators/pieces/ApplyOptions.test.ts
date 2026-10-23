@@ -4,8 +4,8 @@ import {
 	type CommandOptions,
 	CommandStore,
 	container,
-} from "../../../../src/core/index";
-import { ApplyOptions } from "../../../../src/utilities/decorators/index";
+} from "../../../../packages/core/src/core/index";
+import { ApplyOptions } from "../../../../packages/core/src/utilities/decorators/index";
 
 describe("ApplyOptions", () => {
 	beforeAll(() => {

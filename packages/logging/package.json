@@ -1,0 +1,56 @@
+{
+	"name": "@virello/logging",
+	"version": "0.1.2",
+	"description": "Shared Bun logging, console formatting and redacted diagnostics for Virello.",
+	"type": "module",
+	"license": "MIT AND Apache-2.0",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/lilsnibbi/Virello.git",
+		"directory": "packages/logging"
+	},
+	"exports": {
+		".": {
+			"types": "./src/index.ts",
+			"bun": "./src/index.ts"
+		},
+		"./console": {
+			"types": "./src/console.ts",
+			"bun": "./src/console.ts"
+		},
+		"./diagnostics": {
+			"types": "./src/diagnostics.ts",
+			"bun": "./src/diagnostics.ts"
+		},
+		"./format": {
+			"types": "./src/format.ts",
+			"bun": "./src/format.ts"
+		},
+		"./LoggerLike": {
+			"types": "./src/LoggerLike.ts",
+			"bun": "./src/LoggerLike.ts"
+		},
+		"./redact": {
+			"types": "./src/redact.ts",
+			"bun": "./src/redact.ts"
+		}
+	},
+	"types": "./src/index.ts",
+	"files": [
+		"src",
+		"README.md",
+		"LICENSE",
+		"NOTICE",
+		"UPSTREAM-LICENSE"
+	],
+	"engines": {
+		"bun": ">=1.4.2"
+	},
+	"dependencies": {
+		"@lilsnibbi/logger": "1.2.0"
+	},
+	"publishConfig": {
+		"access": "public",
+		"registry": "https://registry.npmjs.org"
+	}
+}

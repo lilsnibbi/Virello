@@ -1,5 +1,5 @@
 import { describe, expect, jest, test } from "bun:test";
-import { lazy } from "../../../src/utilities/index";
+import { lazy } from "../../../packages/util/src/general";
 
 describe("lazy", () => {
 	test("GIVEN string callback THEN returns the same", () => {

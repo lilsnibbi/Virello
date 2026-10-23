@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { union } from "../../../src/utilities/iterators/index";
+import { union } from "../../../packages/util/src/iterators/index";
 
 describe("union", () => {
 	test("GIVEN multiple iterables with unique elements THEN returns union of all elements", () => {

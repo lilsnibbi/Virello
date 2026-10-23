@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, jest, test } from "bun:test";
 import { setTimeout as sleep } from "node:timers/promises";
-import { RateLimitManager } from "../../../../../src/utilities/time/ratelimits/index";
-import { TimerManager } from "../../../../../src/utilities/time/timers/index";
+import { RateLimitManager } from "../../../../../packages/util/src/time/ratelimits/index";
+import { TimerManager } from "../../../../../packages/util/src/time/timers/index";
 
 describe("RateLimitManager", () => {
 	afterEach(() => TimerManager.destroy());
@@ -23,7 +23,7 @@ describe("RateLimitManager", () => {
 
 	test("cooldown maintenance does not keep a Bun process alive", async () => {
 		const moduleUrl = new URL(
-			"../../../../../src/utilities/time/ratelimits/RateLimitManager.ts",
+			"../../../../../packages/util/src/time/ratelimits/RateLimitManager.ts",
 			import.meta.url,
 		).href;
 		const child = Bun.spawn(

@@ -1,6 +1,6 @@
 # Useful helpers
 
-[Docs](README.md) / Utilities · [Discord helpers](../src/utilities/discord/index.ts)
+[Docs](README.md) / Utilities · [Discord helpers](../packages/core/src/utilities/discord/index.ts)
 
 ## Paginate a reply
 

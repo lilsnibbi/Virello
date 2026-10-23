@@ -1,16 +1,16 @@
 import { describe, expect, test } from "bun:test";
-import { ShardCoordinator, ShardManager } from "../../src/index";
+import { ShardCoordinator, ShardManager } from "../../packages/core/src/index";
 import {
 	encode,
 	type Frame,
 	frame,
 	type Op,
-} from "../../src/sharding/transport/protocol";
-import { Socket } from "../../src/sharding/transport/socket";
+} from "../../packages/sharding/src/transport/protocol";
+import { Socket } from "../../packages/sharding/src/transport/socket";
 import {
 	assignmentSchema,
 	type ShardAssignment,
-} from "../../src/sharding/authority";
+} from "../../packages/sharding/src/authority";
 import { fixture, logger, stack, tokenA, tokenB, until } from "./helpers";
 
 async function peer(

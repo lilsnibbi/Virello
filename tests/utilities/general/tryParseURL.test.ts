@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { URL } from "node:url";
-import { tryParseURL } from "../../../src/utilities/index";
+import { tryParseURL } from "../../../packages/util/src/general";
 
 describe("tryParseURL", () => {
 	test("GIVEN valid URL THEN returns URL", () => {

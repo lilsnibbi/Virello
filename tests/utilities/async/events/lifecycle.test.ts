@@ -1,6 +1,6 @@
 import { describe, expect, jest, test } from "bun:test";
 import { EventEmitter } from "node:events";
-import { EventIterator } from "../../../../src/utilities/async/events/index";
+import { EventIterator } from "../../../../packages/util/src/async/events/index";
 
 describe("EventIterator cleanup", () => {
 	test("ignores an event captured before another listener ended the iterator", async () => {

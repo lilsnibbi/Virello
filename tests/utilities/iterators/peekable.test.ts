@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { peekable } from "../../../src/utilities/iterators/index";
+import { peekable } from "../../../packages/util/src/iterators/index";
 
 describe("peekable", () => {
 	test("GIVEN iterable with elements THEN returns peekable iterator", () => {

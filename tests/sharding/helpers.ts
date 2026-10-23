@@ -6,7 +6,7 @@ import {
 	type ShardCoordinatorOptions,
 	ShardManager,
 	type ShardManagerOptions,
-} from "../../src/index";
+} from "../../packages/core/src/index";
 
 export const tokenA = "test-only-public-placeholder-host-A-0000";
 export const tokenB = "test-only-public-placeholder-host-B-0000";

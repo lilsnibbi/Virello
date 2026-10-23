@@ -1,6 +1,6 @@
 # Events and interactions
 
-[Docs](README.md) / Events · [Event names and payloads](../src/events/events.ts)
+[Docs](README.md) / Events · [Event names and payloads](../packages/core/src/events/events.ts)
 
 **`listeners/ready.ts`**, loaded through
 `modules.listeners: "listeners/**/*.ts"`:
@@ -119,7 +119,7 @@ Multiple handlers can accept one interaction, so make custom-ID filters disjoint
 and check ownership/permissions where needed. Only one handler should send the
 initial reply.
 
-[Handler contracts →](../src/events/interactions/interactionHandler.ts) ·
+[Handler contracts →](../packages/core/src/events/interactions/interactionHandler.ts) ·
 [Pagination helpers →](utilities.md#paginate-a-reply)
 
 ## Native event payloads

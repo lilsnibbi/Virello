@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { UnalignedUint16Array } from "../../../../src/utilities/binary/index";
+import { UnalignedUint16Array } from "../../../../packages/util/src/binary/index";
 
 describe("UnalignedUint16Array", () => {
 	test("GIVEN a new instance THEN it has the correct properties", () => {

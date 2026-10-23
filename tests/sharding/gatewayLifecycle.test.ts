@@ -1,8 +1,8 @@
 import { expect, test } from "bun:test";
 import type { ServerWebSocket } from "bun";
 import "./fixtures/contracts";
-import { record } from "../../src/engine/common";
-import { ShardCoordinator } from "../../src/sharding/coordinator/Coordinator";
+import { record } from "../../packages/util/src/runtime";
+import { ShardCoordinator } from "../../packages/sharding/src/coordinator/Coordinator";
 
 import { ready } from "../engine/fixtures";
 import { sessionLimit, stack, tokenA, until } from "./helpers";

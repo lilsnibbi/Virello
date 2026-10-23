@@ -1,5 +1,5 @@
 import { describe, expect, jest, test } from "bun:test";
-import { some } from "../../../src/utilities/iterators/index";
+import { some } from "../../../packages/util/src/iterators/index";
 
 describe("some", () => {
 	test("GIVEN iterable and callback function that returns true for some elements THEN returns true", () => {

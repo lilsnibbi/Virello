@@ -1,7 +1,7 @@
 # Slash commands, menus and subcommands
 
-[Docs](README.md) / Commands · [Command](../src/commands/Command.ts) ·
-[Registry options](../src/commands/registration/Registry.ts)
+[Docs](README.md) / Commands · [Command](../packages/core/src/commands/Command.ts) ·
+[Registry options](../packages/core/src/commands/registration/Registry.ts)
 
 Add **`commands/greet.ts`** to the [first bot](getting-started.md):
 
@@ -134,6 +134,6 @@ export default class SettingsCommand extends Subcommand {
 Mappings accept method names or callbacks, per-subcommand checks/cooldowns,
 and groups with `type: "group"` and `entries`. `default: true` is useful for
 message subcommands. **Keep the inherited `chatInputRun`/`messageRun` methods**:
-they perform dispatch. [Mapping types →](../src/extensions/subcommands/types/mappings.ts)
+they perform dispatch. [Mapping types →](../packages/core/src/extensions/subcommands/types/mappings.ts)
 
 Next: [permissions and cooldowns](checks.md) · [failure replies](events.md#reply-to-failures).

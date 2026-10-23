@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { isFunction } from "../../../src/utilities/index";
+import { isFunction } from "../../../packages/util/src/general";
 
 describe("isFunction", () => {
 	test("GIVEN string THEN returns false", () => {

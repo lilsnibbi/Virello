@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { dropWhile } from "../../../src/utilities/iterators/index";
+import { dropWhile } from "../../../packages/util/src/iterators/index";
 
 describe("dropWhile", () => {
 	test("GIVEN iterable and callback function THEN returns iterable with dropped elements", () => {

@@ -6,13 +6,13 @@ import {
 	ShardManager,
 	type ShardRestartStatus,
 } from "virello/sharding";
-import { ShardLink } from "../../src/sharding/client/Link";
-import { ShardLifecycle } from "../../src/sharding/lifecycle";
+import { ShardLink } from "../../packages/sharding/src/client/Link";
+import { ShardLifecycle } from "../../packages/sharding/src/lifecycle";
 import {
 	frame,
 	limits,
 	type Frame,
-} from "../../src/sharding/transport/protocol";
+} from "../../packages/sharding/src/transport/protocol";
 import { fixture, logger, stack, tokenA, until } from "./helpers";
 
 const operationFixture = new URL("./fixtures/operations.ts", import.meta.url);

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { prepend } from "../../../src/utilities/iterators/index";
+import { prepend } from "../../../packages/util/src/iterators/index";
 
 describe("prepend", () => {
 	test("GIVEN iterable and one iterable THEN returns prepended iterable", () => {

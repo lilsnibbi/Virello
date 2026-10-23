@@ -1,5 +1,5 @@
 import { describe, expect, jest, test } from "bun:test";
-import { partition } from "../../../src/utilities/iterators/index";
+import { partition } from "../../../packages/util/src/iterators/index";
 
 describe("partition", () => {
 	test("GIVEN iterable and predicate THEN returns partitioned iterables", () => {

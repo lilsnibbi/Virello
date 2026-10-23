@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { intersperse, toArray } from "../../../src/utilities/iterators/index";
+import {
+	intersperse,
+	toArray,
+} from "../../../packages/util/src/iterators/index";
 
 describe("intersperse", () => {
 	test("GIVEN an iterable THEN returns a new iterable with the separator in between", () => {

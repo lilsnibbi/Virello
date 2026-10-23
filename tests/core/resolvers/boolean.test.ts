@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { resolveBoolean } from "../../../src/commands/arguments/resolvers/boolean";
-import { Identifiers } from "../../../src/commands/errors/Identifiers";
-import { Result } from "../../../src/utilities/result/index";
+import { resolveBoolean } from "../../../packages/core/src/commands/arguments/resolvers/boolean";
+import { Identifiers } from "../../../packages/core/src/commands/errors/Identifiers";
+import { Result } from "../../../packages/util/src/result/index";
 
 describe("Boolean resolver tests", () => {
 	test("GIVEN a truthy value THEN returns true", () => {

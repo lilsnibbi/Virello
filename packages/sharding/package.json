@@ -1,0 +1,62 @@
+{
+	"name": "@virello/sharding",
+	"version": "0.1.2",
+	"description": "Discord shard coordinator, host manager, typed IPC and fleet REST scheduling for Bun.",
+	"type": "module",
+	"license": "MIT AND Apache-2.0",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/lilsnibbi/Virello.git",
+		"directory": "packages/sharding"
+	},
+	"exports": {
+		".": {
+			"types": "./src/index.ts",
+			"bun": "./src/index.ts"
+		},
+		"./client": {
+			"types": "./src/client/Link.ts",
+			"bun": "./src/client/Link.ts"
+		},
+		"./gateway": {
+			"types": "./src/client/gateway.ts",
+			"bun": "./src/client/gateway.ts"
+		},
+		"./stats": {
+			"types": "./src/stats.ts",
+			"bun": "./src/stats.ts"
+		},
+		"./authority": {
+			"types": "./src/authority.ts",
+			"bun": "./src/authority.ts"
+		},
+		"./messaging": {
+			"types": "./src/messaging.ts",
+			"bun": "./src/messaging.ts"
+		}
+	},
+	"types": "./src/index.ts",
+	"files": [
+		"src",
+		"README.md",
+		"LICENSE",
+		"NOTICE",
+		"UPSTREAM-LICENSE"
+	],
+	"engines": {
+		"bun": ">=1.4.2"
+	},
+	"dependencies": {
+		"@lilsnibbi/logger": "1.2.0",
+		"@virello/cache": "workspace:*",
+		"@virello/logging": "workspace:*",
+		"@virello/rest": "workspace:*",
+		"@virello/ws": "workspace:*",
+		"arktype": "^2.2.8",
+		"discord-api-types": "0.38.57"
+	},
+	"publishConfig": {
+		"access": "public",
+		"registry": "https://registry.npmjs.org"
+	}
+}

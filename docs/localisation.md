@@ -1,6 +1,6 @@
 # Localisation
 
-[Docs](README.md) / Localisation · [Options](../src/extensions/localisation/types.ts)
+[Docs](README.md) / Localisation · [Options](../packages/core/src/extensions/localisation/types.ts)
 
 ## Translate a reply
 
@@ -88,7 +88,7 @@ For response text that must never be empty, supply a fallback:
 `fetchT(target)` returns a bound i18next translation function; `fetchLanguage`
 returns the selected language. `getLocalizedData`, `applyNameLocalizedBuilder`
 and related helpers apply presentation maps outside the registry.
-[Exported helpers →](../src/extensions/localisation/functions.ts)
+[Exported helpers →](../packages/core/src/extensions/localisation/functions.ts)
 
 ## Loading rules worth knowing
 
@@ -103,4 +103,4 @@ and related helpers apply presentation maps outside the registry.
 - Restart after changing JSON. Disabling `localisation` removes these services;
   do not call its helpers or request registration localisation afterward.
 
-[Loader implementation →](../src/extensions/localisation/resources.ts)
+[Loader implementation →](../packages/core/src/extensions/localisation/resources.ts)

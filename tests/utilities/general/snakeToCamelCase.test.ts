@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { snakeToCamelCase } from "../../../src/utilities/text/snakeToCamelCase";
+import { snakeToCamelCase } from "../../../packages/util/src/text/snakeToCamelCase";
 
 describe("snakeToCamelCase", () => {
 	test("should correctly transform snake_case to camelCase", () => {

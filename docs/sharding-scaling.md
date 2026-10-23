@@ -1,7 +1,7 @@
 # Automatic shard scaling
 
 [Docs](README.md) / [Sharding](sharding.md) / Scaling ·
-[Policy implementation](../src/sharding/coordinator/scaling.ts)
+[Policy implementation](../packages/sharding/src/coordinator/scaling.ts)
 
 Scaling is **off by default**. To enable it, add this to coordinator options:
 

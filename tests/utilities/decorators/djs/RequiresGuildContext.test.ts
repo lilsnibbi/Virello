@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { RequiresGuildContext } from "../../../../src/utilities/decorators/index";
+import { RequiresGuildContext } from "../../../../packages/core/src/utilities/decorators/index";
 
 describe("RequiresGuildContext", () => {
 	interface Message {

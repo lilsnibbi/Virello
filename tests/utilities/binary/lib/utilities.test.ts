@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { fromUTF16, toUTF16 } from "../../../../src/utilities/binary/index";
+import { fromUTF16, toUTF16 } from "../../../../packages/util/src/binary/index";
 
 describe("services", () => {
 	describe("toUTF16", () => {

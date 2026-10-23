@@ -7,11 +7,11 @@ import {
 	type VirelloClient,
 } from "virello";
 import { message as nativeMessage } from "../../../fixtures/discord";
-import { UserError } from "../../../../src/core/index";
+import { UserError } from "../../../../packages/core/src/core/index";
 import {
 	DecoratorIdentifiers,
 	RequiresClientPermissions,
-} from "../../../../src/utilities/decorators/index";
+} from "../../../../packages/core/src/utilities/decorators/index";
 
 function buildMessage(
 	channelType: ChannelType,

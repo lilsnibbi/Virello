@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { roundNumber } from "../../../src/utilities/index";
+import { roundNumber } from "../../../packages/util/src/general";
 
 describe("roundNumber", () => {
 	test("GIVEN number without decimals THEN returns number", () => {

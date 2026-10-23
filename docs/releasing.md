@@ -3,8 +3,11 @@
 [Development](development.md) / Releases
 
 `virello` and every public `@virello/*` workspace share one version, changelog
-and GitHub release tag. Today the public packages are `@virello/builders` and
-`virello`, in that dependency order in [release-packages.json](../release-packages.json).
+and GitHub release tag. The ten public packages, in
+[release-packages.json](../release-packages.json) dependency order, are:
+`@virello/builders`, `@virello/logging`, `@virello/util`, `@virello/rest`,
+`@virello/ws`, `@virello/cache`, `@virello/engine`, `@virello/sharding`,
+`@virello/core`, then `virello`. See [package ownership](packages.md).
 Even an unchanged package is published at the shared version.
 
 Release Please keeps the root version, workspace versions and annotated Bun
@@ -39,13 +42,16 @@ bun --revision
 bun install --frozen-lockfile --ignore-scripts
 bun release:check
 bun release:pack
+bun release:verify
 git diff --exit-code
 
 npm login --registry=https://registry.npmjs.org
 npm whoami --registry=https://registry.npmjs.org
 version=$(bun -p 'require("./package.json").version')
-npm view "@virello/builders@$version" version --registry=https://registry.npmjs.org
-npm view "virello@$version" version --registry=https://registry.npmjs.org
+for directory in $(node -p 'require("./release-packages.json").join(" ")'); do
+  name=$(node -p "require('./$directory/package.json').name")
+  npm view "$name@$version" version --registry=https://registry.npmjs.org
+done
 ```
 
 For **Windows PowerShell**, use this equivalent setup and validation block. Call
@@ -67,21 +73,28 @@ $releaseBun = (Resolve-Path '.\scripts\release-tools\node_modules\bun\bin\bun.ex
 if ($LASTEXITCODE -ne 0) { throw 'Release metadata validation failed.' }
 & $releaseBun scripts/release.ts pack
 if ($LASTEXITCODE -ne 0) { throw 'Package validation failed.' }
+& $releaseBun scripts/release.ts verify
+if ($LASTEXITCODE -ne 0) { throw 'Isolated package import validation failed.' }
 git diff --exit-code
 if ($LASTEXITCODE -ne 0) { throw 'Tracked files changed during validation.' }
 
 npm login --registry=https://registry.npmjs.org
 npm whoami --registry=https://registry.npmjs.org
 $version = (Get-Content -Raw package.json | ConvertFrom-Json).version
-npm view "@virello/builders@$version" version --registry=https://registry.npmjs.org
-npm view "virello@$version" version --registry=https://registry.npmjs.org
+foreach ($directory in (Get-Content -Raw release-packages.json | ConvertFrom-Json)) {
+  $manifest = Get-Content -Raw (Join-Path $directory 'package.json') | ConvertFrom-Json
+  npm view "$($manifest.name)@$version" version --registry=https://registry.npmjs.org
+}
 ```
 
-Run commands in order and stop if any fails. The dry-run and owner publish
-commands below use the same `$version` variable syntax in PowerShell.
+Run validation commands in order and stop if any fails. Registry lookups can
+return 404 for an unpublished version; inspect each result rather than treating
+other failures as absence. Keep publishing on hold until the package split has
+been reviewed, all validations pass and ownership is confirmed.
 
-Confirm ownership of `virello` and permission to create public packages under
-`@virello` before publishing. The scope needs to belong to an npm account or
+The owner reports creating the npm `virello` organization. Confirm the laptop
+account owns `virello` and has permission to create all nine public packages
+under `@virello` before publishing. The scope needs to belong to an npm account or
 organization you control, with suitable package publishing permissions. A 404
 does **not** establish availability or ownership; authentication and policy can
 also hide packages. Other registry errors must be resolved before proceeding.
@@ -91,33 +104,72 @@ On 2026-10-23, an unauthenticated registry lookup returned `virello` latest
 verify the laptop account's access to the scope or either package. The manifests
 in this PR remain at `0.1.2`; no version or name has been reserved by this work.
 
-Review the tarballs and perform these safe npm dry-runs first:
+Review all ten tarballs and perform safe npm dry-runs first. These loops use the
+committed dependency order, including the aggregate last; a failed publish stops
+rather than continuing with dependent packages. The shared `$version` comes
+from the validated checkout above.
 
-```sh
-npm publish "./.release/virello-builders-$version.tgz" --dry-run --ignore-scripts --access public --registry=https://registry.npmjs.org
-npm publish "./.release/virello-$version.tgz" --dry-run --ignore-scripts --access public --registry=https://registry.npmjs.org
+**Bash dry-run:**
+
+```bash
+for directory in $(node -p 'require("./release-packages.json").join(" ")'); do
+  name=$(node -p "require('./$directory/package.json').name")
+  filename="${name#@}"
+  filename="${filename//\//-}-$version.tgz"
+  npm publish "./.release/$filename" --dry-run --ignore-scripts --access public --registry=https://registry.npmjs.org || break
+done
 ```
 
-If both versions are unpublished and ownership is confirmed, **the owner** runs
-the two live publishes, completing any interactive authentication/2FA prompts:
+**PowerShell dry-run:**
 
-```sh
-npm publish "./.release/virello-builders-$version.tgz" --ignore-scripts --access public --tag latest --registry=https://registry.npmjs.org
-npm view "@virello/builders@$version" version --registry=https://registry.npmjs.org
-npm publish "./.release/virello-$version.tgz" --ignore-scripts --access public --tag latest --registry=https://registry.npmjs.org
-npm view "virello@$version" version --registry=https://registry.npmjs.org
+```powershell
+foreach ($directory in (Get-Content -Raw release-packages.json | ConvertFrom-Json)) {
+  $manifest = Get-Content -Raw (Join-Path $directory 'package.json') | ConvertFrom-Json
+  $filename = $manifest.name.TrimStart('@').Replace('/', '-') + "-$version.tgz"
+  npm publish "./.release/$filename" --dry-run --ignore-scripts --access public --registry=https://registry.npmjs.org
+  if ($LASTEXITCODE -ne 0) { throw "Dry-run failed for $($manifest.name)." }
+}
+```
+
+Only after review, all validation, registry/ownership checks and successful
+dry-runs, **the owner** may run the live bootstrap below. Complete interactive
+login/2FA prompts locally. No automated fallback credentials are created.
+
+**Bash owner publish:**
+
+```bash
+for directory in $(node -p 'require("./release-packages.json").join(" ")'); do
+  name=$(node -p "require('./$directory/package.json').name")
+  filename="${name#@}"
+  filename="${filename//\//-}-$version.tgz"
+  npm publish "./.release/$filename" --ignore-scripts --access public --tag latest --registry=https://registry.npmjs.org || break
+  npm view "$name@$version" version --registry=https://registry.npmjs.org || break
+done
+```
+
+**PowerShell owner publish:**
+
+```powershell
+foreach ($directory in (Get-Content -Raw release-packages.json | ConvertFrom-Json)) {
+  $manifest = Get-Content -Raw (Join-Path $directory 'package.json') | ConvertFrom-Json
+  $filename = $manifest.name.TrimStart('@').Replace('/', '-') + "-$version.tgz"
+  npm publish "./.release/$filename" --ignore-scripts --access public --tag latest --registry=https://registry.npmjs.org
+  if ($LASTEXITCODE -ne 0) { throw "Publishing stopped at $($manifest.name)." }
+  npm view "$($manifest.name)@$version" version --registry=https://registry.npmjs.org
+  if ($LASTEXITCODE -ne 0) { throw "Verify $($manifest.name) in npm before continuing." }
+}
 ```
 
 Never overwrite an existing version or publish just the root without its matching
-builders. If a version already exists, compare its contents and integrity first;
+dependencies. If a version already exists, compare its contents and integrity first;
 use a new shared version if it differs. Laptop bootstrap has no GitHub OIDC
 provenance. It creates no GitHub release or tag.
 
 ## Configure each npm package's trusted publishers (owner action)
 
-After bootstrap, open **Settings → Trusted publishing** separately for both
-`virello` and `@virello/builders`. Add these two GitHub Actions configurations to
-**each package** (four configurations total):
+After bootstrap, open **Settings → Trusted publishing** separately for each
+of the ten packages listed above. Add these two GitHub Actions configurations
+to **each package** (twenty configurations total):
 
 | Field                | Automatic Release Please path | Release event / manual recovery path |
 | -------------------- | ----------------------------- | ------------------------------------ |
@@ -184,7 +236,8 @@ version. Review any intentional snapshot update as a release configuration chang
 After dependency edits regenerate `bun.lock`, run `bun release:sync` to restore
 the Release Please annotation and align workspace versions to the root version,
 then commit the result. This does not resolve or upgrade dependencies. Run
-`bun release:check` and `bun release:pack` with the locked release tools before
+`bun release:check`, `bun release:pack` and `bun release:verify` with the locked
+release tools before
 submitting release changes.
 CI also runs those checks, and publishing rechecks even when ordinary CI is
 skipped for Release Please's bot commits.

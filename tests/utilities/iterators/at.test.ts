@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { at } from "../../../src/utilities/iterators/index";
+import { at } from "../../../packages/util/src/iterators/index";
 
 describe("at", () => {
 	test("GIVEN iterable and valid index THEN returns element at index", () => {

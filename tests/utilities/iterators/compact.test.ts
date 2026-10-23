@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { compact } from "../../../src/utilities/iterators/index";
+import { compact } from "../../../packages/util/src/iterators/index";
 
 describe("compact", () => {
 	test("GIVEN iterable with null and undefined values THEN returns iterable without null and undefined values", () => {

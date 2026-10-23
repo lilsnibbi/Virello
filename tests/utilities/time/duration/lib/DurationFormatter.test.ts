@@ -3,7 +3,7 @@ import {
 	type DurationFormatSeparators,
 	DurationFormatter,
 	Time,
-} from "../../../../../src/utilities/time/duration/index";
+} from "../../../../../packages/util/src/time/duration/index";
 
 const formatter = new DurationFormatter();
 

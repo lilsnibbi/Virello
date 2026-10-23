@@ -1,6 +1,6 @@
-import type { $Clock } from "../../src/engine/common";
-import { record } from "../../src/engine/common";
-import type { $GatewaySocket } from "../../src/engine/gateway/GatewayShard";
+import type { $Clock } from "../../packages/util/src/runtime";
+import { record } from "../../packages/util/src/runtime";
+import type { $GatewaySocket } from "../../packages/ws/src/GatewayShard";
 
 export class FakeClock implements $Clock {
 	public time = 0;

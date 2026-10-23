@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { resolveDate } from "../../../src/commands/arguments/resolvers/date";
-import { Identifiers } from "../../../src/commands/errors/Identifiers";
-import { Result } from "../../../src/utilities/result/index";
+import { resolveDate } from "../../../packages/core/src/commands/arguments/resolvers/date";
+import { Identifiers } from "../../../packages/core/src/commands/errors/Identifiers";
+import { Result } from "../../../packages/util/src/result/index";
 
 const DATE_2018_PLAIN_STRING = "August 11, 2018 00:00:00";
 const DATE_2018 = new Date(DATE_2018_PLAIN_STRING);

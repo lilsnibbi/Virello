@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { enumToObject } from "../../../../../src/utilities/collections/bitfield/index";
+import { enumToObject } from "../../../../../packages/util/src/collections/bitfield/index";
 
 describe("services", () => {
 	describe("enumToObject", () => {

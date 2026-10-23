@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
 	isArrayLike,
 	isValidLength,
-} from "../../../../../src/utilities/binary/shared/_common";
+} from "../../../../../packages/util/src/binary/shared/_common";
 
 describe("isArrayLike", () => {
 	test.each([undefined, null, 42, 100n, () => {}, Symbol("foo"), "bar"])(

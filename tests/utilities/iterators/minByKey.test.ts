@@ -5,7 +5,7 @@ import {
 	descNumber,
 	descString,
 	minByKey,
-} from "../../../src/utilities/iterators/index";
+} from "../../../packages/util/src/iterators/index";
 
 describe("minByKey", () => {
 	test("GIVEN iterable with positive numbers by ascending string and asc comparator THEN returns the lexicographic minimum value", () => {

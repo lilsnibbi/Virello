@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { RateLimits, routeKey } from "../../src/engine/rest/RateLimits";
-import { RestClient } from "../../src/engine/rest/RestClient";
-import { RestError } from "../../src/engine/rest/RestError";
+import { RateLimits, routeKey } from "../../packages/rest/src/RateLimits";
+import { RestClient } from "../../packages/rest/src/RestClient";
+import { RestError } from "../../packages/rest/src/RestError";
 import { FakeClock, flush } from "./support";
 
 function json(

@@ -1,10 +1,10 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import type { PreconditionContainerSingle } from "../../../src/commands/checks/containers/Entry";
-import { PreconditionContainerArray } from "../../../src/commands/checks/containers/Group";
-import { parseConstructorPreConditionsCooldown } from "../../../src/commands/checks/resolvers/cooldown";
-import { BucketScope } from "../../../src/commands/enums";
-import type { CooldownOptions } from "../../../src/core/client/VirelloClient";
-import { container } from "../../../src/core/modules/index";
+import type { PreconditionContainerSingle } from "../../../packages/core/src/commands/checks/containers/Entry";
+import { PreconditionContainerArray } from "../../../packages/core/src/commands/checks/containers/Group";
+import { parseConstructorPreConditionsCooldown } from "../../../packages/core/src/commands/checks/resolvers/cooldown";
+import { BucketScope } from "../../../packages/core/src/commands/enums";
+import type { CooldownOptions } from "../../../packages/core/src/core/client/VirelloClient";
+import { container } from "../../../packages/core/src/core/modules/index";
 
 describe("parseConstructorPreConditionsCooldown", () => {
 	const originalClient = container.client;

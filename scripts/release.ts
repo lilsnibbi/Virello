@@ -49,9 +49,9 @@ const main = packages.find((pkg) => pkg.path === ".");
 if (!main) throw new Error("The release plan must include the root package.");
 const version = main.manifest.version;
 const [command, output = ".release"] = process.argv.slice(2);
-if (!["sync", "check", "pack", "publish"].includes(command ?? ""))
+if (!["sync", "check", "pack", "verify", "publish"].includes(command ?? ""))
 	throw new Error(
-		"Usage: bun scripts/release.ts check|sync|pack|publish [directory]",
+		"Usage: bun scripts/release.ts check|sync|pack|verify|publish [directory]",
 	);
 
 function run(args: string[], cwd = root): string {
@@ -157,7 +157,7 @@ if (
 	);
 console.log(`Shared version ${version}: ${[...seen].join(" → ")}`);
 
-if (command === "pack" || command === "publish") {
+if (command === "pack" || command === "verify" || command === "publish") {
 	const expected = json(
 		join(root, "scripts/release-tools/package.json"),
 	).bunRevision;
@@ -248,6 +248,83 @@ if (command === "pack") {
 		}
 	} finally {
 		rmSync(staging, { recursive: true, force: true });
+	}
+}
+
+if (command === "verify") {
+	// Each consumer gets only its requested tarball and the dependencies it needs.
+	// Overrides resolve unpublished siblings locally without a registry publish.
+	const overrides = Object.fromEntries(
+		packages.map((pkg) => [
+			pkg.manifest.name,
+			`file:${packagePath(resolve(root, output, `${pkg.manifest.name.replace(/^@/, "").replaceAll("/", "-")}-${version}.tgz`))}`,
+		]),
+	);
+	for (const pkg of packages) {
+		const consumer = mkdtempSync(join(tmpdir(), "virello-consumer-"));
+		try {
+			writeFileSync(
+				join(consumer, "package.json"),
+				JSON.stringify({
+					private: true,
+					dependencies: { [pkg.manifest.name]: overrides[pkg.manifest.name] },
+					overrides,
+				}),
+			);
+			run(
+				[
+					process.execPath,
+					"install",
+					"--ignore-scripts",
+					`--registry=${registry}`,
+				],
+				consumer,
+			);
+			if (
+				pkg.path !== "." &&
+				existsSync(join(consumer, "node_modules/virello"))
+			)
+				throw new Error(
+					`Standalone ${pkg.manifest.name} installed the aggregate.`,
+				);
+			cpSync(
+				join(root, "tests/fixtures/imports.ts"),
+				join(consumer, "imports.ts"),
+			);
+			for (const path of Object.keys(pkg.manifest.exports)) {
+				const spec = pkg.manifest.name + (path === "." ? "" : path.slice(1));
+				run(
+					[
+						process.execPath,
+						"imports.ts",
+						spec,
+						pkg.path === "." ? "" : "standalone",
+					],
+					consumer,
+				);
+			}
+			if (pkg.path === ".") {
+				const identityCheck = `
+					const root = await import("virello");
+					const engine = await import("virello/engine");
+					for (const name of ${JSON.stringify(packages.filter((value) => value.path !== ".").map((value) => value.manifest.name))}) {
+						const owned = await import(name);
+						let shared = 0;
+						for (const [key, value] of Object.entries(owned)) {
+							const reference = [root, engine, root.Utils].find((entry) => key in entry);
+							if (!reference) continue;
+							if (value !== reference[key]) throw new Error("Duplicate identity: " + name + " " + key);
+							shared++;
+						}
+						if (!shared) throw new Error("No aggregate identity checked for " + name);
+					}
+				`;
+				run([process.execPath, "-e", identityCheck], consumer);
+			}
+			console.log(`Verified isolated imports: ${pkg.manifest.name}`);
+		} finally {
+			rmSync(consumer, { recursive: true, force: true });
+		}
 	}
 }
 

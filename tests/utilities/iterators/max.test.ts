@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { max } from "../../../src/utilities/iterators/index";
+import { max } from "../../../packages/util/src/iterators/index";
 
 describe("max", () => {
 	test("GIVEN iterable with numbers THEN returns the lexicographic maximum value", () => {

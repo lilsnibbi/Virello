@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { FleetRestScheduler } from "../../src/sharding/rest/FleetRestScheduler";
+import { FleetRestScheduler } from "../../packages/sharding/src/rest/FleetRestScheduler";
 import { assignment, authority } from "./fixtures/authority";
 import { until } from "./helpers";
 import { FakeClock } from "../engine/support";

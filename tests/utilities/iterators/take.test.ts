@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { take } from "../../../src/utilities/iterators/index";
+import { take } from "../../../packages/util/src/iterators/index";
 
 describe("take", () => {
 	test("GIVEN iterable and limit greater than iterable length THEN returns entire iterable", () => {

@@ -1,5 +1,5 @@
-import type { ShardAssignment } from "../../../src/sharding/authority";
-import { ControlStore } from "../../../src/sharding/coordinator/ControlStore";
+import type { ShardAssignment } from "../../../packages/sharding/src/authority";
+import { ControlStore } from "../../../packages/sharding/src/coordinator/ControlStore";
 
 export function assignment(shardId = 0): ShardAssignment {
 	return {

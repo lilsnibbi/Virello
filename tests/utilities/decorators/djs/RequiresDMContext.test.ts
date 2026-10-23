@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { RequiresDMContext } from "../../../../src/utilities/decorators/index";
+import { RequiresDMContext } from "../../../../packages/core/src/utilities/decorators/index";
 
 describe("RequiresDMContext", () => {
 	interface Message {

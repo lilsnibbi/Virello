@@ -7,6 +7,10 @@ import {
 	type Op,
 } from "../../src/sharding/transport/protocol";
 import { Socket } from "../../src/sharding/transport/socket";
+import {
+	assignmentSchema,
+	type ShardAssignment,
+} from "../../src/sharding/authority";
 import { fixture, logger, stack, tokenA, tokenB, until } from "./helpers";
 
 async function peer(
@@ -23,10 +27,22 @@ async function peer(
 		perMessageDeflate: false,
 	});
 	const messages: Frame[] = [];
+	const assignments = new Map<number, ShardAssignment>();
 	let closed = false;
-	socket.addEventListener("message", (event) =>
-		messages.push(JSON.parse(event.data)),
-	);
+	socket.addEventListener("message", (event) => {
+		const message: Frame = JSON.parse(event.data);
+		messages.push(message);
+		if (
+			message.op === "reply" &&
+			message.data.ok &&
+			typeof message.data.value === "object" &&
+			message.data.value !== null &&
+			"assignment" in message.data.value
+		) {
+			const identity = assignmentSchema.assert(message.data.value.assignment);
+			assignments.set(identity.shardId, identity);
+		}
+	});
 	socket.addEventListener("close", () => {
 		closed = true;
 	});
@@ -40,11 +56,14 @@ async function peer(
 		);
 		return messages.splice(index, 1)[0] as Frame<K>;
 	};
-	await next("welcome");
+	const welcome = await next("welcome");
+	const wire = (message: Frame) =>
+		encode({ ...message, session: welcome.session, term: welcome.term }, 65536);
 	return {
 		socket,
 		next,
 		instance,
+		assignments,
 		get closed() {
 			return closed;
 		},
@@ -53,18 +72,23 @@ async function peer(
 			data: Record<string, unknown> = {},
 			id: string = crypto.randomUUID(),
 		) {
+			if (op === "identify")
+				data = {
+					...data,
+					attemptId: id,
+					assignment: assignments.get(Number(data.shard)),
+				};
 			if (op === "ready")
 				socket.send(
-					encode(
+					wire(
 						frame("lease", undefined, {
-							previous: data.shard,
+							previous: null,
 							generation: data.generation,
 							preferred: data.shard,
 						}),
-						65536,
 					),
 				);
-			socket.send(encode(frame(op, id, data), 65536));
+			socket.send(wire(frame(op, id, data)));
 			return id;
 		},
 		async close() {
@@ -99,7 +123,7 @@ describe("authenticated coordinator on real WebSockets", () => {
 			});
 			expect((await replacement.next("reply", refused)).data).toMatchObject({
 				ok: false,
-				error: { code: "LEASE_TAKEN" },
+				error: { code: "LEASE_INVALID" },
 			});
 			const forged = replacement.send("offline", {
 				shard: null,
@@ -114,7 +138,7 @@ describe("authenticated coordinator on real WebSockets", () => {
 				generation: "child-one",
 				preferred: 0,
 			});
-			expect((await returned.next("reply", again)).data).toEqual({
+			expect((await returned.next("reply", again)).data).toMatchObject({
 				ok: true,
 				value: { shard: 0, count: 2 },
 			});
@@ -393,6 +417,11 @@ describe("authenticated coordinator on real WebSockets", () => {
 				error: { code: "ABORTED" },
 			});
 			a.send("done", { shard: 0, generation: "a1" });
+			a.send("permitOutcome", {
+				assignment: a.assignments.get(0),
+				attemptId: first,
+				kind: "sent",
+			});
 			const start = performance.now();
 			const next = b.send("identify", {
 				shard: 1,
@@ -429,7 +458,13 @@ describe("authenticated coordinator on real WebSockets", () => {
 					}),
 			).toThrow("wss");
 			expect(
-				() => new ShardCoordinator({ ...s.base, hostname: "0.0.0.0" }),
+				() =>
+					new ShardCoordinator({
+						...s.base,
+						development: false,
+						applicationId: "test-app",
+						hostname: "0.0.0.0",
+					}),
 			).toThrow("TLS");
 			expect(
 				() =>

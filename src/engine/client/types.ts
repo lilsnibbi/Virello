@@ -9,7 +9,11 @@ import type {
 	$CacheOptions,
 } from "../cache/types";
 import type { $Clock } from "../common";
-import type { $GatewayOptions, $GatewayState } from "../gateway/GatewayShard";
+import type {
+	$GatewayOptions,
+	$GatewayState,
+	$GatewayPermit,
+} from "../gateway/GatewayShard";
 import type { $GatewayDispatch, $MessageUpdateData } from "../gateway/types";
 import type { $RestOptions } from "../rest/RestClient";
 import type { EngineInteraction } from "./EngineInteraction";
@@ -69,8 +73,11 @@ export interface $EngineOptions {
 	/** Synchronous failure callback. Defaults to framework console logging; callback errors are logged without escaping. */
 	onError?: (failure: $EngineFailure) => void;
 	/**
-	 * Optional external permit awaited before each fresh IDENTIFY, followed by the local Discord session gate. Observe the
-	 * abort signal when coordinating shards.
+	 * Await external admission before fresh IDENTIFY. A one-shot permit owns admission and is consumed at the write;
+	 * a void result retains the standalone local session gate. Observe the abort signal when coordinating shards.
 	 */
-	waitForIdentify?: (shardId: number, signal: AbortSignal) => Promise<void>;
+	waitForIdentify?: (
+		shardId: number,
+		signal: AbortSignal,
+	) => Promise<void | $GatewayPermit>;
 }

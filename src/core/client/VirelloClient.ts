@@ -21,7 +21,6 @@ import { validateSchedulerOptions } from "../../extensions/scheduledTasks/timing
 import { ShardLink, shardConfig } from "../../sharding/client/Link";
 import { ManagedGateway } from "../../sharding/client/gateway";
 import { sampleStats } from "../../sharding/stats";
-import { ShardError } from "../../sharding/types";
 import type { Awaitable } from "../../utilities/index";
 import { type ExtensionOptions, resolveExtensions } from "../config/extensions";
 import { clientOptionsSchema } from "../config/options";
@@ -141,13 +140,13 @@ export class VirelloClient extends DiscordRuntime {
 	/** Coordinator-routed messaging and fresh shard stats. Also available through container.sharding. */
 	public readonly sharding: ShardLink;
 	/**
-	 * Whether managed coordinator assignment is unreconciled. Sharding updates this flag; the Discord connection may stay
-	 * open during maintenance.
+	 * Whether the managed Gateway is deliberately suspended. Contact loss alone preserves sticky ownership and sessions.
 	 */
 	public maintenance = false;
 	private readonly managedGateway?: ManagedGateway;
 	private closePromise?: Promise<void>;
 	private loginPromise?: Promise<string>;
+	private startupComplete = false;
 	private closed = false;
 	private readonly disposers: Disposer[] = [];
 	private readonly features: FeatureState[] = [];
@@ -166,6 +165,8 @@ export class VirelloClient extends DiscordRuntime {
 		clientOptionsSchema.assert(options);
 		const managed = shardConfig();
 		if (managed) {
+			if (options.rest?.scheduler)
+				throw new TypeError("ShardManager owns the fleet REST scheduler.");
 			if (
 				options.gateway?.shard !== undefined ||
 				options.waitForIdentify !== undefined
@@ -258,29 +259,41 @@ export class VirelloClient extends DiscordRuntime {
 						component: "sharding.client",
 						event: "managed_shard_stopped",
 						message:
-							cause instanceof ShardError &&
-							cause.code === "COORDINATOR_TIMEOUT"
-								? "Coordinator reconciliation deadline expired; terminating this shard process so its host can restart it."
-								: "Stopping this shard after a supervisor or coordination failure; inspect the host logs.",
+							"Stopping this shard after a supervisor or gateway failure; inspect the host logs.",
 						error: cause,
 						context: { code },
 					});
 				await this.destroy();
 			},
-			() => ({ ready: this.isReady(), guilds: this.cache.guilds.size }),
+			() => ({
+				ready: this.isReady(),
+				applicationReady: this.startupComplete && this.isReady(),
+				guilds: this.cache.guilds.size,
+				gatewayState: this.gatewayState,
+				...(this.gatewayFailure
+					? { blockedCode: this.gatewayFailure.code }
+					: {}),
+			}),
 			{
 				maintenance: (value) => {
 					this.maintenance = value;
+					if (value) this.managedGateway?.suspend();
 				},
 				assignment: async (shard, count) => {
 					await this.managedGateway?.reconcile(shard, count);
 				},
 				available: () => this.managedGateway?.resume(),
+				released: () => this.waitForRelease(),
+				block: (code) => this.blockGateway(code),
 				logger: this.logger,
 			},
 			() => sampleStats(this),
 		);
 		if (managed) {
+			this.options.rest = {
+				...this.options.rest,
+				scheduler: this.sharding.restScheduler,
+			};
 			this.managedGateway = new ManagedGateway(
 				this,
 				() => this.sharding.waitForAssignment(),
@@ -381,6 +394,7 @@ export class VirelloClient extends DiscordRuntime {
 			this.assertOpen();
 			await this.runFeatures("afterLogin");
 			this.assertOpen();
+			this.startupComplete = true;
 			return result;
 		} catch (error) {
 			try {

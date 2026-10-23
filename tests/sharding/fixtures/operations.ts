@@ -9,6 +9,7 @@ const client = new VirelloClient({
 });
 let ready = process.env.SHARD_TEST_READY !== "false";
 Reflect.set(client, "isReady", () => ready);
+Reflect.set(client, "startupComplete", true);
 const transitions: ShardClientStatus[] = [];
 client.sharding.onLifecycle(({ status }) => {
 	transitions.push(status);

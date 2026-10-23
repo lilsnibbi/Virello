@@ -9,7 +9,7 @@ import { writeEvent } from "../../core/logging/diagnostics";
 import { EngineCache } from "../cache/EngineCache";
 import { systemClock } from "../common";
 import type { $GatewayState } from "../gateway/GatewayShard";
-import { GatewayShard } from "../gateway/GatewayShard";
+import { GatewayShard, GatewayBlockedError } from "../gateway/GatewayShard";
 import { IdentifyGate } from "../gateway/IdentifyGate";
 import type { $GatewayDispatch } from "../gateway/types";
 import { RestClient } from "../rest/RestClient";
@@ -26,12 +26,14 @@ export class EngineClient {
 	public readonly rest: RestClient;
 	private readonly events: EventHub<$EngineEvents>;
 	private gateway?: GatewayShard;
+	private closing: Promise<void> = Promise.resolve();
 	private connection?: Promise<void>;
 	private connecting?: AbortController;
 	private generation = 0;
 	private closed = false;
 	private revision = 0;
 	private reporting = false;
+	private startupFailure?: GatewayBlockedError;
 	readonly #options: $EngineOptions;
 
 	/**
@@ -60,7 +62,13 @@ export class EngineClient {
 	}
 	/** Gateway lifecycle state, or idle before connect and closed after close. */
 	public get state(): $GatewayState {
-		return this.closed ? "closed" : (this.gateway?.state ?? "idle");
+		return this.closed
+			? "closed"
+			: (this.gateway?.state ?? (this.startupFailure ? "blocked" : "idle"));
+	}
+	/** Machine-readable terminal Gateway cause, independent of process liveness. */
+	public get gatewayFailure(): GatewayBlockedError | undefined {
+		return this.gateway?.blocked ?? this.startupFailure;
 	}
 	/** Number of unfinished asynchronous event handlers. */
 	public get pendingHandlers(): number {
@@ -74,9 +82,15 @@ export class EngineClient {
 	public reassign(shard: readonly [number, number] | null): void {
 		if (this.closed) throw new Error("Engine client is closed.");
 		++this.generation;
+		this.startupFailure = undefined;
 		++this.revision;
 		this.connecting?.abort(new Error("Gateway assignment changed."));
 		this.gateway?.stop();
+		if (this.gateway)
+			this.closing = Promise.all([
+				this.closing,
+				this.gateway.waitForClose(),
+			]).then(() => {});
 		this.gateway = undefined;
 		this.connection = undefined;
 		this.cache.clear();
@@ -85,6 +99,10 @@ export class EngineClient {
 			shard: shard ?? undefined,
 		};
 		this.events.emit("gatewayState", "idle");
+	}
+	/** Await closure of every retired Gateway socket; a missing close event leaves release unresolved. */
+	public waitForGatewayClose(): Promise<void> {
+		return this.closing;
 	}
 	/**
 	 * Listen to an engine event. Handlers start synchronously in registration order; async results are tracked.
@@ -102,7 +120,7 @@ export class EngineClient {
 	 * Discover fresh gateway metadata and connect one gateway shard once.
 	 * @returns The shared promise, resolved when the gateway is ready.
 	 * @throws For closure, metadata/gateway failures, or missing shard configuration when Discord recommends multiple shards.
-	 * Failed startup closes the engine.
+	 * Failed Gateway startup blocks the Gateway while preserving REST and event subscriptions for inspection.
 	 */
 	public connect(): Promise<void> {
 		if (this.closed)
@@ -112,12 +130,35 @@ export class EngineClient {
 			this.connecting = new AbortController();
 			this.connection = this.open(this.connecting.signal).catch(
 				(error: unknown) => {
-					if (generation === this.generation) this.close();
-					throw error;
+					if (generation !== this.generation) throw error;
+					const failure =
+						error instanceof GatewayBlockedError
+							? error
+							: new GatewayBlockedError(
+									error instanceof Error
+										? error.message
+										: "Gateway startup failed.",
+									"GATEWAY_STARTUP",
+									{ cause: error },
+								);
+					this.startupFailure = failure;
+					if (!(error instanceof GatewayBlockedError))
+						this.report({ source: "gateway", error: failure, fatal: true });
+					this.events.emit("gatewayState", "blocked");
+					throw failure;
 				},
 			);
 		}
 		return this.connection;
+	}
+	/** Open the bot-wide credential circuit without destroying the engine. */
+	public blockGateway(code: string): void {
+		this.gateway?.block(
+			new GatewayBlockedError(
+				"Gateway blocked by fleet credential circuit.",
+				code,
+			),
+		);
 	}
 	private async open(signal: AbortSignal): Promise<void> {
 		const info = await this.rest.getGatewayBot(signal);
@@ -139,7 +180,8 @@ export class EngineClient {
 				url: this.#options.gateway?.url ?? info.url,
 				clock,
 				identify: async (signal) => {
-					await this.#options.waitForIdentify?.(shardId, signal);
+					const permit = await this.#options.waitForIdentify?.(shardId, signal);
+					if (permit) return permit;
 					await gate.acquire(signal);
 				},
 			},
@@ -152,7 +194,6 @@ export class EngineClient {
 				state: (state) => this.events.emit("gatewayState", state),
 				failure: (error, fatal) => {
 					this.report({ source: "gateway", error, fatal });
-					if (fatal) this.close();
 				},
 			},
 		);

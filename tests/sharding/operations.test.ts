@@ -197,7 +197,10 @@ describe("controlled local restarts", () => {
 				if (event.status.phase === "waiting" && event.status.currentSlot === 0)
 					secondUnchanged = manager.processes[1].pid === old[1];
 			});
-			const replacements = await manager.restartAll({ timeoutMs: 8000 });
+			const replacements = await manager.restartAll({
+				timeoutMs: 8000,
+				stabilityMs: 50,
+			});
 			expect(replacements.map(({ slot }) => slot)).toEqual([0, 1]);
 			expect(replacements.every(({ pid }, index) => pid !== old[index])).toBe(
 				true,
@@ -267,7 +270,7 @@ describe("controlled local restarts", () => {
 			const old = manager.processes[0].pid;
 			let settled = false;
 			const restart = manager
-				.restartProcess(0, { timeoutMs: 8000 })
+				.restartProcess(0, { timeoutMs: 8000, stabilityMs: 50 })
 				.finally(() => {
 					settled = true;
 				});

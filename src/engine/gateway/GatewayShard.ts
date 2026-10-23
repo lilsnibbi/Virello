@@ -27,11 +27,29 @@ export type $GatewaySocket = Pick<
 export type $GatewayState =
 	| "idle"
 	| "connecting"
+	| "waiting_admission"
 	| "identifying"
 	| "resuming"
 	| "ready"
 	| "reconnecting"
+	| "blocked"
 	| "closed";
+/** One-shot admission capability, consumed synchronously at the IDENTIFY write boundary. */
+export interface $GatewayPermit {
+	/** Validate and consume the grant immediately before executing one local socket write. */
+	consume(write: () => boolean): boolean;
+}
+/** Terminal protocol/retry circuit state; the surrounding runtime remains inspectable. */
+export class GatewayBlockedError extends Error {
+	public constructor(
+		message: string,
+		public readonly code: string,
+		options?: ErrorOptions,
+	) {
+		super(message, options);
+		this.name = "GatewayBlockedError";
+	}
+}
 /** Authentication, transport, and recovery settings for one gateway shard. */
 export interface $GatewayOptions {
 	/** Discord bot token used for IDENTIFY and RESUME. */
@@ -49,7 +67,7 @@ export interface $GatewayOptions {
 	/** Create a WebSocket for the supplied gateway URL. Defaults to new WebSocket(url). */
 	socket?: (url: string) => $GatewaySocket;
 	/** Wait for an identify permit. Called before each fresh IDENTIFY; reject or observe the signal to cancel. */
-	identify: (signal: AbortSignal) => Promise<void>;
+	identify: (signal: AbortSignal) => Promise<void | $GatewayPermit>;
 	/** Positive integer deadline in milliseconds for each handshake stage. Defaults to 15000. */
 	handshakeTimeoutMs?: number;
 	/** Nonnegative consecutive recovery limit. Defaults to 10; 0 disables recovery attempts. */
@@ -101,6 +119,9 @@ export class GatewayShard {
 	private authenticated = false;
 	private stopped = false;
 	private failures = 0;
+	private readyAt?: number;
+	private readonly closing = new Set<Promise<void>>();
+	private blockedCause?: GatewayBlockedError;
 	private current: $GatewayState = "idle";
 	private startPromise?: Promise<void>;
 	private resolveStart?: () => void;
@@ -150,6 +171,18 @@ export class GatewayShard {
 	public get state(): $GatewayState {
 		return this.current;
 	}
+	/** Stable terminal cause until explicit replacement of this Gateway object. */
+	public get blocked(): GatewayBlockedError | undefined {
+		return this.blockedCause;
+	}
+	/** Explicitly block a known-invalid configuration; ordinary reconnect does not clear it. */
+	public block(error: GatewayBlockedError): void {
+		if (!this.stopped) this.fail(error);
+	}
+	/** Actual socket closure barrier. No timeout is converted into proof of closure. */
+	public async waitForClose(): Promise<void> {
+		await Promise.all(this.closing);
+	}
 	/**
 	 * Connect once and recover temporary failures within the configured retry limit.
 	 * @returns The shared startup promise, resolved at READY or RESUMED.
@@ -171,6 +204,15 @@ export class GatewayShard {
 	}
 	private connect(): void {
 		if (this.stopped) return;
+		if (this.closing.size >= 32) {
+			this.fail(
+				new GatewayBlockedError(
+					"Too many Gateway sockets have unconfirmed closure.",
+					"GATEWAY_CLOSE_UNKNOWN",
+				),
+			);
+			return;
+		}
 		const generation = ++this.generation;
 		this.controller = new AbortController();
 		this.hello = false;
@@ -198,7 +240,12 @@ export class GatewayShard {
 			socket.onclose = (event) => {
 				if (generation !== this.generation || this.stopped) return;
 				if ([4004, 4010, 4011, 4012, 4013, 4014].includes(event.code)) {
-					this.fail(new Error(`Gateway closed with fatal code ${event.code}`));
+					this.fail(
+						new GatewayBlockedError(
+							`Gateway closed with terminal code ${event.code}`,
+							`GATEWAY_${event.code}`,
+						),
+					);
 					return;
 				}
 				if ([1000, 1001, 4003, 4007, 4009].includes(event.code))
@@ -212,6 +259,10 @@ export class GatewayShard {
 	}
 	private receive(data: unknown, generation: number): void {
 		const packet = decodeFrame(data, this.frameLimit);
+		if (packet.op === Op.Reconnect) {
+			this.retry(new Error("Gateway requested reconnect."), 0);
+			return;
+		}
 		if (packet.op === Op.Hello) {
 			if (this.hello) throw new Error("Received duplicate HELLO.");
 			this.hello = true;
@@ -227,9 +278,6 @@ export class GatewayShard {
 				return;
 			case Op.HeartbeatAck:
 				this.heartbeat.acknowledge();
-				return;
-			case Op.Reconnect:
-				this.retry(new Error("Gateway requested reconnect."), 0);
 				return;
 			case Op.InvalidSession:
 				if (!packet.d) this.resetSession();
@@ -262,7 +310,7 @@ export class GatewayShard {
 				this.sequence = packet.s;
 				if (packet.t === E.Ready || packet.t === E.Resumed) {
 					this.clearHandshake();
-					this.failures = 0;
+					this.readyAt = this.clock.now();
 					this.stateChanged("ready");
 					this.resolveStart?.();
 					this.resolveStart = undefined;
@@ -286,31 +334,34 @@ export class GatewayShard {
 					},
 				});
 			} else {
-				this.stateChanged("identifying");
-				await this.#options.identify(signal);
+				this.stateChanged("waiting_admission");
+				const permit = await this.#options.identify(signal);
 				if (this.stopped || generation !== this.generation || signal.aborted)
 					return;
 				this.callbacks.reset();
 				if (this.stopped || generation !== this.generation) return;
-				this.authenticated = this.send({
-					op: Op.Identify,
-					d: {
-						token: this.#options.token,
-						intents: this.#options.intents,
-						shard: this.shard,
-						presence: this.#options.presence,
-						properties: {
-							os: process.platform,
-							browser: "virello-engine",
-							device: "virello-engine",
+				this.stateChanged("identifying");
+				const write = () =>
+					this.send({
+						op: Op.Identify,
+						d: {
+							token: this.#options.token,
+							intents: this.#options.intents,
+							shard: this.shard,
+							presence: this.#options.presence,
+							properties: {
+								os: process.platform,
+								browser: "virello-engine",
+								device: "virello-engine",
+							},
 						},
-					},
-				});
+					});
+				this.authenticated = permit ? permit.consume(write) : write();
 			}
 			if (!this.stopped && generation === this.generation) this.armTimeout();
 		} catch (error) {
 			if (!signal.aborted && generation === this.generation)
-				this.fail(errorOf(error));
+				this.retry(errorOf(error));
 		}
 	}
 	private send(payload: GatewaySendPayload): boolean {
@@ -353,6 +404,21 @@ export class GatewayShard {
 		this.socket = undefined;
 		if (socket) {
 			socket.onopen = socket.onmessage = socket.onclose = socket.onerror = null;
+			let resolve!: () => void;
+			const closed = new Promise<void>((done) => {
+				resolve = done;
+			});
+			this.closing.add(closed);
+			socket.onclose = () => {
+				this.closing.delete(closed);
+				socket.onclose = null;
+				resolve();
+			};
+			if (socket.readyState === WebSocket.CLOSED) {
+				this.closing.delete(closed);
+				socket.onclose = null;
+				resolve();
+			}
 			try {
 				socket.close(code);
 			} catch {
@@ -363,6 +429,9 @@ export class GatewayShard {
 	private retry(error: Error, wait?: number): void {
 		if (this.stopped) return;
 		if (this.reconnect !== undefined) return;
+		if (this.readyAt !== undefined && this.clock.now() - this.readyAt >= 60000)
+			this.failures = 0;
+		this.readyAt = undefined;
 		if (this.failures++ >= this.maximumFailures) {
 			this.fail(error);
 			return;
@@ -381,8 +450,16 @@ export class GatewayShard {
 		}, backoff);
 	}
 	private fail(error: Error): void {
-		this.stop(error);
-		this.callbacks.failure(error, true);
+		const cause =
+			error instanceof GatewayBlockedError
+				? error
+				: new GatewayBlockedError(error.message, "GATEWAY_RETRY_CIRCUIT", {
+						cause: error,
+					});
+		this.blockedCause = cause;
+		this.stop(cause);
+		this.stateChanged("blocked");
+		this.callbacks.failure(cause, true);
 	}
 	/**
 	 * Permanently stop the shard, cancel timers, abort identification, and reset its session. Repeated calls do nothing.

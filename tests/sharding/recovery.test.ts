@@ -13,7 +13,7 @@ import { fileURLToPath } from "node:url";
 import "./fixtures/contracts";
 import { ShardCoordinator } from "../../src/sharding/coordinator/Coordinator";
 import { ShardManager } from "../../src/sharding/manager/Manager";
-import { frame } from "../../src/sharding/transport/protocol";
+
 import { fixture, logger, sessionLimit, tokenA, until } from "./helpers";
 
 function legacyFiles() {
@@ -38,6 +38,7 @@ function legacyFiles() {
 		bytes: readFileSync(path),
 	}));
 	const options = {
+		development: true,
 		shardCount: 1,
 		workers: [{ id: "a", token: tokenA, shards: [0] }],
 		statePath,
@@ -86,7 +87,7 @@ function manager(url: string, stateDirectory?: string) {
 	return new ShardManager(options);
 }
 
-test("repeated coordinator-first stop/start works with locked legacy state and invalid host files left untouched", async () => {
+test("production restart requires explicit fleet fencing and leaves unrelated legacy files untouched", async () => {
 	const f = legacyFiles();
 	let coordinator = new ShardCoordinator(f.options);
 	let host: ShardManager | undefined;
@@ -95,52 +96,58 @@ test("repeated coordinator-first stop/start works with locked legacy state and i
 		const port = Number(new URL(coordinator.url!).port);
 		host = manager(coordinator.url!, f.stateDirectory);
 		await host.start();
-		for (let cycle = 0; cycle < 3; cycle++) {
-			await until(() => host!.processes[0]?.state === "running");
-			const oldChild = host["children"].get(0)!;
-			const oldSession = [...coordinator["sessions"].values()].find(
-				(session) => session.host.id === "a",
-			)!;
-			const oldSocket = host["socket"];
-			await coordinator.close();
-			// Server shutdown finishes before the remote close event necessarily reaches the supervisor.
-			// Observe maintenance first so the next running state cannot belong to the old connection.
-			await until(
-				() => !host!.isConnected && host!.processes[0]?.state === "maintenance",
-				30000,
-			);
-			expect(oldChild.reconciled).toBe(false);
-			expect(oldChild.process.exitCode).toBeNull();
-			coordinator = new ShardCoordinator({ ...f.options, port });
-			await coordinator.start();
-			await until(
-				() =>
-					host!.isConnected &&
-					host!.processes[0]?.state === "running" &&
-					host!.processes[0].pid === oldChild.process.pid,
-			);
-			expect(host["socket"]).not.toBe(oldSocket);
-			expect(oldChild.reconciled).toBe(true);
-			const newSession = [...coordinator["sessions"].values()].find(
-				(session) => session.host.id === "a",
-			)!;
-			expect(newSession.connectionId).not.toBe(oldSession.connectionId);
-			expect(newSession.ready.get(0)).toBe(oldChild.generation);
-			expect(oldChild.process.exitCode).toBeNull();
-			expect(() => coordinator["receive"](oldSession, frame("ping"))).toThrow(
-				"Stale worker connection",
-			);
-			expect((await host.request(0, "probe", { value: cycle })).value).toBe(
-				cycle,
-			);
-			f.unchanged();
-		}
+		await until(() => host!.processes[0]?.state === "running");
+		const child = host["children"].get(0)!;
+		const term = coordinator.status.coordinatorTerm;
+		await coordinator.close();
+		await until(() => !host!.isConnected);
+		coordinator = new ShardCoordinator({
+			...f.options,
+			development: false,
+			applicationId: "test-app",
+			port,
+		});
+		await coordinator.start();
+		await until(() => host!.isConnected);
+		await Bun.sleep(150);
+		expect(coordinator.status.recoveryRequired).toBe(true);
+		expect(coordinator.status.coordinatorTerm).not.toBe(term);
+		expect(coordinator.status.leasedShards).toEqual([]);
+		expect(child.process.exitCode).toBeNull();
+		expect(host.processes[0].pid).toBe(child.process.pid);
+		await expect(
+			coordinator.confirmFleetStopped(
+				{
+					operationId: "bad",
+					hosts: [],
+					evidence: "not every host is accounted for",
+				},
+				sessionLimit,
+			),
+		).rejects.toMatchObject({ code: "EVIDENCE" });
+		await host.close();
+		expect(child.process.exitCode).not.toBeNull();
+		await coordinator.confirmFleetStopped(
+			{
+				operationId: "fenced",
+				hosts: ["a"],
+				evidence:
+					"test-owned host tree exited; fixture has no external effects",
+			},
+			sessionLimit,
+		);
+		expect(coordinator.status.recoveryRequired).toBe(false);
+		host = manager(coordinator.url!, f.stateDirectory);
+		await host.start();
+		await until(() => host!.processes[0]?.state === "running");
+		expect((await host.request(0, "probe", { value: 1 })).value).toBe(1);
+		f.unchanged();
 	} finally {
 		await host?.close();
 		await coordinator.close();
 		f.remove();
 	}
-}, 60000);
+}, 25000);
 
 test("a new supervisor stays dormant until a confirmed exit releases capacity", async () => {
 	const f = legacyFiles();
@@ -279,16 +286,17 @@ test("an interrupted coordinator restarts on the same port, ignores old files an
 		);
 		processes.push(second);
 		await until(
-			() =>
-				host!.isConnected &&
-				host!.processes[0]?.state === "running" &&
-				host!.processes[0].pid === oldChild.process.pid,
+			() => host!.isConnected && host!.processes[0]?.state === "dormant",
 		);
 		expect(oldChild.process.exitCode).toBeNull();
-		expect((await host.request(0, "probe", { value: 7 })).value).toBe(7);
+		expect(host.processes[0].pid).toBe(oldChild.process.pid);
 		// Restart is not permission to reuse the previous process's session allowance.
-		await expect(host.request(0, "identify", null)).rejects.toThrow();
-		await until(() => host!.processes[0]?.state === "failed");
+		await expect(
+			host.request(0, "identify", null, { timeoutMs: 1500 }),
+		).rejects.toThrow();
+		expect(host.processes[0].pid).toBe(oldChild.process.pid);
+		expect(oldChild.process.exitCode).toBeNull();
+		expect(host.processes[0].state).toBe("dormant");
 		for (const run of processes) {
 			expect(
 				run.messages.filter((message) => message.event === "metadata"),

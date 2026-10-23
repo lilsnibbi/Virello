@@ -1,4 +1,6 @@
 import type { LoggerLike } from "../core/logging/LoggerLike";
+import type { $RestOptions } from "../engine/rest/RestClient";
+import type { ShardAssignment } from "./authority";
 
 /** Add named { input, output } request contracts by augmenting virello. Inputs and outputs must be plain JSON values. */
 export interface ShardRequests {}
@@ -179,6 +181,8 @@ export interface ShardScalingOptions {
 	drainTimeoutMs?: number;
 	/** Deadline in milliseconds for the new topology to become ready (100..3600000). Defaults to 300000. */
 	readyTimeoutMs?: number;
+	/** Continuous Gateway readiness required after a layout change, default 5000ms; 0 is useful for isolated tests. */
+	stabilityMs?: number;
 }
 /** Snapshot of the coordinator’s current scaling phase. */
 export interface ShardScalingStatus {
@@ -193,6 +197,19 @@ export interface ShardScalingStatus {
 }
 /** Coordinator listener, authenticated hosts, and Discord session allowance. */
 export interface ShardCoordinatorOptions {
+	/** Fleet HTTP transport settings. Queues, retries and effect authorization remain coordinator-owned. */
+	rest?: Pick<
+		$RestOptions,
+		"baseURL" | "fetch" | "maxRateLimitRetries" | "timeoutMs"
+	>;
+	/** Stable bot identity used to scope authority. Required outside explicit development mode. */
+	applicationId?: string;
+	/** Skip the recovery gate only for a new isolated loopback test fleet. All state is always memory-only. */
+	development?: boolean;
+	/** Deployment/configuration revision for this coordinator lifetime. Defaults to "initial". */
+	configurationRevision?: string;
+	/** Session starts withheld from normal admission for operator recovery. Default 0. */
+	sessionReserve?: number;
 	/** Initial total Discord shard count (1..4096). Assign each ID exactly once across workers. */
 	shardCount: number;
 	/** Configured supervisor hosts and assignments, not JavaScript Worker threads. */
@@ -227,6 +244,8 @@ export interface ShardRecovery {
 }
 /** Local process supervisor and its connection to one coordinator. */
 export interface ShardManagerOptions {
+	/** Build/config identity carried by every worker incarnation. Defaults to "initial". */
+	deploymentId?: string;
 	/** Host ID matching a configured coordinator worker. */
 	id: string;
 	/** Coordinator ws(s)://host:port/sharding URL, without credentials, query, or fragment. Remote hosts require wss. */
@@ -259,11 +278,11 @@ export interface ShardManagerOptions {
 	startupTimeoutMs?: number;
 	/** Grace period for each shutdown stage in milliseconds (1..300000). Defaults to 5000. */
 	shutdownTimeoutMs?: number;
-	/** Each attempt, including queueing and re-identification; default 120 seconds. */
+	/** Coordinator request ceiling, default 120 seconds. Each fresh IDENTIFY attempt is additionally capped at 15 seconds. */
 	identifyTimeoutMs?: number;
 	/** Dormant assignment polling, default 30 seconds (50..300000ms). */
 	assignmentPollIntervalMs?: number;
-	/** Maximum unreconciled lifetime of an assigned process, default 15 minutes (1..2147483647ms). */
+	/** @deprecated Ignored. Existing ownership survives coordinator contact loss; fresh IDENTIFY waits for authority. */
 	maxDisconnectedLifetimeMs?: number;
 	/** Optional minimum local process pool, including standby capacity. Must fit the host's configured maxShards. */
 	processCount?: number;
@@ -281,6 +300,7 @@ export interface ShardProcessStatus {
 		| "starting"
 		| "running"
 		| "maintenance"
+		| "idle"
 		| "dormant"
 		| "backoff"
 		| "failed"
@@ -299,6 +319,8 @@ export interface ShardRestartOptions {
 	signal?: AbortSignal;
 	/** Await a fresh gateway-ready sample for assigned replacements. Default true; dormant slots only await reconciliation. */
 	waitForReady?: boolean;
+	/** Continuous readiness before advancing to the next slot, default 5000ms (0..300000). */
+	stabilityMs?: number;
 }
 /** Detached progress for the latest explicit restart operation. */
 export interface ShardRestartStatus {
@@ -321,17 +343,50 @@ export interface ShardManagerStatus {
 	readonly shardCount: number;
 	readonly processes: readonly (Readonly<ShardProcessStatus> & {
 		readonly gatewayReady: boolean;
+		readonly applicationReady: boolean;
+		readonly gatewayState: string;
+		readonly blockedCode: string | null;
+		readonly assignment: ShardAssignment | null;
+		readonly reconciled: boolean;
 	})[];
 	readonly restart: ShardRestartStatus | null;
 }
 /** Safe control-plane snapshot. Registered shards are distinct from gateway-ready shards. */
 export interface ShardCoordinatorStatus {
+	/** Every new production incarnation starts in recovery; no state survives restart. */
+	readonly recoveryRequired: boolean;
+	readonly coordinatorTerm: string | null;
+	readonly admission: {
+		readonly remaining: number;
+		readonly unresolved: number;
+		readonly credentialBlocked: boolean;
+		readonly fault: string | null;
+	};
+	readonly assignments: readonly {
+		readonly assignment: ShardAssignment;
+		readonly phase: "owned" | "draining" | "release_unknown";
+		readonly releaseOperationId: string | null;
+	}[];
+	readonly http: {
+		readonly pending: number;
+		readonly queuedBytes: number;
+		readonly inFlight: number;
+		readonly credentialBlocked: boolean;
+	} | null;
+	readonly transition: {
+		readonly id: string;
+		readonly phase: "draining" | "starting" | "degraded";
+		readonly count: number;
+		readonly placements: Readonly<Record<string, string>>;
+		readonly reason: string;
+	} | null;
 	readonly listening: boolean;
 	readonly closed: boolean;
 	readonly shardCount: number;
 	readonly pendingCount: number;
 	readonly leasedShards: readonly number[];
 	readonly gatewayReadyShards: readonly number[];
+	readonly applicationReadyShards: readonly number[];
 	readonly workers: readonly {
 		readonly id: string;
 		readonly connected: boolean;

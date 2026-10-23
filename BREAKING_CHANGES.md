@@ -196,38 +196,35 @@ handler limits do not include all framework listeners.
   `Tasks`, `ShardRequests`, and `DetailedDescriptionCommandObject` remain
   augmentable interfaces.
 
-## Shard maintenance and coordinator reconciliation
+## Shard authority and fleet admission
 
-- Upgrade coordinator, hosts and children together. The internal protocol now
-  authenticates per-process leases and acknowledges assignment application.
-- Coordinator loss retains children and Discord sessions in `client.maintenance`,
-  with a default fifteen-minute unreconciled outage cutoff. `reconnect: false`
-  retains its explicit stop-on-loss behavior.
-- Fixed shard totals remain the default. `workers[].shards` are initial placement
-  preferences; leases decide ownership. Distinct authenticated supervisor
-  instances can connect together; duplicate sockets for one instance are refused.
-- Disconnected leases remain reserved during the coordinator lifetime until the
-  owner confirms exit/release. A new supervisor does not prove old children died.
-  Restarting the coordinator rebuilds slots without a global grace period, which
-  can allow overlapping old and replacement Discord sessions until recovery or
-  the outage cutoff. There is no zero-duplicate-processing guarantee.
-- Processes without capacity remain dormant, with no Discord session and
-  `client.sharding.id === null`. They poll every thirty seconds by default.
-  `login()` and transport-only `sharding.connect()` wait for the first assignment.
-- Changed totals close the old gateway before reconnecting, even for the same ID.
-  Assignment changes reset native entity caches and gateway resume data,
-  preserving the client, modules and application listeners. Extension login hooks
-  run once; Discord ready events may repeat.
-- `ShardProcessStatus.shard` is nullable. `slot` identifies the local process
-  position; `maintenance` and `dormant` are new states. Slots are not Discord IDs.
-- Coordinator calls fail immediately by default. Use
-  `{ waitForCoordinator: true, timeoutMs }` for a bounded wait. Broadcasts share
-  one deadline across waiting and all targets. Dispatched calls are never replayed.
-- Configure `assignmentPollIntervalMs`, `maxDisconnectedLifetimeMs`, and optionally
-  a minimum standby `processCount` on `ShardManager`. Existing crash/backoff and
-  opt-in automatic scaling policies remain. Reservations belonging to disconnected
-  instances block scaling until reconciled or released.
+- Upgrade coordinator, hosts and workers together; the internal control protocol
+  now checks coordinator/connection incarnations and exact assignment identities.
+- All coordinator state is memory-only, including Bun SQL's in-memory operation
+  history. Every production start requires a stable applicationId and an explicit
+  confirmFleetStopped attestation after process-tree fencing and effect review.
+  Empty state never authorizes adopting or replacing potentially live owners.
+- Coordinator contact loss keeps existing Gateway sessions and local RESUME
+  working. Fresh IDENTIFY waits for authority. maxDisconnectedLifetimeMs is ignored;
+  reconnect:false retains workers instead of killing them.
+- One process still owns one shard. Unassigned workers stay dormant. Idle closes
+  one Gateway while retaining its lease; releaseProcess also relinquishes the lease
+  after an application onRelease barrier, actual Gateway closure and HTTP drain.
+  Unknown release retains the reservation.
+- Terminal Gateway errors and retry exhaustion block Gateway activity while the
+  process stays inspectable. Credential failures open a fleet-wide circuit.
+- IDENTIFY permits are one-shot and charged before delivery. Unknown sends retain
+  their bucket; socket-write outcome receipts, not READY, control cooldown.
+- Managed native REST now uses a separate fleet HTTP scheduler. Configure botToken
+  on the coordinator. Do not bypass it with independent bot-token clients.
+  Mutation operation IDs, ordering keys and unknown-outcome quarantine last only
+  for this coordinator incarnation; external business idempotency remains yours.
+- Process state, reconciliation, Gateway state and application readiness are
+  distinct. Restarts preflight replacement/rollback budget and wait for stable
+  readiness. Cold layout changes confirm old exits and HTTP drain before commit.
+- Existing typed RPC and partial-result stats remain bounded. IPC now has receipt
+  credits in addition to frame limits. Dispatched RPC is never replayed on timeout.
 
-Disk-backed ownership remains removed. No state migration is needed. See
-[shard recovery](docs/sharding-recovery.md) for the full contract and supervision
-boundary.
+No state files are migrated, created or removed. See
+[recovery and limitations](docs/sharding-recovery.md),
+[fleet HTTP](docs/sharding-rest.md) and [operations](docs/sharding-operations.md).

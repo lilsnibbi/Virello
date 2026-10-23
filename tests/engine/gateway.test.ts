@@ -181,8 +181,8 @@ describe("GatewayShard", () => {
 		test(`fatal close ${code} rejects startup and cancels timers`, async () => {
 			const h = harness();
 			h.sockets[0].disconnect(code);
-			await expect(h.started).rejects.toThrow(`fatal code ${code}`);
-			expect(h.shard.state).toBe("closed");
+			await expect(h.started).rejects.toThrow(`terminal code ${code}`);
+			expect(h.shard.state).toBe("blocked");
 			expect(h.clock.pending).toBe(0);
 			expect(h.failures.at(-1)?.fatal).toBe(true);
 		});

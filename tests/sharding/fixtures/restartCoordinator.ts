@@ -21,6 +21,7 @@ globalThis.fetch = Object.assign(
 );
 // Deliberately retain obsolete untyped configuration: it must not open or modify legacy files.
 const options = {
+	development: true,
 	shardCount: 1,
 	workers: [{ id: "a", token: tokenA, shards: [0] }],
 	port: Number(Bun.argv[2]),

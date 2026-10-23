@@ -11,6 +11,10 @@ import {
 	type Op,
 } from "../../src/sharding/transport/protocol";
 import { Socket } from "../../src/sharding/transport/socket";
+import {
+	assignmentSchema,
+	type ShardAssignment,
+} from "../../src/sharding/authority";
 import { stack, tokenA, tokenB, until } from "./helpers";
 
 const stacks: Awaited<ReturnType<typeof stack>>[] = [];
@@ -69,10 +73,22 @@ async function peer(
 		perMessageDeflate: false,
 	});
 	const messages: Frame[] = [];
+	const assignments = new Map<number, ShardAssignment>();
 	let closed = false;
-	socket.addEventListener("message", (event) =>
-		messages.push(JSON.parse(event.data)),
-	);
+	socket.addEventListener("message", (event) => {
+		const message: Frame = JSON.parse(event.data);
+		messages.push(message);
+		if (
+			message.op === "reply" &&
+			message.data.ok &&
+			typeof message.data.value === "object" &&
+			message.data.value !== null &&
+			"assignment" in message.data.value
+		) {
+			const identity = assignmentSchema.assert(message.data.value.assignment);
+			assignments.set(identity.shardId, identity);
+		}
+	});
 	socket.addEventListener("close", () => {
 		closed = true;
 	});
@@ -91,7 +107,9 @@ async function peer(
 			1,
 		)[0] as Frame<K>;
 	};
-	await next("welcome");
+	const welcome = await next("welcome");
+	const wire = (message: Frame) =>
+		encode({ ...message, session: welcome.session, term: welcome.term }, 65536);
 	return {
 		socket,
 		instance,
@@ -104,18 +122,23 @@ async function peer(
 			data: Record<string, unknown> = {},
 			id: string = crypto.randomUUID(),
 		) {
+			if (op === "identify")
+				data = {
+					...data,
+					attemptId: id,
+					assignment: assignments.get(Number(data.shard)),
+				};
 			if (op === "ready")
 				socket.send(
-					encode(
+					wire(
 						frame("lease", undefined, {
-							previous: data.shard,
+							previous: null,
 							generation: data.generation,
 							preferred: data.shard,
 						}),
-						65536,
 					),
 				);
-			socket.send(encode(frame(op, id, data), 65536));
+			socket.send(wire(frame(op, id, data)));
 			return id;
 		},
 		async close() {
@@ -141,6 +164,7 @@ for (const level of ["info", "debug"] as const) {
 				env: {
 					...process.env,
 					DISCORD_TOKEN: "fixture-discord-credential-do-not-use",
+					DISCORD_APPLICATION_ID: "fixture-app",
 					SHARD_HOST_ID: "a",
 					SHARD_HOST_TOKEN: tokenA,
 					SHARD_WORKERS: "",
@@ -154,7 +178,7 @@ for (const level of ["info", "debug"] as const) {
 					VIRELLO_LOG_STACKS: "off",
 					VIRELLO_TEST_CONTROL_SHUTDOWN: "1",
 				},
-				stdin: "ignore",
+				stdin: "pipe",
 				stdout: "pipe",
 				stderr: "pipe",
 				windowsHide: true,
@@ -194,6 +218,22 @@ for (const level of ["info", "debug"] as const) {
 			const listening = records().find(
 				(record) => record.event === "listening",
 			)!;
+			await until(() =>
+				records().some((record) => record.event === "recovery_required"),
+			);
+			const recovery = records().find(
+				(record) => record.event === "recovery_required",
+			)!;
+			child.stdin.write(
+				JSON.stringify({
+					operationId: recovery.context!.operationId,
+					hosts: ["a"],
+					evidence: "isolated fixture; no prior host trees or external effects",
+				}) + "\n",
+			);
+			await until(() =>
+				records().some((record) => record.event === "recovery_confirmed"),
+			);
 			host = await peer(`ws://127.0.0.1:${listening.context!.port}/sharding`);
 			host.send("ready", { shard: 0, generation: "fixture-generation" });
 			const ping = host.send("ping");
@@ -219,7 +259,11 @@ for (const level of ["info", "debug"] as const) {
 				ok: true,
 				value: "fixture-sensitive-result",
 			});
-			host.send("offline", { shard: 0, generation: "fixture-generation" });
+			const offline = host.send("offline", {
+				shard: 0,
+				generation: "fixture-generation",
+			});
+			await host.next("reply", offline);
 			const release = host.send("release");
 			await host.next("released", release);
 			await host.close();

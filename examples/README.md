@@ -38,7 +38,7 @@ setup uses two shards so you can try cross-process calls; `SHARD_COUNT=1` works.
    Copy-Item examples/.env.example examples/.env
    ```
 
-2. Set `DISCORD_TOKEN`. Generate a **separate** host secret:
+2. Set `DISCORD_TOKEN` and `DISCORD_APPLICATION_ID`. Generate a **separate** host secret:
 
    ```sh
    bun -e "console.log(crypto.randomUUID() + crypto.randomUUID())"
@@ -56,11 +56,25 @@ setup uses two shards so you can try cross-process calls; `SHARD_COUNT=1` works.
    bun --env-file=examples/.env examples/coordinator.ts
    ```
 
-5. Once it accepts host connections, start the host in another terminal:
+5. The coordinator starts with admission blocked. Stop/fence every prior host
+   process tree and reconcile external effects. In its terminal, submit one JSON
+   line using the fresh `operationId` and host IDs printed by `recovery_required`:
 
-   ```sh
-   bun --env-file=examples/.env examples/host.ts
-   ```
+```json
+{
+	"operationId": "copy-current-id",
+	"hosts": ["local"],
+	"evidence": "verified prior host trees stopped and external effects reconciled"
+}
+```
+
+Do this deliberately for each incarnation; never save confirmation in a restart
+script. The coordinator waits 5.5 seconds and refreshes Discord limits. Wait for
+`recovery_confirmed`, then start the host in another terminal:
+
+```sh
+bun --env-file=examples/.env examples/host.ts
+```
 
 The host launches `bot.ts`. Do not launch it separately or set
 `VIRELLO_SHARD` manually. Wait for registration/readiness logs before trying
@@ -91,7 +105,7 @@ the commands.
 
 Restart the host after changing code. Stop the host before the coordinator for
 normal shutdown. See [maintenance and recovery](../docs/sharding-recovery.md)
-for outages, dormant slots and retained sessions.
+for outages, dormant slots and gateway reconnection in retained processes.
 
 Changing `DEV_GUILD_ID` does not delete commands from their old scope.
 To clear **all global commands and all commands in the configured dev guild**,
@@ -109,6 +123,7 @@ the example commands again.
 | Variable                           | Default / purpose                                                    |
 | ---------------------------------- | -------------------------------------------------------------------- |
 | `DISCORD_TOKEN`                    | Required for live runs; same bot on coordinator and hosts            |
+| `DISCORD_APPLICATION_ID`           | Required stable bot application identity on coordinator              |
 | `DEV_GUILD_ID`                     | Blank: global commands                                               |
 | `SHARD_COUNT`                      | `2`; initial total                                                   |
 | `SHARD_HOST_ID`                    | `local`                                                              |
@@ -116,7 +131,6 @@ the example commands again.
 | `SHARD_COORDINATOR_URL`            | `ws://127.0.0.1:8080/sharding`                                       |
 | `SHARD_COORDINATOR_HOST` / `PORT`  | `127.0.0.1` / `8080`; port `0` picks a free port                     |
 | `SHARD_ASSIGNMENT_POLL_MS`         | `30000`; dormant slot polling                                        |
-| `SHARD_MAX_DISCONNECTED_MS`        | `900000`; assigned outage cutoff                                     |
 | `SHARD_WORKERS`                    | Optional JSON array of host IDs, secrets, shard lists and capacities |
 | `SHARD_SCALING`                    | Blank: fixed mode; JSON opts into scaling                            |
 | `SHARD_HOST_MAX_SHARDS`            | Capacity for the simple host configuration; required for scaling     |

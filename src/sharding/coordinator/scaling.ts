@@ -26,6 +26,7 @@ export class ScalingPolicy {
 			sessionReserve: 0,
 			drainTimeoutMs: 30000,
 			readyTimeoutMs: 300000,
+			stabilityMs: 5000,
 			...options,
 		};
 		type({
@@ -40,6 +41,7 @@ export class ScalingPolicy {
 			sessionReserve: "number.integer >= 0 & number <= 1000000",
 			drainTimeoutMs: "number.integer >= 100 & number <= 300000",
 			readyTimeoutMs: "number.integer >= 100 & number <= 3600000",
+			stabilityMs: "number.integer >= 0 & number <= 300000",
 			"+": "reject",
 		}).assert(this.options);
 		if (this.options.minShards > this.options.maxShards)

@@ -57,6 +57,22 @@ Set `VIRELLO_TEST_REDIS_URL` first. CI requires zero skipped tests, frozen
 dependencies, type/lint/format checks, examples and package/export validation.
 [The workflow](../.github/workflows/ci.yml) defines the current release gates.
 
+## Local package artifacts
+
+`bun scripts/package.ts <output-directory>` prepares `@virello/builders` and
+`virello` tarballs without installing or publishing them. Both artifacts use the
+umbrella manifest's version, and the umbrella depends on that exact builders
+version. The workspace's source manifests and lockfile remain unchanged.
+Retained Apache/MIT licenses and modification notices travel with the builders.
+The focused `tests/integration/packages.test.ts` checks the actual archive
+contents and imports from separate consumers.
+
+The release workflow still needs to adopt these artifacts and order builders
+before the umbrella; it is not changed by this work. Publishing remains a
+separate operation. A further engine/sharding package split is not selected:
+the native engine and sharding implementations remain in `virello`, with their
+supported `virello/engine` and `virello/sharding` imports.
+
 ## Prepare a change
 
 - [ ] Keep unrelated work out of the diff.

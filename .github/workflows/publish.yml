@@ -16,13 +16,13 @@ on:
         type: string
 permissions: {}
 concurrency:
-  group: npm-publish-${{ inputs.tag_name || github.event.release.tag_name }}
+  group: npm-publish
   cancel-in-progress: false
 jobs:
   publish:
-    name: Publish package
-    if: ${{ github.event_name != 'workflow_dispatch' ||
-      github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    name: Publish synchronized packages
+    if: ${{ github.repository == 'lilsnibbi/Virello' &&
+      (github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/main') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     environment: prod
@@ -30,32 +30,39 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - name: Verify manually selected published release
-        if: ${{ github.event_name == 'workflow_dispatch' }}
+      - name: Initialize token-free npm configuration
+        run: |
+          touch "$RUNNER_TEMP/virello-npmrc" "$RUNNER_TEMP/virello-global-npmrc"
+          echo "NPM_CONFIG_USERCONFIG=$RUNNER_TEMP/virello-npmrc" >> "$GITHUB_ENV"
+          echo "NPM_CONFIG_GLOBALCONFIG=$RUNNER_TEMP/virello-global-npmrc" >> "$GITHUB_ENV"
+      - name: Verify published stable release
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          RELEASE_TAG: ${{ inputs.tag_name }}
+          RELEASE_TAG: ${{ inputs.tag_name || github.event.release.tag_name }}
         run: |
+          [[ "$RELEASE_TAG" =~ ^v?(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]
           encoded_tag=$(jq -rn --arg tag "$RELEASE_TAG" '$tag | @uri')
           release=$(gh api "repos/$GH_REPO/releases/tags/$encoded_tag")
           test "$(jq -r .tag_name <<<"$release")" = "$RELEASE_TAG"
           test "$(jq -r .draft <<<"$release")" = false
+          test "$(jq -r .prerelease <<<"$release")" = false
           published_at=$(jq -r .published_at <<<"$release")
           test -n "$published_at" && test "$published_at" != null
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1, Node 24
         with:
           ref: ${{ inputs.tag_name || github.event.release.tag_name }}
           persist-credentials: false
+          fetch-depth: 0
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0, Node 24
         with:
           node-version: "24.22.1"
-          registry-url: https://registry.npmjs.org
           package-manager-cache: false
-      - name: Verify release version
+      - name: Verify release version and ancestry
         env:
           RELEASE_TAG: ${{ inputs.tag_name || github.event.release.tag_name }}
         run: |
+          git merge-base --is-ancestor HEAD origin/main
           expected_version=$(node -p "require('./package.json').version")
           case "$RELEASE_TAG" in
             "$expected_version"|"v$expected_version") ;;
@@ -65,17 +72,17 @@ jobs:
               ;;
           esac
           npm --version
-      - name: Skip an already published version
-        id: check_published
+      - name: Install the locked Bun canary release tool
         run: |
-          package_name=$(node -p "require('./package.json').name")
-          package_version=$(node -p "require('./package.json').version")
-          if npm view "$package_name@$package_version" version >/dev/null 2>&1; then
-            echo "$package_name@$package_version is already published"
-            echo "published=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "published=false" >> "$GITHUB_OUTPUT"
-          fi
-      - name: Publish package with npm trusted publishing
-        if: ${{ steps.check_published.outputs.published != 'true' }}
-        run: npm publish --access public
+          npm ci --prefix scripts/release-tools --no-audit --no-fund
+          echo "$GITHUB_WORKSPACE/scripts/release-tools/node_modules/.bin" >> "$GITHUB_PATH"
+      - name: Verify locked dependencies and shared versions
+        run: |
+          bun install --frozen-lockfile --ignore-scripts
+          bun release:check
+          git diff --exit-code -- package.json packages bun.lock
+      - name: Pack and verify public packages
+        run: bun release:pack
+      - name: Publish packages with npm trusted publishing
+        # Uses npm publish --access public on the verified Bun tarballs, dependency first.
+        run: bun scripts/release.ts publish

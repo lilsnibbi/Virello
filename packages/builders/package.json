@@ -6,7 +6,7 @@
 	"license": "MIT AND Apache-2.0",
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/lilsnibbi/virello.git",
+		"url": "https://github.com/lilsnibbi/Virello.git",
 		"directory": "packages/builders"
 	},
 	"exports": {
@@ -33,6 +33,7 @@
 		"zod": "^4.5.4"
 	},
 	"publishConfig": {
-		"access": "public"
+		"access": "public",
+		"registry": "https://registry.npmjs.org"
 	}
 }

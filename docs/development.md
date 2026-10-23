@@ -56,6 +56,8 @@ bun scripts/ci.ts
 Set `VIRELLO_TEST_REDIS_URL` first. CI requires zero skipped tests, frozen
 dependencies, type/lint/format checks, examples and package/export validation.
 [The workflow](../.github/workflows/ci.yml) defines the current release gates.
+See [npm releases](releasing.md) for shared versioning, laptop bootstrap and
+per-package trusted-publisher setup.
 
 ## Prepare a change
 

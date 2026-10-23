@@ -32,6 +32,13 @@ type Manifest = {
 	files: string[];
 } & Partial<Record<(typeof groups)[number], Record<string, string>>>;
 const json = (file: string) => JSON.parse(readFileSync(file, "utf8"));
+// Manifest paths and tar entries use forward slashes on every platform.
+const packagePath = (file: string) => file.replaceAll("\\", "/");
+const scanFiles = (pattern: string, cwd: string, dot = false) =>
+	Array.from(
+		new Bun.Glob(pattern).scanSync({ cwd, dot, onlyFiles: true }),
+		packagePath,
+	);
 const paths: string[] = json(join(root, "release-packages.json"));
 const packages = paths.map((path) => ({
 	path,
@@ -94,7 +101,7 @@ if (names.size !== packages.length || new Set(paths).size !== paths.length)
 	throw new Error("Duplicate release package.");
 const publicPaths = [
 	".",
-	...Array.from(new Bun.Glob("packages/*/package.json").scanSync({ cwd: root }))
+	...scanFiles("packages/*/package.json", root)
 		.filter((file) => !json(join(root, file)).private)
 		.map((file) => file.slice(0, -"/package.json".length)),
 ];
@@ -178,11 +185,7 @@ if (command === "pack") {
 		for (const file of ["bun.lock", ".gitignore"])
 			if (existsSync(join(root, file)))
 				cpSync(join(root, file), join(staging, file));
-		for (const file of new Bun.Glob("**/*").scanSync({
-			cwd: staging,
-			dot: true,
-			onlyFiles: true,
-		}))
+		for (const file of scanFiles("**/*", staging, true))
 			chmodSync(join(staging, file), 0o644);
 		for (const pkg of packages) {
 			const tarball = join(
@@ -201,7 +204,9 @@ if (command === "pack") {
 				],
 				join(staging, pkg.path),
 			);
-			const entries = new Set(run(["tar", "-tzf", tarball]).split("\n"));
+			const entries = new Set(
+				run(["tar", "-tzf", tarball]).split(/\r?\n/).map(packagePath),
+			);
 			const packed = JSON.parse(
 				run(["tar", "-xOf", tarball, "package/package.json"]),
 			) as Manifest;
@@ -214,16 +219,13 @@ if (command === "pack") {
 					entry.types,
 					entry.bun,
 				]),
-				...new Bun.Glob("src/**").scanSync({
-					cwd: pkg.directory,
-					onlyFiles: true,
-				}),
+				...scanFiles("src/**", pkg.directory),
 				...pkg.manifest.files.filter(
 					(file) => !["src", "docs", "examples"].includes(file),
 				),
 			];
 			for (const file of required) {
-				if (!entries.has(`package/${file.replace(/^\.\//, "")}`))
+				if (!entries.has(`package/${packagePath(file).replace(/^\.\//, "")}`))
 					throw new Error(`Missing packed file in ${pkg.path}: ${file}`);
 			}
 			for (const entry of entries) {

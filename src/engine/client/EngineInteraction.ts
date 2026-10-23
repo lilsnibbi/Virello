@@ -19,6 +19,8 @@ export type $InteractionReplyState =
 /** Uses native callback bodies and prevents concurrent initial responses. */
 export class EngineInteraction {
 	private current: $InteractionReplyState = "unanswered";
+	private readonly receivedAt = performance.now();
+	private attempts = 0;
 	/**
 	 * Wrap a native interaction with initial-response tracking.
 	 * @param data - Native interaction payload.
@@ -71,6 +73,11 @@ export class EngineInteraction {
 			throw new Error(
 				"Interaction initial response is already pending or consumed.",
 			);
+		const deadlineMs = Math.floor(2500 - (performance.now() - this.receivedAt));
+		if (deadlineMs <= 0)
+			throw new Error(
+				"Initial interaction callback deadline elapsed; acknowledge before slow work.",
+			);
 		this.current = "pending";
 		try {
 			await this.rest.request({
@@ -79,6 +86,8 @@ export class EngineInteraction {
 				body,
 				files,
 				auth: false,
+				deadlineMs,
+				operationId: `interaction:${this.data.id}:${++this.attempts}`,
 			});
 			this.current = "answered";
 		} catch (error) {

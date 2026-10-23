@@ -71,11 +71,12 @@ client.sharding.handle("crash", () => process.exit(42));
 client.sharding.handle("oversized", () => "x".repeat(100000));
 client.sharding.handle("lossy", () => ({ value: undefined }));
 client.sharding.handle("hung", () => new Promise<null>(() => {}));
-client.sharding.handle("identify", async () => {
-	await client.options.waitForIdentify!(
+client.sharding.handle("identify", async (_input, context) => {
+	const permit = await client.options.waitForIdentify!(
 		client.sharding.id!,
-		new AbortController().signal,
+		context.signal,
 	);
+	permit?.consume(() => true);
 	const at = Date.now();
 	client.sharding.identified();
 	return { at, hooked: !!client.options.waitForIdentify };
@@ -86,10 +87,11 @@ if (
 ) {
 	// Exercise VirelloClient.login and the actual installed throttler, replacing only Discord network connection.
 	Reflect.set(client, "openGateway", async () => {
-		await client.options.waitForIdentify!(
+		const permit = await client.options.waitForIdentify!(
 			client.sharding.id!,
 			new AbortController().signal,
 		);
+		permit?.consume(() => true);
 		if (process.env.SHARD_TEST_MODE === "scaling") loggedIn = true;
 		client.emit("shardReady", client.sharding.id!);
 		return "offline-test-placeholder";

@@ -39,6 +39,7 @@ async function cluster(
 		{ preconnect: originalFetch.preconnect },
 	);
 	const coordinator = new ShardCoordinator({
+		development: true,
 		shardCount: 1,
 		port: 0,
 		botToken: "synthetic-offline-token",
@@ -53,6 +54,7 @@ async function cluster(
 			cooldownMs: 60000,
 			drainTimeoutMs: 1000,
 			readyTimeoutMs: 15000,
+			stabilityMs: 0,
 			...scaling,
 		},
 	});
@@ -295,7 +297,7 @@ test("a disconnect after commit rolls forward on welcome; stale sessions cannot 
 					guilds: 1,
 				}),
 			),
-		).toThrow("Stale");
+		).toThrow("obsolete control session");
 		expect(c.managers.every((manager) => manager.shardCount === 2)).toBe(true);
 	} finally {
 		await c.close();
@@ -341,6 +343,7 @@ test("closing during drain cancels the transition and clears pending work and th
 
 test("polling evaluates automatically, reschedules after completion and stops scheduling on close", async () => {
 	const coordinator = new ShardCoordinator({
+		development: true,
 		shardCount: 1,
 		botToken: "fake",
 		logger,
@@ -379,6 +382,7 @@ test("polling evaluates automatically, reschedules after completion and stops sc
 test("automatic plans validate identify queue capacity and reconnect frame size before draining", async () => {
 	const create = (limits = {}) =>
 		new ShardCoordinator({
+			development: true,
 			shardCount: 1,
 			botToken: "fake",
 			logger,
@@ -408,6 +412,7 @@ test("automatic plans validate identify queue capacity and reconnect frame size 
 
 test("automatic options are opt-in and protocol metrics are bounded", async () => {
 	const fixed = new ShardCoordinator({
+		development: true,
 		shardCount: 1,
 		workers: [{ id: "a", token: tokenA, shards: [0] }],
 		sessionStartLimit: sessionLimit,
@@ -417,6 +422,7 @@ test("automatic options are opt-in and protocol metrics are bounded", async () =
 	expect(
 		() =>
 			new ShardCoordinator({
+				development: true,
 				shardCount: 1,
 				workers: [],
 				sessionStartLimit: sessionLimit,
@@ -426,6 +432,7 @@ test("automatic options are opt-in and protocol metrics are bounded", async () =
 	expect(
 		() =>
 			new ShardCoordinator({
+				development: true,
 				shardCount: 1,
 				workers: [{ id: "a", token: tokenA, shards: [0] }],
 				botToken: "fake",

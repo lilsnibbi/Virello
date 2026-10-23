@@ -81,6 +81,15 @@ export abstract class DiscordRuntime extends EventEmitter<ClientEvents> {
 	get ping(): number | null {
 		return this.native?.ping ?? null;
 	}
+	get gatewayState() {
+		return this.native?.state ?? "idle";
+	}
+	get gatewayFailure() {
+		return this.native?.gatewayFailure;
+	}
+	blockGateway(code: string): void {
+		this.native?.blockGateway(code);
+	}
 	isReady(): boolean {
 		return this.native?.state === "ready" && this.user !== null;
 	}
@@ -106,7 +115,7 @@ export abstract class DiscordRuntime extends EventEmitter<ClientEvents> {
 							this.options.onError?.(failure);
 							this.emit("error", failure.error);
 						} finally {
-							if (failure.fatal)
+							if (failure.fatal && failure.source !== "gateway")
 								void client
 									.destroy()
 									.catch((error: unknown) => fallbackLogger().error(error));
@@ -161,6 +170,15 @@ export abstract class DiscordRuntime extends EventEmitter<ClientEvents> {
 		}
 		await this.native.connect();
 		return this.#credential!;
+	}
+	/** Await actual closure of retired Gateway sockets. */
+	waitForGatewayClose(): Promise<void> {
+		return this.native?.waitForGatewayClose() ?? Promise.resolve();
+	}
+	/** Await retired sockets and tracked native event handlers after application quiescence. */
+	async waitForRelease(): Promise<void> {
+		await this.waitForGatewayClose();
+		await this.native?.idle();
 	}
 	/** Retire the old session immediately, preserving REST, modules and listeners. */
 	reassignGateway(shard: readonly [number, number] | null): void {

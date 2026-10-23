@@ -1,5 +1,6 @@
 import type { VirelloClient } from "../../core/client/VirelloClient";
 import { ShardError } from "../types";
+import { GatewayBlockedError } from "../../engine/gateway/GatewayShard";
 
 /** Reconcile native gateway assignments while retaining modules, REST and application listeners. */
 export class ManagedGateway {
@@ -10,21 +11,32 @@ export class ManagedGateway {
 	private closed = false;
 	private running?: Promise<string>;
 	private attempt?: Promise<unknown>;
+	private changed?: () => void;
 	public constructor(
 		private readonly client: VirelloClient,
 		private readonly waitForAssignment: () => Promise<void>,
 		private readonly fail: (error: unknown) => void,
 	) {}
+	/** Revoke gateway authority immediately; keep the client available for a later assignment. */
+	public suspend(): void {
+		if (this.closed) return;
+		this.revision++;
+		this.changed?.();
+		this.assignment = undefined;
+		this.client.reassignGateway(null);
+	}
 	public async reconcile(shard: number | null, count: number): Promise<void> {
 		if (
 			this.closed ||
 			(this.assignment?.shard === shard && this.assignment.count === count)
 		)
 			return;
-		this.revision++;
+		const revision = ++this.revision;
+		this.changed?.();
 		this.client.reassignGateway(shard === null ? null : [shard, count]);
+		await this.client.waitForGatewayClose();
 		await this.attempt?.catch(() => {});
-		if (this.closed) return;
+		if (this.closed || revision !== this.revision) return;
 		this.assignment = { shard, count };
 	}
 	public start(token?: string): Promise<string> {
@@ -41,6 +53,7 @@ export class ManagedGateway {
 	}
 	public stop(): void {
 		this.closed = true;
+		this.changed?.();
 		this.revision++;
 		this.client.reassignGateway(null);
 	}
@@ -51,10 +64,12 @@ export class ManagedGateway {
 	}
 	private async open(): Promise<string> {
 		while (!this.closed) {
+			const revision = this.revision;
 			await this.waitForAssignment();
 			if (this.closed) break;
+			if (revision !== this.revision || this.assignment?.shard == null)
+				continue;
 			if (this.onlineRevision === this.revision) return this.token!;
-			const revision = this.revision;
 			const attempt = this.client.openGateway(this.token);
 			this.attempt = attempt;
 			try {
@@ -64,7 +79,14 @@ export class ManagedGateway {
 					return this.token!;
 				}
 			} catch (error) {
-				if (revision === this.revision && !this.closed) throw error;
+				if (revision === this.revision && !this.closed) {
+					if (!(error instanceof GatewayBlockedError)) throw error;
+					// Keep managed startup pending and IPC live. Only explicit reassignment/replacement permits recovery.
+					await new Promise<void>((resolve) => {
+						this.changed = resolve;
+					});
+					this.changed = undefined;
+				}
 			} finally {
 				if (this.attempt === attempt) this.attempt = undefined;
 			}

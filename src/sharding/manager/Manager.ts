@@ -4,6 +4,11 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Logger } from "@lilsnibbi/logger";
 import { type } from "arktype";
+import {
+	assignmentSchema,
+	sameAssignment,
+	type ShardAssignment,
+} from "../authority";
 import { createConsoleLogger } from "../../core/logging/console";
 import { writeEvent } from "../../core/logging/diagnostics";
 import { ShardMessenger } from "../messaging";
@@ -11,6 +16,7 @@ import { freezeSnapshot } from "../lifecycle";
 import { RestartDeadline } from "./RestartDeadline";
 import { Availability } from "../transport/availability";
 import { Pending } from "../transport/pending";
+import { IpcWindow } from "../transport/IpcWindow";
 import {
 	decode,
 	encode,
@@ -38,6 +44,7 @@ import {
 } from "../types";
 
 interface Child {
+	delivery: IpcWindow;
 	slot: number;
 	preferred: number;
 	shard: number | null;
@@ -49,12 +56,18 @@ interface Child {
 	intentional: boolean;
 	ready: boolean;
 	gatewayReady: boolean;
+	applicationReady?: boolean;
 	metricsAt: number;
+	gatewayState?: string;
+	blockedCode?: string;
 	requests: Map<string, AbortController>;
 	controls: Pending;
 	reconciled: boolean;
+	revision: number;
+	authority?: string;
+	assignment?: ShardAssignment;
+	releaseOperationId?: string;
 	reconciling?: Promise<void>;
-	outage?: ReturnType<typeof setTimeout>;
 	stop?: Promise<void>;
 	startup?: ReturnType<typeof setTimeout>;
 }
@@ -70,6 +83,8 @@ export class ShardManager extends ShardMessenger<ShardManagerEvent> {
 	private policy: Limits = limits();
 	private count = 0;
 	private socket?: NativeSocket;
+	private controlSession?: string;
+	private coordinatorTerm?: string;
 	private connected = false;
 	private draining = false;
 	private transition?: {
@@ -81,6 +96,8 @@ export class ShardManager extends ShardMessenger<ShardManagerEvent> {
 	private closed = false;
 	private readonly lifecycle = new AbortController();
 	private readonly children = new Map<number, Child>();
+	private readonly idleSlots = new Set<number>();
+	private processControl?: number;
 	private manualRestart?: { slots: Set<number>; abort: AbortController };
 	private latestRestart: ShardRestartStatus | null = null;
 	private readonly statuses = new Map<number, ShardProcessStatus>();
@@ -108,7 +125,6 @@ export class ShardManager extends ShardMessenger<ShardManagerEvent> {
 	private readonly shutdownMs: number;
 	private readonly identifyMs: number;
 	private readonly pollMs: number;
-	private readonly disconnectedMs: number;
 	private get logger() {
 		return this.options.logger ?? (this.ownedLogger ??= createConsoleLogger());
 	}
@@ -136,6 +152,7 @@ export class ShardManager extends ShardMessenger<ShardManagerEvent> {
 			"cwd?": "string",
 		}).assert(options);
 		identifier.assert(options.id);
+		identifier.assert(options.deploymentId ?? "initial");
 		validateToken(options.token);
 		const url = new URL(options.url);
 		if (
@@ -204,11 +221,11 @@ export class ShardManager extends ShardMessenger<ShardManagerEvent> {
 		this.pollMs = timeout(options.assignmentPollIntervalMs ?? 30000);
 		if (this.pollMs < 50)
 			throw new TypeError("assignmentPollIntervalMs must be at least 50ms.");
-		this.disconnectedMs = options.maxDisconnectedLifetimeMs ?? 900000;
+		const disconnectedMs = options.maxDisconnectedLifetimeMs ?? 900000;
 		if (
-			!Number.isSafeInteger(this.disconnectedMs) ||
-			this.disconnectedMs < 1 ||
-			this.disconnectedMs > 2147483647
+			!Number.isSafeInteger(disconnectedMs) ||
+			disconnectedMs < 1 ||
+			disconnectedMs > 2147483647
 		)
 			throw new TypeError("maxDisconnectedLifetimeMs must be 1..2147483647ms.");
 		if (
@@ -244,6 +261,14 @@ export class ShardManager extends ShardMessenger<ShardManagerEvent> {
 			processes: this.processes.map((process) => ({
 				...process,
 				gatewayReady: this.gatewayReady(this.children.get(process.slot)),
+				applicationReady:
+					this.gatewayReady(this.children.get(process.slot)) &&
+					this.children.get(process.slot)?.applicationReady === true,
+				gatewayState:
+					this.children.get(process.slot)?.gatewayState ?? "unknown",
+				blockedCode: this.children.get(process.slot)?.blockedCode ?? null,
+				assignment: this.children.get(process.slot)?.assignment ?? null,
+				reconciled: this.children.get(process.slot)?.reconciled ?? false,
 			})),
 			restart: this.latestRestart,
 		});
@@ -251,7 +276,7 @@ export class ShardManager extends ShardMessenger<ShardManagerEvent> {
 	private gatewayReady(child: Child | undefined): boolean {
 		return (
 			!!child &&
-			child.reconciled &&
+			!this.idleSlots.has(child.slot) &&
 			child.gatewayReady &&
 			!child.intentional &&
 			performance.now() - child.metricsAt < 15000
@@ -266,6 +291,148 @@ export class ShardManager extends ShardMessenger<ShardManagerEvent> {
 			error,
 			"lifecycle_listener_failed",
 		);
+	}
+	/**
+	 * Idle or reconnect one local gateway without replacing its process, modules or listeners.
+	 * @param slot - Existing local process slot, from processes.
+	 * @param idle - True closes Discord and reserves the lease; false permits a fresh coordinated login.
+	 * @returns Status after assignment acknowledgement and coordinator registration, before Discord readiness.
+	 * @throws If disconnected, the slot is unavailable, another control operation is active, or reconciliation fails.
+	 * The requested idle state survives connection loss; failure does not roll it back. Each handshake uses startupTimeoutMs.
+	 */
+	public async setProcessIdle(
+		slot: number,
+		idle: boolean,
+	): Promise<Readonly<ShardProcessStatus>> {
+		if (this.closed) throw new ShardError("CLOSED", "Manager is closed.");
+		if (!this.connected)
+			throw new ShardError("DISCONNECTED", "Manager is not connected.");
+		if (
+			this.draining ||
+			this.manualRestart ||
+			this.processControl !== undefined
+		)
+			throw new ShardError(
+				"BUSY",
+				"A process control operation is already in progress.",
+			);
+		const child = this.children.get(slot);
+		if (!Number.isInteger(slot) || !child?.ready || child.intentional)
+			throw new ShardError(
+				"TARGET",
+				"Select an existing, booted local process slot.",
+			);
+		if (typeof idle !== "boolean") throw new TypeError("idle must be boolean.");
+		if (this.idleSlots.has(slot) === idle && child.reconciled)
+			return Object.freeze({ ...child.status });
+		this.processControl = slot;
+		const socket = this.socket;
+		if (idle) this.idleSlots.add(slot);
+		else this.idleSlots.delete(slot);
+		this.suspendChild(child);
+		this.updateAvailability();
+		this.publishStatus();
+		try {
+			await child.reconciling;
+			if (
+				this.socket !== socket ||
+				!this.connected ||
+				this.closed ||
+				this.draining
+			)
+				throw new ShardError(
+					"DISCONNECTED",
+					"Coordinator authority changed during process control.",
+				);
+			if (this.children.get(slot) !== child || child.intentional)
+				throw new ShardError(
+					"CHILD_EXIT",
+					"The selected process is no longer available.",
+				);
+			if (!child.reconciled) this.reconcile(child);
+			await child.reconciling;
+			if (
+				!child.reconciled ||
+				this.children.get(slot) !== child ||
+				this.socket !== socket
+			)
+				throw new ShardError(
+					"RECONCILE",
+					"The requested gateway state is not yet reconciled.",
+				);
+			return Object.freeze({ ...child.status });
+		} finally {
+			this.processControl = undefined;
+		}
+	}
+	/** Release an assignment after Gateway closure and the registered application effect barrier. The process stays idle.
+	 * Failed or timed-out releases retain their reservation and operation ID; retry this method to reconcile them.
+	 */
+	public async releaseProcess(
+		slot: number,
+		timeoutMs = this.shutdownMs,
+	): Promise<void> {
+		timeout(timeoutMs);
+		if (!this.connected || this.closed)
+			throw new ShardError("DISCONNECTED", "Coordinator unavailable.");
+		if (
+			this.processControl !== undefined ||
+			this.manualRestart ||
+			this.draining
+		)
+			throw new ShardError("BUSY", "Another lifecycle operation is active.");
+		const child = this.children.get(slot);
+		if (!child?.assignment || !child.ready || child.intentional)
+			throw new ShardError("TARGET", "Select a live assigned process.");
+		const assignment = child.assignment;
+		const operationId = (child.releaseOperationId ??= crypto.randomUUID());
+		this.processControl = slot;
+		try {
+			const prior = await this.rpc(
+				frame("drainShard", undefined, { assignment, operationId }),
+				{ timeoutMs },
+			);
+			if (!type({ released: "true" }).allows(prior)) {
+				this.suspendChild(child);
+				const result = child.controls.create(operationId, timeoutMs);
+				void result.catch(() => {});
+				this.sendChild(
+					child,
+					frame("releaseAssignment", operationId, { assignment, timeoutMs }),
+				);
+				await result;
+				await this.rpc(
+					frame("releaseState", undefined, {
+						assignment,
+						operationId,
+						status: "released",
+					}),
+					{ timeoutMs },
+				);
+			}
+			child.assignment = undefined;
+			child.releaseOperationId = undefined;
+			child.shard = child.status.shard = null;
+			child.status.state = "idle";
+			child.reconciled = true;
+			this.idleSlots.add(slot);
+			this.publishStatus();
+		} catch (error) {
+			await this.rpc(
+				frame("releaseState", undefined, {
+					assignment,
+					operationId,
+					status: "unknown",
+				}),
+				{ timeoutMs },
+			).catch(() => {});
+			throw new ShardError(
+				"RELEASE_UNKNOWN",
+				`Release ${operationId} is unresolved; the process and reservation remain. ${error instanceof Error ? error.message : ""}`,
+			);
+		} finally {
+			this.processControl = undefined;
+		}
 	}
 	/** Restart one stable local process slot; its shard remains coordinator-leased rather than forcibly assigned. */
 	public async restartProcess(
@@ -295,7 +462,11 @@ export class ShardManager extends ShardMessenger<ShardManagerEvent> {
 		if (this.closed) throw new ShardError("CLOSED", "Manager is closed.");
 		if (!this.connected)
 			throw new ShardError("DISCONNECTED", "Manager is not connected.");
-		if (this.draining || this.manualRestart)
+		if (
+			this.draining ||
+			this.manualRestart ||
+			this.processControl !== undefined
+		)
 			throw new ShardError(
 				"BUSY",
 				"A restart or topology change is already in progress.",
@@ -318,6 +489,13 @@ export class ShardManager extends ShardMessenger<ShardManagerEvent> {
 		)
 			throw new TypeError("waitForReady must be boolean.");
 		const selected = [...slots];
+		const stabilityMs = options.stabilityMs ?? 5000;
+		if (
+			!Number.isInteger(stabilityMs) ||
+			stabilityMs < 0 ||
+			stabilityMs > 300000
+		)
+			throw new TypeError("stabilityMs must be 0..300000.");
 		const waitForReady = options.waitForReady !== false;
 		const operation = {
 			slots: new Set(selected),
@@ -364,6 +542,12 @@ export class ShardManager extends ShardMessenger<ShardManagerEvent> {
 		};
 		const results: Readonly<ShardProcessStatus>[] = [];
 		try {
+			await deadline.wait(
+				this.rpc(
+					frame("preflight", undefined, { starts: selected.length * 2 }),
+					{ signal, timeoutMs: this.startupMs },
+				),
+			);
 			for (const slot of selected) {
 				deadline.check();
 				currentSlot = slot;
@@ -374,6 +558,18 @@ export class ShardManager extends ShardMessenger<ShardManagerEvent> {
 					this.statuses.get(slot)!.shard ??
 					slot;
 				progress("draining");
+				if (child?.assignment) {
+					child.releaseOperationId ??= `${id}:${slot}`;
+					await deadline.wait(
+						this.rpc(
+							frame("drainShard", undefined, {
+								assignment: child.assignment,
+								operationId: child.releaseOperationId,
+							}),
+							{ signal, timeoutMs: this.startupMs },
+						),
+					);
+				}
 				if (child) await deadline.wait(this.stopChild(child));
 				deadline.check();
 				progress("releasing");
@@ -398,6 +594,7 @@ export class ShardManager extends ShardMessenger<ShardManagerEvent> {
 						"A replacement process could not be started.",
 					);
 				progress("waiting");
+				let stableSince: number | undefined;
 				for (;;) {
 					deadline.check();
 					if (this.children.get(slot) !== replacement)
@@ -408,10 +605,19 @@ export class ShardManager extends ShardMessenger<ShardManagerEvent> {
 					if (
 						replacement.reconciled &&
 						(replacement.shard === null ||
+							this.idleSlots.has(slot) ||
 							!waitForReady ||
-							this.gatewayReady(replacement))
-					)
-						break;
+							(this.gatewayReady(replacement) && replacement.applicationReady))
+					) {
+						stableSince ??= performance.now();
+						if (
+							!waitForReady ||
+							replacement.shard === null ||
+							this.idleSlots.has(slot) ||
+							performance.now() - stableSince >= stabilityMs
+						)
+							break;
+					} else stableSince = undefined;
 					await deadline.wait(Bun.sleep(25));
 				}
 				results.push(Object.freeze({ ...replacement.status }));
@@ -506,8 +712,8 @@ export class ShardManager extends ShardMessenger<ShardManagerEvent> {
 								? "This supervisor instance is still connected; waiting for its previous socket to close."
 								: "Coordinator is unavailable; waiting to connect before starting any shards."
 							: this.options.reconnect === false
-								? "Coordinator connection ended; reconnect is disabled and local shards will stop."
-								: "Coordinator connection interrupted; shards keep Discord open in maintenance while reconnecting.",
+								? "Coordinator connection ended; reconnect is disabled and existing owners retain their Gateway sessions."
+								: "Coordinator connection interrupted; retaining existing Gateway sessions while fresh admission waits for reconciliation.",
 						context: { host: this.options.id, attempt: attempt + 1, reason },
 						error: welcomed ? failure : undefined,
 					});
@@ -517,8 +723,8 @@ export class ShardManager extends ShardMessenger<ShardManagerEvent> {
 			this.requests.close();
 			for (const timer of this.restarts.values()) clearTimeout(timer);
 			this.restarts.clear();
-			// Connectivity loss does not establish process death. Existing children keep their leases and gateways.
-			if (this.closed || this.options.reconnect === false)
+			// Contact loss suspends fresh admission; committed owners remain alive.
+			if (this.closed)
 				await Promise.all(
 					[...this.children.values()].map((child) => this.stopChild(child)),
 				);
@@ -674,12 +880,20 @@ export class ShardManager extends ShardMessenger<ShardManagerEvent> {
 						"released",
 						"drain",
 						"assignment",
+						"gatewayBlock",
 					]);
 					lastSeen = performance.now();
 					if (!welcome) {
 						if (message.op !== "welcome")
 							throw new ShardError("PROTOCOL", "Expected coordinator welcome.");
 						const d = message.data;
+						if (!message.session || !message.term)
+							throw new ShardError(
+								"PROTOCOL",
+								"Coordinator must establish a control session and incarnation.",
+							);
+						this.controlSession = message.session;
+						this.coordinatorTerm = message.term;
 						if (
 							d.count > 4096 ||
 							new Set(d.shards).size !== d.shards.length ||
@@ -721,6 +935,14 @@ export class ShardManager extends ShardMessenger<ShardManagerEvent> {
 						this.publishStatus();
 						return;
 					}
+					if (
+						message.session !== this.controlSession ||
+						message.term !== this.coordinatorTerm
+					)
+						throw new ShardError(
+							"CONTROL_SESSION",
+							"Obsolete coordinator frame.",
+						);
 					if (message.op === "welcome")
 						throw new ShardError("PROTOCOL", "Repeated welcome.");
 					if (message.op === "drain" || message.op === "assignment") {
@@ -870,7 +1092,6 @@ export class ShardManager extends ShardMessenger<ShardManagerEvent> {
 								identifyTimeoutMs: this.identifyMs,
 								shutdownTimeoutMs: this.shutdownMs,
 								assignmentPollIntervalMs: this.pollMs,
-								maxDisconnectedLifetimeMs: this.disconnectedMs,
 							},
 							this.policy.maxBytes,
 						),
@@ -886,6 +1107,7 @@ export class ShardManager extends ShardMessenger<ShardManagerEvent> {
 								this.fromChild(
 									child,
 									decode(input, this.policy.maxBytes, [
+										"receipt",
 										"boot",
 										"pong",
 										"poll",
@@ -893,6 +1115,8 @@ export class ShardManager extends ShardMessenger<ShardManagerEvent> {
 										"call",
 										"result",
 										"identify",
+										"permitOutcome",
+										"releaseResult",
 										"done",
 										"cancel",
 										"metrics",
@@ -927,7 +1151,9 @@ export class ShardManager extends ShardMessenger<ShardManagerEvent> {
 				metricsAt: 0,
 				requests: new Map(),
 				controls: new Pending(1),
+				delivery: new IpcWindow(this.policy),
 				reconciled: false,
+				revision: 0,
 			};
 			this.children.set(slot, child);
 			this.publishStatus();
@@ -1000,14 +1226,25 @@ export class ShardManager extends ShardMessenger<ShardManagerEvent> {
 				),
 		);
 	}
-	private armOutage(child: Child): void {
-		if (child.outage || child.shard === null || child.intentional) return;
-		// The child owns its graceful cutoff; the supervisor also bounds a stalled child's shutdown.
-		child.outage = setTimeout(() => {
-			child.outage = setTimeout(() => {
-				if (this.children.get(child.slot) === child) child.process.kill(9);
-			}, this.shutdownMs);
-		}, this.disconnectedMs);
+	private suspendChild(child: Child, revoke = true): void {
+		child.revision++;
+		child.reconciled = false;
+		if (revoke) {
+			child.authority = undefined;
+			child.gatewayReady = false;
+			child.metricsAt = 0;
+		}
+		child.controls.close();
+		for (const controller of child.requests.values()) controller.abort();
+		for (const [id, entry] of this.inbound)
+			if (entry.child === child) {
+				clearTimeout(entry.timer);
+				this.inbound.delete(id);
+				this.safeChild(child, frame("cancel", id));
+			}
+		if (child.shard !== null) child.status.state = "maintenance";
+		if (child.ready && !child.intentional)
+			this.safeChild(child, frame(revoke ? "revoke" : "unavailable"));
 	}
 	private loseControl(): void {
 		this.manualRestart?.abort.abort(
@@ -1024,12 +1261,7 @@ export class ShardManager extends ShardMessenger<ShardManagerEvent> {
 		}
 		this.inbound.clear();
 		for (const child of this.children.values()) {
-			child.reconciled = false;
-			child.controls.close();
-			if (child.shard !== null) child.status.state = "maintenance";
-			this.armOutage(child);
-			if (child.ready && !child.intentional)
-				this.safeChild(child, frame("unavailable"));
+			this.suspendChild(child, false);
 		}
 	}
 	private flushReleases(): Promise<void> {
@@ -1073,40 +1305,59 @@ export class ShardManager extends ShardMessenger<ShardManagerEvent> {
 		)
 			return;
 		const socket = this.socket;
+		const revision = child.revision;
+		const idle = this.idleSlots.has(child.slot);
+		let timedOut = false;
 		const current = () =>
 			this.connected &&
 			!this.closed &&
 			!this.draining &&
 			this.socket === socket &&
 			this.children.get(child.slot) === child &&
+			child.revision === revision &&
 			!child.intentional;
 		child.reconciling = (async () => {
 			let shard: number | null;
+			let rest: { url: string; capability: string } | undefined;
 			let count = this.count;
 			let reason = "";
 			try {
-				const lease = (await this.rpc(
+				const lease = await this.rpc(
 					frame("lease", undefined, {
 						previous: child.shard,
 						generation: child.generation,
 						preferred: child.preferred,
+						...(child.assignment ? { assignment: child.assignment } : {}),
+						deploymentId: this.options.deploymentId ?? "initial",
 					}),
 					{ timeoutMs: this.startupMs },
-				)) as { shard: number; count: number };
+				);
+				const accepted = type({
+					shard: "number.integer >= 0",
+					count: "number.integer > 0 & number <= 4096",
+					assignment: assignmentSchema,
+					rest: { url: "string", capability: "string" },
+				}).assert(lease);
 				if (
-					!Number.isInteger(lease.shard) ||
-					lease.shard < 0 ||
-					!Number.isInteger(lease.count) ||
-					lease.count < 1 ||
-					lease.count > 4096 ||
-					lease.shard >= lease.count
+					accepted.shard >= accepted.count ||
+					accepted.assignment.hostId !== this.options.id ||
+					accepted.assignment.hostBootId !== this.instance ||
+					accepted.assignment.workerBootId !== child.generation
 				)
 					throw new ShardError(
 						"PROTOCOL",
 						"Coordinator returned an invalid shard lease.",
 					);
-				shard = lease.shard;
-				count = lease.count;
+				shard = accepted.shard;
+				count = accepted.count;
+				if (!current()) return;
+				child.assignment = accepted.assignment;
+				rest = {
+					...accepted.rest,
+					url: this.options.url
+						.replace(/^ws/, "http")
+						.replace(/\/sharding$/, "/rest"),
+				};
 			} catch (error) {
 				if (
 					!(error instanceof ShardError) ||
@@ -1121,9 +1372,16 @@ export class ShardManager extends ShardMessenger<ShardManagerEvent> {
 			if (shard !== null) {
 				child.shard = shard;
 				child.status.shard = shard;
-				this.armOutage(child);
 			}
-			const assignment = frame("assign", undefined, { shard, count, reason });
+			child.gatewayReady = false;
+			child.metricsAt = 0;
+			const assignment = frame("assign", undefined, {
+				shard: idle ? null : shard,
+				count,
+				reason: idle ? "OPERATOR_IDLE" : reason,
+				...(child.assignment ? { assignment: child.assignment } : {}),
+				...(rest ? { rest } : {}),
+			});
 			const applied = child.controls.create(assignment.id, this.startupMs);
 			void applied.catch(() => {});
 			this.sendChild(child, assignment);
@@ -1138,23 +1396,25 @@ export class ShardManager extends ShardMessenger<ShardManagerEvent> {
 				throw error;
 			}
 			// A rejected process has confirmed its old Discord session is closed before forgetting the ID.
+			if (!current()) return;
 			child.shard = shard;
 			child.status.shard = shard;
-			if (shard === null) {
-				clearTimeout(child.outage);
-				child.outage = undefined;
-			}
-			if (!current()) return;
 			if (shard !== null)
 				await this.rpc(
-					frame("ready", undefined, { shard, generation: child.generation }),
+					frame(idle ? "idle" : "ready", undefined, {
+						shard,
+						generation: child.generation,
+					}),
 					{ timeoutMs: this.startupMs },
 				);
 			if (!current()) return;
 			child.reconciled = true;
-			child.status.state = shard === null ? "dormant" : "running";
-			clearTimeout(child.outage);
-			child.outage = undefined;
+			child.authority = assignment.id;
+			child.status.state = idle
+				? "idle"
+				: shard === null
+					? "dormant"
+					: "running";
 			this.safeChild(child, frame("healthy", assignment.id));
 			this.updateAvailability();
 			this.publishStatus();
@@ -1165,8 +1425,9 @@ export class ShardManager extends ShardMessenger<ShardManagerEvent> {
 					error instanceof ShardError &&
 					error.code === "RECONCILE_TIMEOUT"
 				) {
+					timedOut = true;
 					this.report(
-						"Shard gateway reconciliation timed out; terminating the owned process for recovery.",
+						"Shard gateway reconciliation timed out; keeping it unauthorized and retrying on the next poll.",
 						error,
 						"reconciliation_failed",
 						{
@@ -1174,7 +1435,7 @@ export class ShardManager extends ShardMessenger<ShardManagerEvent> {
 							shard: child.shard,
 						},
 					);
-					child.process.kill(9);
+					this.suspendChild(child);
 				}
 				if (
 					current() &&
@@ -1185,9 +1446,21 @@ export class ShardManager extends ShardMessenger<ShardManagerEvent> {
 			})
 			.finally(() => {
 				child.reconciling = undefined;
+				// A newer connection/control change may have arrived while the old request was settling.
+				if (
+					!timedOut &&
+					(this.socket !== socket || child.revision !== revision)
+				)
+					this.reconcile(child);
 			});
 	}
 	private fromChild(child: Child, message: Frame): void {
+		if (
+			!child.delivery.receive(message, (receipt) =>
+				this.sendChild(child, receipt),
+			)
+		)
+			return;
 		child.lastSeen = performance.now();
 		if (child.intentional) return;
 		if (message.op === "boot") {
@@ -1207,20 +1480,81 @@ export class ShardManager extends ShardMessenger<ShardManagerEvent> {
 				"Child must boot before sending requests.",
 			);
 		if (message.op === "pong") return;
+		if (message.op === "releaseResult") {
+			if (message.data.status === "released")
+				child.controls.resolve(message.id, null);
+			else
+				child.controls.reject(
+					message.id,
+					new ShardError("RELEASE_UNKNOWN", message.data.reason),
+				);
+			return;
+		}
+		if (message.op === "permitOutcome") {
+			if (message.data.assignment.workerBootId !== child.generation)
+				throw new ShardError(
+					"OWNERSHIP",
+					"Child cannot reconcile another incarnation's permit.",
+				);
+			void this.rpc(frame("permitOutcome", undefined, message.data), {
+				timeoutMs: 10000,
+			}).then(
+				(value) =>
+					this.safeChild(
+						child,
+						frame("reply", message.id, { ok: true, value }),
+					),
+				(error) =>
+					this.safeChild(child, frame("reply", message.id, failure(error))),
+			);
+			return;
+		}
 		if (message.op === "applied") {
 			child.controls.resolve(message.id, null);
 			return;
 		}
 		if (message.op === "poll") {
-			if (!child.reconciled || child.shard === null) this.reconcile(child);
+			if (!this.connected || child.releaseOperationId) return;
+			// A child can independently lose authority when the supervisor heartbeat stalls.
+			if (
+				!child.reconciling &&
+				!(child.reconciled && this.idleSlots.has(child.slot))
+			) {
+				if (child.reconciled) this.suspendChild(child);
+				this.reconcile(child);
+			}
+			return;
+		}
+		// IPC survives coordinator reconnects. Discard work buffered under an older assignment.
+		if (
+			(message.op === "metrics" ||
+				message.op === "done" ||
+				message.op === "identify" ||
+				message.op === "call") &&
+			(!child.authority || message.data.authority !== child.authority)
+		) {
+			if (message.op === "identify" || message.op === "call")
+				this.safeChild(
+					child,
+					frame(
+						"reply",
+						message.id,
+						failure(new ShardError("DISCONNECTED", "Stale gateway authority.")),
+					),
+				);
 			return;
 		}
 		if (message.op === "metrics") {
-			if (!child.reconciled || child.shard === null || !this.connected) return;
+			if (child.shard === null || this.idleSlots.has(child.slot)) return;
 			const changed = child.gatewayReady !== message.data.ready;
+			child.gatewayState = message.data.gatewayState;
+			child.blockedCode = message.data.blockedCode;
 			child.gatewayReady = message.data.ready;
+			child.applicationReady =
+				message.data.applicationReady ?? message.data.ready;
 			child.metricsAt = performance.now();
 			if (changed) this.publishStatus();
+			if (!this.connected || !child.reconciled) return;
 			this.send(
 				frame("metrics", message.id, {
 					...message.data,
@@ -1235,7 +1569,13 @@ export class ShardManager extends ShardMessenger<ShardManagerEvent> {
 			return;
 		}
 		if (message.op === "done") {
-			if (!child.reconciled || child.shard === null || !this.connected) return;
+			if (
+				!child.reconciled ||
+				child.shard === null ||
+				!this.connected ||
+				this.idleSlots.has(child.slot)
+			)
+				return;
 			this.send(
 				frame("done", message.id, {
 					shard: child.shard,
@@ -1265,6 +1605,7 @@ export class ShardManager extends ShardMessenger<ShardManagerEvent> {
 		}
 		if (
 			!child.reconciled ||
+			this.idleSlots.has(child.slot) ||
 			child.shard === null ||
 			!this.connected ||
 			this.draining
@@ -1303,11 +1644,26 @@ export class ShardManager extends ShardMessenger<ShardManagerEvent> {
 		child.requests.set(message.id, controller);
 		const data =
 			message.op === "call"
-				? { ...message.data, source: child.shard }
+				? {
+						source: child.shard,
+						target: message.data.target,
+						name: message.data.name,
+						payload: message.data.payload,
+						timeoutMs: message.data.timeoutMs,
+					}
 				: {
 						shard: child.shard,
 						generation: child.generation,
-						timeoutMs: this.identifyMs,
+						timeoutMs: Math.min(
+							this.identifyMs,
+							message.op === "identify" ? message.data.timeoutMs : 15000,
+						),
+						...(message.op === "identify"
+							? {
+									attemptId: message.data.attemptId,
+									assignment: message.data.assignment,
+								}
+							: {}),
 					};
 		void this.rpc(frame(message.op, undefined, data), {
 			timeoutMs: data.timeoutMs,
@@ -1329,6 +1685,11 @@ export class ShardManager extends ShardMessenger<ShardManagerEvent> {
 			.finally(() => child.requests.delete(message.id));
 	}
 	private receive(message: Frame): void {
+		if (message.op === "gatewayBlock") {
+			for (const child of this.children.values())
+				this.safeChild(child, message);
+			return;
+		}
 		if (message.op === "pong") return;
 		if (message.op === "released") {
 			this.requests.resolve(message.id, null);
@@ -1360,6 +1721,9 @@ export class ShardManager extends ShardMessenger<ShardManagerEvent> {
 			if (
 				!child?.ready ||
 				!child.reconciled ||
+				!child.assignment ||
+				!sameAssignment(child.assignment, message.data.assignment) ||
+				this.idleSlots.has(child.slot) ||
 				child.intentional ||
 				child.generation !== message.data.generation
 			) {
@@ -1485,14 +1849,22 @@ export class ShardManager extends ShardMessenger<ShardManagerEvent> {
 		if (!this.socket || !this.connected)
 			throw new ShardError("DISCONNECTED", "Manager is disconnected.");
 		try {
-			sendSocket(this.socket, message, this.policy);
+			sendSocket(
+				this.socket,
+				{
+					...message,
+					session: this.controlSession,
+					term: this.coordinatorTerm,
+				},
+				this.policy,
+			);
 		} catch (error) {
 			this.finishConnection?.();
 			throw error;
 		}
 	}
 	private sendChild(child: Child, message: Frame): void {
-		child.process.send(encode(message, this.policy.maxBytes));
+		child.delivery.send(message, (encoded) => child.process.send(encoded));
 	}
 	private safeChild(child: Child, message: Frame): void {
 		try {
@@ -1504,7 +1876,6 @@ export class ShardManager extends ShardMessenger<ShardManagerEvent> {
 	private exited(child: Child, code: number): void {
 		if (this.children.get(child.slot) !== child) return;
 		clearTimeout(child.startup);
-		clearTimeout(child.outage);
 		child.controls.close();
 		this.children.delete(child.slot);
 		child.status.pid = null;
@@ -1583,7 +1954,6 @@ export class ShardManager extends ShardMessenger<ShardManagerEvent> {
 		child.intentional = true;
 		this.updateAvailability();
 		clearTimeout(child.startup);
-		clearTimeout(child.outage);
 		return (child.stop ??= (async () => {
 			try {
 				this.sendChild(child, frame("stop"));

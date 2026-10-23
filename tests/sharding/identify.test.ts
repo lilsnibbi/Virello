@@ -1,128 +1,138 @@
-import { describe, expect, setSystemTime, test } from "bun:test";
+import { expect, test } from "bun:test";
 import {
-	IdentifyScheduler,
-	identifyCooldownMs,
-} from "../../src/sharding/coordinator/identify";
-
+	Admission,
+	admissionCooldownMs,
+} from "../../src/sharding/coordinator/Admission";
+import { assignment, authority } from "./fixtures/authority";
 const limit = {
 	total: 10,
 	remaining: 10,
 	reset_after: 100000,
 	max_concurrency: 2,
 };
-function scheduler() {
-	let now = 0;
-	const value = new IdentifyScheduler(() => now);
-	value.update(limit);
-	return { value, advance: (ms: number) => (now += ms) };
-}
 
-describe("in-memory Discord identify scheduling", () => {
-	test("every new coordinator observes a startup cooldown without spending allowance", () => {
-		const s = scheduler();
-		expect(s.value.grant("a", 0, "one")).toBe(false);
-		s.advance(identifyCooldownMs - 1);
-		expect(s.value.grant("a", 0, "one")).toBe(false);
-		expect(s.value.remaining).toBe(10);
-		s.advance(1);
-		expect(s.value.grant("a", 0, "one")).toBe(true);
-		expect(s.value.remaining).toBe(9);
-	});
-	test("holds a bucket until readiness or disconnect, then cools down; other buckets progress", () => {
-		const s = scheduler();
-		s.advance(identifyCooldownMs);
-		expect(s.value.grant("connection-a", 0, "one")).toBe(true);
-		expect(s.value.grant("connection-b", 1, "two")).toBe(true);
-		s.advance(20000);
-		expect(s.value.grant("replacement", 2, "three")).toBe(false);
-		s.value.stopped("connection-a", 0, "stale");
-		expect(s.value.grant("replacement", 2, "three")).toBe(false);
-		s.value.stopped("connection-a");
-		s.advance(identifyCooldownMs - 1);
-		expect(s.value.grant("replacement", 2, "three")).toBe(false);
-		s.advance(1);
-		expect(s.value.grant("replacement", 2, "three")).toBe(true);
-		// Delayed cleanup from an old connection cannot release the new connection's permit.
-		s.value.stopped("connection-a");
-		s.advance(20000);
-		expect(s.value.grant("another", 4, "four")).toBe(false);
-		s.value.stopped("replacement", 2, "three");
-		s.advance(identifyCooldownMs);
-		expect(s.value.grant("another", 4, "four")).toBe(true);
-		expect(s.value.remaining).toBe(6);
-	});
-	test("does not refund cancelled or disconnected permits or increase an unexpired allowance", () => {
-		const s = scheduler();
-		s.advance(identifyCooldownMs);
-		s.value.update({ ...limit, remaining: 1 });
-		expect(s.value.grant("a", 0, "one")).toBe(true);
-		s.value.stopped("a");
-		s.value.update(limit);
-		s.advance(identifyCooldownMs);
-		expect(s.value.remaining).toBe(0);
-		expect(s.value.grant("b", 1, "two")).toBe(false);
-	});
-	test("expiry alone never replenishes a snapshot and a new process uses only its fresh snapshot", () => {
-		const s = scheduler();
-		s.advance(100000);
-		expect(s.value.expired).toBe(true);
-		expect(s.value.grant("a", 0, "one")).toBe(false);
-		s.value.update({ ...limit, remaining: 2 });
-		expect(s.value.grant("a", 0, "one")).toBe(true);
-		expect(s.value.remaining).toBe(1);
-		const replacement = scheduler();
-		replacement.value.update({ ...limit, remaining: 0 });
-		replacement.advance(identifyCooldownMs);
-		expect(replacement.value.grant("a", 0, "two")).toBe(false);
-	});
-	test("zero reset intervals use the reported allowance without immediate expiry or invented refill", () => {
-		const s = scheduler();
-		s.advance(100000);
-		s.value.update({ ...limit, reset_after: 0 });
-		expect(s.value.grant("a", 0, "one")).toBe(true);
-		s.value.update({ ...limit, reset_after: 0 });
-		expect(s.value.remaining).toBe(9);
-		s.advance(59999);
-		expect(s.value.expired).toBe(false);
-		s.advance(1);
-		expect(s.value.remaining).toBe(0);
-	});
-	test("wall-clock jumps cannot expire or replenish the monotonic allowance", () => {
-		const s = scheduler();
-		try {
-			s.advance(identifyCooldownMs);
-			expect(s.value.grant("a", 0, "one")).toBe(true);
-			setSystemTime(new Date("2099-01-01T00:00:00Z"));
-			s.value.update(limit);
-			expect(s.value.remaining).toBe(9);
-			setSystemTime(new Date("2000-01-01T00:00:00Z"));
-			s.advance(100000);
-			expect(s.value.expired).toBe(true);
-		} finally {
-			setSystemTime();
-		}
-	});
-	test("rejects impossible metadata and concurrency changes while an old bucket is active", () => {
-		const s = scheduler();
-		for (const value of [
-			{ ...limit, remaining: 11 },
-			{ ...limit, reset_after: -1 },
-			{ ...limit, max_concurrency: 0 },
-		])
-			expect(() => s.value.update(value)).toThrow();
-		expect(() => s.value.update({ ...limit, max_concurrency: 1 })).toThrow(
-			"max_concurrency",
-		);
-		s.advance(identifyCooldownMs);
-		s.value.grant("a", 0, "one");
-		s.advance(100000);
-		expect(() => s.value.update({ ...limit, max_concurrency: 1 })).toThrow(
-			"max_concurrency",
-		);
-		s.value.stopped("a");
-		s.advance(identifyCooldownMs);
+test("startup and memory loss never invent admission authority", async () => {
+	const store = await authority(false);
+	const other = await authority(false);
+	let now = 0;
+	const admission = new Admission(store, 1, () => now);
+	try {
+		admission.update(limit);
+		now += admissionCooldownMs;
+		expect(
+			admission.grant(assignment(), "blocked", performance.now()),
+		).toBeUndefined();
+		store.change((state) => {
+			state.recoveryConfirmed = true;
+		});
+		expect(
+			admission.grant(assignment(), "first", performance.now()),
+		).toBeDefined();
+		expect(other.state.term).not.toBe(store.state.term);
+		expect(other.state.permits).toEqual({});
+		expect(other.state.recoveryConfirmed).toBe(false);
+		expect(admission.remaining).toBe(9);
+	} finally {
+		await store.close();
+		await other.close();
+	}
+});
+
+test("unknown sends hold their bucket through delays and duplicates; outcomes anchor cooldown without refunds", async () => {
+	const store = await authority();
+	let now = 0;
+	const a = new Admission(store, 0, () => now);
+	try {
+		a.update(limit);
+		expect(a.grant(assignment(), "one", performance.now())).toBeUndefined();
+		now += admissionCooldownMs;
+		const permit = a.grant(assignment(), "one", performance.now())!;
+		expect(a.grant(assignment(), "one", performance.now())).toEqual(permit);
+		expect(
+			a.grant(assignment(1), "other-bucket", performance.now()),
+		).toBeDefined();
+		a.outcome({ assignment: assignment(), attemptId: "one", kind: "unknown" });
+		now += 30000;
+		expect(a.grant(assignment(2), "two", performance.now())).toBeUndefined();
 		expect(() =>
-			s.value.update({ ...limit, max_concurrency: 1 }),
-		).not.toThrow();
-	});
+			a.outcome({ assignment: assignment(2), attemptId: "one", kind: "sent" }),
+		).toThrow("original reservation");
+		a.outcome({ assignment: assignment(), attemptId: "one", kind: "sent" });
+		now += admissionCooldownMs - 1;
+		expect(a.grant(assignment(2), "two", performance.now())).toBeUndefined();
+		a.outcome({ assignment: assignment(), attemptId: "one", kind: "sent" });
+		now++;
+		expect(a.grant(assignment(2), "two", performance.now())).toBeDefined();
+		a.outcome({ assignment: assignment(), attemptId: "one", kind: "sent" });
+		now += 30000;
+		expect(a.grant(assignment(), "three", performance.now())).toBeUndefined();
+		a.fenced(assignment(2));
+		now += admissionCooldownMs;
+		expect(a.grant(assignment(), "three", performance.now())).toBeDefined();
+		expect(a.remaining).toBe(6);
+	} finally {
+		await store.close();
+	}
+});
+
+test("revocation never refunds allowance, expiry needs a fresh snapshot, and stale epochs cannot identify", async () => {
+	const store = await authority();
+	let now = 0;
+	const a = new Admission(store, 1, () => now);
+	try {
+		a.update({ ...limit, remaining: 2 });
+		now += admissionCooldownMs;
+		expect(a.grant(assignment(), "one", performance.now())).toBeDefined();
+		a.outcome({
+			assignment: assignment(),
+			attemptId: "one",
+			kind: "revokedBeforeSend",
+		});
+		a.update(limit);
+		now += admissionCooldownMs;
+		expect(a.remaining).toBe(1);
+		expect(
+			a.grant(assignment(1), "reserved", performance.now()),
+		).toBeUndefined();
+		now += 200000;
+		expect(a.remaining).toBe(0);
+		a.update(limit);
+		expect(a.remaining).toBe(10);
+		store.change((state) => {
+			state.leases["0"].phase = "draining";
+		});
+		expect(() => a.grant(assignment(), "stale", performance.now())).toThrow(
+			"current owned",
+		);
+		expect(
+			a.grant(assignment(1), "expired-request", performance.now() - 16000),
+		).toBeUndefined();
+	} finally {
+		await store.close();
+	}
+});
+
+test("contradictory outcomes stop fleet admission; old concurrency cannot change with unresolved senders", async () => {
+	const store = await authority();
+	let now = 0;
+	const a = new Admission(store, 0, () => now);
+	try {
+		a.update(limit);
+		now += admissionCooldownMs;
+		a.grant(assignment(), "one", performance.now());
+		expect(() => a.update({ ...limit, max_concurrency: 1 })).toThrow(
+			"old admission buckets",
+		);
+		a.outcome({
+			assignment: assignment(),
+			attemptId: "one",
+			kind: "revokedBeforeSend",
+		});
+		a.outcome({ assignment: assignment(), attemptId: "one", kind: "sent" });
+		expect(store.state.admissionFault).toBeDefined();
+		now += admissionCooldownMs;
+		expect(a.grant(assignment(1), "two", performance.now())).toBeUndefined();
+	} finally {
+		await store.close();
+	}
 });

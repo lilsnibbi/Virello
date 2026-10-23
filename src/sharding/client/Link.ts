@@ -1,4 +1,14 @@
+import { setTimeout as wait } from "node:timers/promises";
 import { type } from "arktype";
+import {
+	assignmentSchema,
+	permitSchema,
+	sameAssignment,
+	type ShardAssignment,
+	type IdentifyOutcome,
+} from "../authority";
+import type { $GatewayPermit } from "../../engine/gateway/GatewayShard";
+import { RemoteRestScheduler } from "../rest/RemoteRestScheduler";
 import { writeEvent } from "../../core/logging/diagnostics";
 import type { LoggerLike } from "../../core/logging/LoggerLike";
 import { ShardMessenger } from "../messaging";
@@ -6,6 +16,7 @@ import { freezeSnapshot } from "../lifecycle";
 import { statsRequest } from "../stats";
 import { Availability } from "../transport/availability";
 import { Pending } from "../transport/pending";
+import { IpcWindow } from "../transport/IpcWindow";
 import {
 	decode,
 	encode,
@@ -83,11 +94,15 @@ interface Lifecycle {
 	maintenance: (value: boolean) => void;
 	assignment: (shard: number | null, count: number) => Promise<void>;
 	available: () => void;
+	released?: () => Promise<void>;
+	block?: (code: string) => void;
 	logger: LoggerLike;
 }
 
 /** Typed messaging on one managed VirelloClient. Handlers run local registered code only. */
 export class ShardLink extends ShardMessenger<ShardClientEvent> {
+	/** @internal Managed HTTP effect capability; construction opens no network connection. */
+	public readonly restScheduler = new RemoteRestScheduler();
 	private readonly handlers = new Map<string, Handler>();
 	private readonly active = new Map<string, Active>();
 	private readonly requests: Pending;
@@ -102,11 +117,18 @@ export class ShardLink extends ShardMessenger<ShardClientEvent> {
 	private lastSeen = 0;
 	private stopPromise?: Promise<void>;
 	private poll?: ReturnType<typeof setInterval>;
-	private outage?: ReturnType<typeof setTimeout>;
 	private revision = 0;
 	private appliedId?: string;
+	private authority?: string;
+	private assignment?: ShardAssignment;
+	private readonly outcomes = new Map<string, IdentifyOutcome>();
+	private readonly revokePermits = new Set<() => void>();
+	private flushing?: Promise<void>;
+	private releaseBarrier?: (signal: AbortSignal) => Promise<void>;
+	private releasing?: Promise<void>;
+	private readonly released = new Set<string>();
 	private applying = false;
-	private nextAssignment?: Frame;
+	private nextAssignment?: Frame<"assign">;
 	private assignmentWait?: {
 		promise: Promise<void>;
 		resolve: () => void;
@@ -120,18 +142,38 @@ export class ShardLink extends ShardMessenger<ShardClientEvent> {
 	public constructor(
 		private readonly config: ShardConfig | undefined,
 		private readonly shutdown: (code: number, cause?: unknown) => Promise<void>,
-		private readonly metrics?: () => { ready: boolean; guilds: number },
+		private readonly metrics?: () => {
+			ready: boolean;
+			applicationReady?: boolean;
+			guilds: number;
+			gatewayState?: string;
+			blockedCode?: string;
+		},
 		private readonly lifecycle?: Lifecycle,
 		private readonly statistics?: () => ShardStats,
 	) {
 		super();
 		this.policy = config?.limits ?? limits();
+		this.delivery = new IpcWindow(this.policy);
 		this.requests = new Pending(this.policy.maxPending);
 		if (config) this.lifecycle?.maintenance(true);
 	}
 	/** True when this client was started as a ShardManager child. */
 	public get enabled(): boolean {
 		return this.config !== undefined;
+	}
+	/**
+	 * Supply the application's effect barrier for reusable-worker release. It must quiesce retained handlers, timers,
+	 * database writes and delegated jobs, not merely request cancellation. Without this hook a live release stays unknown.
+	 * @param barrier - Idempotent drain hook; rejection/timeout never authorizes a successor.
+	 */
+	public onRelease(barrier: (signal: AbortSignal) => Promise<void>): void {
+		if (this.releaseBarrier || typeof barrier !== "function")
+			throw new ShardError(
+				"CONFIG",
+				"Register one application release barrier.",
+			);
+		this.releaseBarrier = barrier;
 	}
 	/** True once the coordinator has accepted and reconciled this process's assignment. */
 	public get isConnected(): boolean {
@@ -232,7 +274,7 @@ export class ShardLink extends ShardMessenger<ShardClientEvent> {
 			process.on("disconnect", this.onDisconnect);
 			process.on("SIGTERM", this.onSignal);
 			this.heartbeat = setInterval(() => {
-				if (performance.now() - this.lastSeen > 15000) void this.stop(1);
+				if (performance.now() - this.lastSeen > 15000) this.unavailable(true);
 			}, 3000);
 			this.poll = setInterval(() => {
 				if (!this.connected && !this.closed) {
@@ -308,6 +350,7 @@ export class ShardLink extends ShardMessenger<ShardClientEvent> {
 		identifier.assert(name);
 		return this.rpc(
 			frame("call", undefined, {
+				authority: this.authority,
 				source: this.id,
 				target,
 				name,
@@ -321,55 +364,139 @@ export class ShardLink extends ShardMessenger<ShardClientEvent> {
 	public async waitForIdentify(
 		shard: number,
 		signal: AbortSignal,
-	): Promise<void> {
-		try {
-			while (!this.closed) {
-				try {
-					await this.prepare({
-						waitForCoordinator: true,
-						timeoutMs: 300000,
-						signal,
-					});
-					if (shard !== this.id)
-						throw new ShardError(
-							"IDENTIFY",
-							"This process no longer owns the requested shard.",
-						);
-					await this.rpc(
-						frame("identify", undefined, {
-							shard,
-							generation: this.config!.generation,
-							timeoutMs: this.config!.identifyTimeoutMs,
-						}),
-						{ signal, timeoutMs: this.config!.identifyTimeoutMs },
+	): Promise<$GatewayPermit> {
+		while (!this.closed) {
+			let revoke: (() => void) | undefined;
+			try {
+				await this.prepare({
+					waitForCoordinator: true,
+					timeoutMs: 300000,
+					signal,
+				});
+				if (shard !== this.id)
+					throw new ShardError(
+						"IDENTIFY",
+						"This process no longer owns the requested shard.",
 					);
-					break;
-				} catch (error) {
-					if (
-						!signal.aborted &&
-						!this.closed &&
-						!this.connected &&
-						error instanceof ShardError &&
-						["DISCONNECTED", "TIMEOUT"].includes(error.code)
-					)
-						continue;
-					throw error;
+				await this.flushOutcomes();
+				if (!this.assignment || this.outcomes.size >= this.policy.maxPending)
+					throw new ShardError(
+						"ADMISSION_CAPACITY",
+						"Assignment or outcome reconciliation unavailable.",
+					);
+				const assignment = this.assignment;
+				const revision = this.revision;
+				const attemptId = crypto.randomUUID();
+				const deadline = performance.now() + 15000;
+				let finished = false;
+				let consuming = false;
+				const settle = (kind: IdentifyOutcome["kind"]) => {
+					if (finished) return;
+					finished = true;
+					signal.removeEventListener("abort", cancel);
+					this.revokePermits.delete(cancel);
+					this.outcomes.set(attemptId, { assignment, attemptId, kind });
+					void this.flushOutcomes().catch(() => {});
+				};
+				const cancel = () => settle("revokedBeforeSend");
+				revoke = cancel;
+				this.revokePermits.add(cancel);
+				signal.addEventListener("abort", cancel, { once: true });
+				const result = await this.rpc(
+					frame("identify", undefined, {
+						authority: this.authority,
+						shard,
+						generation: this.config!.generation,
+						timeoutMs: 15000,
+						assignment,
+						attemptId,
+					}),
+					{ signal, timeoutMs: 15000 },
+				);
+				const permit = permitSchema.assert(result);
+				if (
+					permit.attemptId !== attemptId ||
+					!sameAssignment(permit.assignment, assignment)
+				)
+					throw new ShardError(
+						"PROTOCOL",
+						"Admission response does not match this attempt.",
+					);
+				signal.throwIfAborted();
+				return {
+					consume: (write) => {
+						if (consuming)
+							throw new ShardError(
+								"PERMIT_EXPIRED",
+								"IDENTIFY permit was already consumed.",
+							);
+						if (
+							finished ||
+							signal.aborted ||
+							!this.connected ||
+							revision !== this.revision ||
+							performance.now() >= deadline
+						) {
+							cancel();
+							throw new ShardError(
+								"PERMIT_EXPIRED",
+								"IDENTIFY permission expired or was revoked before send.",
+							);
+						}
+						consuming = true;
+						this.revokePermits.delete(cancel);
+						signal.removeEventListener("abort", cancel);
+						try {
+							return write();
+						} finally {
+							settle("sent");
+						}
+					},
+				};
+			} catch (error) {
+				revoke?.();
+				if (
+					!signal.aborted &&
+					!this.closed &&
+					error instanceof ShardError &&
+					[
+						"DISCONNECTED",
+						"TIMEOUT",
+						"IDENTIFY_TIMEOUT",
+						"UNAVAILABLE",
+						"RESHARDING",
+						"RECOVERING",
+					].includes(error.code)
+				) {
+					await wait(1000, undefined, { signal });
+					continue;
 				}
+				throw error;
 			}
-		} catch (error) {
-			// discord.js 14's throttler catch can fall through to IDENTIFY after a non-abort failure.
-			// A managed process must stop before returning such a failure to that hook.
-			if (!signal.aborted) await this.stop(1, error);
-			throw error;
 		}
 		signal.throwIfAborted();
+		throw new ShardError("CLOSED", "Sharding is closed.");
 	}
-	/** READY acknowledges actual identification; the coordinator then starts the bucket cooldown. */
+	private flushOutcomes(): Promise<void> {
+		return (this.flushing ??= (async () => {
+			if (!this.connected || this.closed) return;
+			for (const [id, outcome] of this.outcomes) {
+				await this.rpc(frame("permitOutcome", undefined, outcome), {
+					timeoutMs: 10000,
+				});
+				this.outcomes.delete(id);
+			}
+		})().finally(() => {
+			this.flushing = undefined;
+		}));
+	}
+	/** READY reports application/Gateway progress; permit consumption is acknowledged at the send boundary. */
 	public identified(): void {
 		if (this.connected && !this.closed) {
 			try {
 				this.send(
 					frame("done", undefined, {
+						authority: this.authority,
 						shard: this.id,
 						generation: this.config!.generation,
 					}),
@@ -381,9 +508,10 @@ export class ShardLink extends ShardMessenger<ShardClientEvent> {
 		}
 	}
 	private reportMetrics(): void {
-		if (this.metrics && this.connected && !this.closed)
+		if (this.metrics && this.authority && this.id !== null && !this.closed)
 			this.send(
 				frame("metrics", undefined, {
+					authority: this.authority,
 					shard: this.id,
 					generation: this.config!.generation,
 					...this.metrics(),
@@ -418,9 +546,11 @@ export class ShardLink extends ShardMessenger<ShardClientEvent> {
 		}
 		return promise;
 	}
+	private readonly delivery: IpcWindow;
 	private readonly onMessage = (input: unknown): void => {
 		try {
 			const message = decode(input, this.policy.maxBytes, [
+				"receipt",
 				"ping",
 				"stop",
 				"reply",
@@ -429,11 +559,25 @@ export class ShardLink extends ShardMessenger<ShardClientEvent> {
 				"assign",
 				"healthy",
 				"unavailable",
+				"revoke",
+				"releaseAssignment",
+				"gatewayBlock",
 			]);
+			if (!this.delivery.receive(message, (receipt) => this.send(receipt)))
+				return;
 			this.lastSeen = performance.now();
 			switch (message.op) {
+				case "gatewayBlock":
+					this.lifecycle?.block?.(message.data.code);
+					return;
+				case "releaseAssignment":
+					this.releaseAssignment(message);
+					return;
 				case "unavailable":
 					this.unavailable();
+					return;
+				case "revoke":
+					this.unavailable(true);
 					return;
 				case "assign":
 					this.applyAssignment(message);
@@ -441,11 +585,10 @@ export class ShardLink extends ShardMessenger<ShardClientEvent> {
 				case "healthy":
 					if (message.id !== this.appliedId || this.closed) return;
 					this.appliedId = undefined;
+					this.authority = message.id;
 					this.connected = this.id !== null;
 					this.availability.set(this.connected);
-					clearTimeout(this.outage);
-					this.outage = undefined;
-					this.lifecycle?.maintenance(!this.connected);
+					if (this.connected) this.lifecycle?.maintenance(false);
 					this.publishStatus();
 					if (this.connected) {
 						this.event(
@@ -463,6 +606,7 @@ export class ShardLink extends ShardMessenger<ShardClientEvent> {
 				case "ping":
 					this.send(frame("pong", message.id));
 					this.reportMetrics();
+					void this.flushOutcomes().catch(() => {});
 					return;
 				case "stop":
 					void this.stop(0);
@@ -509,75 +653,122 @@ export class ShardLink extends ShardMessenger<ShardClientEvent> {
 				context,
 			});
 	}
-	private armOutage(): void {
-		if (this.outage || this.closed) return;
-		this.outage = setTimeout(() => {
-			void this.stop(
-				1,
-				new ShardError(
-					"COORDINATOR_TIMEOUT",
-					"Coordinator reconciliation deadline expired; restarting the entire shard process.",
-				),
-			);
-		}, this.config?.maxDisconnectedLifetimeMs ?? 900000);
+	private releaseAssignment(message: Frame<"releaseAssignment">): void {
+		const reply = (status: "released" | "unknown", reason = "") =>
+			this.send(frame("releaseResult", message.id, { status, reason }));
+		if (this.released.has(message.id)) {
+			reply("released");
+			return;
+		}
+		if (
+			!this.assignment ||
+			!sameAssignment(message.data.assignment, this.assignment)
+		) {
+			reply("unknown", "Release targets an obsolete assignment.");
+			return;
+		}
+		if (this.releasing) {
+			reply("unknown", "An earlier barrier is still running.");
+			return;
+		}
+		this.unavailable(true);
+		const signal = AbortSignal.timeout(message.data.timeoutMs);
+		this.releasing = (async () => {
+			if (!this.releaseBarrier)
+				throw new ShardError(
+					"RELEASE_UNKNOWN",
+					"No application effect barrier is registered.",
+				);
+			await this.releaseBarrier(signal);
+			await Promise.all([...this.active.values()].map((entry) => entry.task));
+			await this.lifecycle?.released?.();
+			signal.throwIfAborted();
+			this.assignment = undefined;
+			this.config!.shard = null;
+			this.released.add(message.id);
+			if (this.released.size > 128)
+				this.released.delete(this.released.values().next().value!);
+			reply("released");
+		})()
+			.catch((error) => {
+				reply(
+					"unknown",
+					error instanceof Error
+						? error.message.slice(0, 500)
+						: "Effect barrier failed.",
+				);
+			})
+			.finally(() => {
+				this.releasing = undefined;
+			});
+		void this.releasing.catch(() => this.onDisconnect());
 	}
-	private unavailable(): void {
+	private unavailable(revoke = false): void {
 		const wasConnected = this.connected;
 		this.connected = false;
 		this.appliedId = undefined;
+		if (revoke) this.authority = undefined;
+		this.nextAssignment = undefined;
 		this.revision++;
 		this.availability.set(false);
-		this.lifecycle?.maintenance(true);
+		for (const cancel of [...this.revokePermits]) cancel();
+		if (revoke) this.lifecycle?.maintenance(true);
+		if (revoke) this.restScheduler.revoke();
 		this.requests.close();
-		if (this.id !== null) this.armOutage();
+		for (const entry of this.active.values())
+			entry.controller.abort(
+				new ShardError("DISCONNECTED", "Coordinator unavailable."),
+			);
 		this.publishStatus();
 		if (wasConnected)
 			this.event(
 				"alert",
 				"maintenance_started",
-				"Coordinator unavailable; keeping Discord connected while retrying.",
-				{
-					shard: this.id,
-					maxDisconnectedLifetimeMs:
-						this.config?.maxDisconnectedLifetimeMs ?? 900000,
-				},
+				"Control unavailable; retaining committed ownership and waiting for new admission authority.",
+				{ shard: this.id },
 			);
 	}
-	private applyAssignment(message: Frame): void {
+	private applyAssignment(message: Frame<"assign">): void {
 		if (!this.config || this.closed) return;
+		this.unavailable(message.data.shard === null);
 		if (this.applying) {
 			// Reconnects can overtake a slow gateway close. Retain only the latest replacement instruction.
 			this.nextAssignment = message;
 			return;
 		}
 		this.applying = true;
-		const { shard, count, reason } = message.data as {
-			shard: number | null;
-			count: number;
-			reason: string;
-		};
+		const { shard, count, reason, assignment } = message.data;
+		if (assignment) {
+			assignmentSchema.assert(assignment);
+			if (
+				assignment.workerBootId !== this.config.generation ||
+				(shard !== null &&
+					(shard !== assignment.shardId || count !== assignment.totalShards))
+			)
+				throw new ShardError(
+					"OWNERSHIP",
+					"Assignment targets another worker or layout.",
+				);
+			this.assignment = assignment;
+			if (message.data.rest && shard !== null)
+				this.restScheduler.configure(assignment, message.data.rest);
+		}
 		if (shard !== null && shard >= count)
 			throw new ShardError(
 				"PROTOCOL",
 				"Assigned shard ID is outside the current count.",
 			);
 		const revision = ++this.revision;
-		this.connected = false;
-		this.appliedId = undefined;
-		this.availability.set(false);
-		this.lifecycle?.maintenance(true);
-		if (shard !== null) this.armOutage();
 		void Promise.resolve()
 			.then(async () => {
-				if (this.closed) return;
+				if (this.closed || revision !== this.revision) return;
 				const previous = this.config!.shard;
 				await this.lifecycle?.assignment(shard, count);
+				if (this.closed || revision !== this.revision) return;
 				this.config!.shard = shard;
 				this.config!.count = count;
 				this.publishStatus();
 				if (shard === null) {
-					clearTimeout(this.outage);
-					this.outage = undefined;
 					if (previous !== null || this.dormantReason !== reason)
 						this.event(
 							"alert",
@@ -596,7 +787,8 @@ export class ShardLink extends ShardMessenger<ShardClientEvent> {
 				this.send(frame("applied", message.id));
 			})
 			.catch((error) => {
-				void this.stop(1, error);
+				if (!this.closed && revision === this.revision)
+					void this.stop(1, error);
 			})
 			.finally(() => {
 				this.applying = false;
@@ -619,6 +811,22 @@ export class ShardLink extends ShardMessenger<ShardClientEvent> {
 		if (
 			!this.connected ||
 			this.closed ||
+			!this.assignment ||
+			!sameAssignment(this.assignment, message.data.assignment)
+		) {
+			if (!this.closed)
+				this.send(
+					frame("result", message.id, {
+						shard: message.data.target,
+						generation: message.data.generation,
+						result: failure(
+							new ShardError("DISCONNECTED", "Shard authority is unavailable."),
+						),
+					}),
+				);
+			return;
+		}
+		if (
 			message.data.target !== this.id ||
 			message.data.generation !== this.config!.generation
 		)
@@ -700,7 +908,7 @@ export class ShardLink extends ShardMessenger<ShardClientEvent> {
 	private send(message: Frame): void {
 		if (!process.connected || !process.send)
 			throw new ShardError("DISCONNECTED", "Parent IPC is disconnected.");
-		process.send(encode(message, this.policy.maxBytes));
+		this.delivery.send(message, (encoded) => process.send!(encoded));
 	}
 	private stop(code: number, cause?: unknown): Promise<void> {
 		return (this.stopPromise ??= (async () => {
@@ -723,6 +931,7 @@ export class ShardLink extends ShardMessenger<ShardClientEvent> {
 	 * @returns The shared close promise, waiting briefly for handlers to settle. Normally called by client.destroy().
 	 */
 	public close(): Promise<void> {
+		this.restScheduler.revoke();
 		this.closed = true;
 		this.connected = false;
 		return (this.closePromise ??= this.finish());
@@ -730,7 +939,6 @@ export class ShardLink extends ShardMessenger<ShardClientEvent> {
 	private async finish(): Promise<void> {
 		clearInterval(this.heartbeat);
 		clearInterval(this.poll);
-		clearTimeout(this.outage);
 		this.availability.close();
 		this.assignmentWait?.reject(
 			new ShardError("CLOSED", "Sharding is closed."),

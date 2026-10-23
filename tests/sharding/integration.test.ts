@@ -167,7 +167,7 @@ describe("real loopback coordinator, supervisors and Bun shard processes", () =>
 			await s.close();
 		}
 	}, 15000);
-	test("reconciles after coordinator restart while preserving its existing child", async () => {
+	test("blocks adoption after coordinator state loss while preserving the existing child", async () => {
 		const s = await stack();
 		let replacement: ShardCoordinator | undefined;
 		try {
@@ -177,15 +177,22 @@ describe("real loopback coordinator, supervisors and Bun shard processes", () =>
 			const port = Number(new URL(s.coordinator.url!).port);
 			await s.coordinator.close();
 			await until(() => !a.isConnected);
-			replacement = new ShardCoordinator({ ...s.base, port });
+			replacement = new ShardCoordinator({
+				...s.base,
+				port,
+				development: false,
+				applicationId: "test-app",
+			});
 			await replacement.start();
-			await until(
-				() =>
-					a.isConnected &&
-					a.processes[0]?.state === "running" &&
-					a.processes[0].pid === old,
-			);
-			expect((await a.request(0, "probe", { value: 6 })).value).toBe(6);
+			await until(() => a.isConnected);
+			await Bun.sleep(200);
+			expect(replacement.status.recoveryRequired).toBe(true);
+			expect(replacement.status.leasedShards).toEqual([]);
+			expect(a.processes[0].pid).toBe(old);
+			expect(a.processes[0].state).toBe("maintenance");
+			await expect(a.request(0, "probe", { value: 6 })).rejects.toMatchObject({
+				code: "DISCONNECTED",
+			});
 			await a.close();
 		} finally {
 			await replacement?.close();
@@ -226,19 +233,22 @@ describe("real loopback coordinator, supervisors and Bun shard processes", () =>
 			await s.close();
 		}
 	}, 10000);
-	test("reconnect:false stops local children without starting them after coordinator recovery", async () => {
+	test("reconnect:false leaves local processes offline until explicit manager shutdown", async () => {
 		const s = await stack();
 		let replacement: ShardCoordinator | undefined;
 		try {
 			const a = await s.host("a", { reconnect: false });
 			await until(() => a.processes[0]?.state === "running");
+			const pid = a.processes[0].pid;
 			const port = Number(new URL(s.coordinator.url!).port);
 			await s.coordinator.close();
-			await until(() => a.processes[0]?.pid === null);
+			await until(() => a.processes[0]?.state === "maintenance");
 			replacement = new ShardCoordinator({ ...s.base, port });
 			await replacement.start();
 			await Bun.sleep(250);
 			expect(a.isConnected).toBe(false);
+			expect(a.processes[0].pid).toBe(pid);
+			await a.close();
 			expect(a.processes[0].pid).toBeNull();
 		} finally {
 			await replacement?.close();

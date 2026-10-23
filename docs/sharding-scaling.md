@@ -24,27 +24,28 @@ shows the same configuration without editing TypeScript.
 
 ## Policy options
 
-| `scaling` key          | Default   | Constraint / meaning                                            |
-| ---------------------- | --------- | --------------------------------------------------------------- |
-| `maxShards`            | Required  | Global ceiling, `1..4096`, bounded by total host capacity       |
-| `minShards`            | `1`       | At most maxShards                                               |
-| `targetGuildsPerShard` | `0` (off) | Optional average target, up to `2500`; uses cached guild counts |
-| `pollIntervalMs`       | `300000`  | Metadata poll; `60000..86400000` ms                             |
-| `cooldownMs`           | `1800000` | Between transition attempts; `60000..604800000` ms              |
-| `confirmations`        | `3`       | Matching decisions required; `1..100`                           |
-| `allowDownscale`       | `true`    | Allows fewer shards inside this opt-in mode                     |
-| `rebalanceThreshold`   | `0.25`    | Required peak weighted-load improvement; `0.05..1`              |
-| `sessionReserve`       | `0`       | Unspent IDENTIFY allowance beyond transition needs              |
-| `drainTimeoutMs`       | `30000`   | Confirm old process exits; `100..300000` ms                     |
-| `readyTimeoutMs`       | `300000`  | New gateway readiness; `100..3600000` ms                        |
+| `scaling` key          | Default   | Constraint / meaning                                               |
+| ---------------------- | --------- | ------------------------------------------------------------------ |
+| `maxShards`            | Required  | Global ceiling, `1..4096`, bounded by total host capacity          |
+| `minShards`            | `1`       | At most maxShards                                                  |
+| `targetGuildsPerShard` | `0` (off) | Optional average target, up to `2500`; uses cached guild counts    |
+| `pollIntervalMs`       | `300000`  | Metadata poll; `60000..86400000` ms                                |
+| `cooldownMs`           | `1800000` | Between transition attempts; `60000..604800000` ms                 |
+| `confirmations`        | `3`       | Matching decisions required; `1..100`                              |
+| `allowDownscale`       | `true`    | Allows fewer shards inside this opt-in mode                        |
+| `rebalanceThreshold`   | `0.25`    | Required peak weighted-load improvement; `0.05..1`                 |
+| `sessionReserve`       | `0`       | Unspent IDENTIFY allowance beyond transition needs                 |
+| `drainTimeoutMs`       | `30000`   | Confirm old process exits; `100..300000` ms                        |
+| `readyTimeoutMs`       | `300000`  | New gateway readiness; `100..3600000` ms                           |
+| `stabilityMs`          | `5000`    | Continuous application readiness before completion; `0..300000` ms |
 
 Each worker's `maxShards` is `1..4096`; optional `weight` defaults to `1`
 (range `0.01..1000`). Weight describes relative host capacity.
 
 Initial assignments must still cover the configured `shardCount` once.
-In automatic mode that count is a seed: fresh metadata and policy determine
-startup placement. No previous topology, cooldown or confirmation history is
-restored. Use `minShards` for a floor across restarts.
+After the production recovery gate, fresh metadata and policy determine later
+placement. No topology, cooldown or confirmation history survives restart. Use
+`minShards` for a floor; first stop/fence the prior fleet and reconcile its effects.
 
 ## How a count is chosen
 
@@ -77,11 +78,13 @@ loads, then later polls can rebalance.
    metrics no older than 15 seconds. A larger Discord recommendation may repair
    an unready topology.
 2. Confirm the plan and cooldown. Require remaining session starts of at least
-   `max(currentCount, proposedCount) + sessionReserve` before disrupting children.
+   `currentCount + proposedCount + sessionReserve` before disrupting children.
+   Resolve unknown admission and credential faults first.
 3. Return `RESHARDING` for shard RPC/IDENTIFY work. Ask every host to drain and
-   confirm actual child exits.
+   confirm actual child exits and settlement of accepted fleet HTTP work.
 4. Commit the new topology only after all old processes stop. Start new children
-   and wait for gateway readiness.
+   and wait for stable application readiness. The memory transition record exposes
+   its operation ID, planned total/placement and draining/starting/degraded phase.
 
 | Failure point                                  | Recovery                                                                    |
 | ---------------------------------------------- | --------------------------------------------------------------------------- |
@@ -110,9 +113,11 @@ confirmations, cooldown and safety conditions; simultaneous checks share a promi
 
 Size `limits.maxPending` (default 256) for startup IDENTIFY work and
 `limits.maxBytes` for assignment frames. These checks run before draining.
-The 5.5-second IDENTIFY bucket spacing and the host's maximum 300-second
-`identifyTimeoutMs` still apply. More hosts do not increase Discord concurrency.
+The 5.5-second receipt-based IDENTIFY bucket spacing still applies. Each attempt
+has at most 15 seconds, even if the host's `identifyTimeoutMs` is larger; waiting
+workers request new attempts without reusing expired permits. More hosts do not
+increase Discord concurrency.
 
-[Recovery limitations](sharding-recovery.md#restart-tradeoffs) also apply during
+[Recovery requirements](sharding-recovery.md#restart-runbook) also apply during
 coordinator restarts. [Logs](console-logging.md) expose `scaling_status`,
 `scaling_failed` and host `reassigned` events.

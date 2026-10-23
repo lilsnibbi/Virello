@@ -32,6 +32,7 @@ export async function until(
 export async function stack(options: Partial<ShardCoordinatorOptions> = {}) {
 	const folder = mkdtempSync(join(tmpdir(), "virello-shards-"));
 	const base: ShardCoordinatorOptions = {
+		development: true,
 		shardCount: 2,
 		workers: [
 			{ id: "a", token: tokenA, shards: [0] },

@@ -17,8 +17,17 @@ export type $Fetch = (
 	input: string | URL,
 	init?: RequestInit,
 ) => Promise<Response>;
+/** One logical HTTP scheduler shared by all workers of a bot. */
+export interface $RestScheduler {
+	/** Submit bounded work; mutation timeouts must preserve the operation's unknown outcome. */
+	request(request: $RestRequest): Promise<unknown>;
+}
 /** Discord REST transport, queue, retry, and response limits. */
 export interface $RestOptions {
+	/** External fleet scheduler. Managed Virello workers use their assignment's authenticated scheduler. */
+	scheduler?: $RestScheduler;
+	/** Internal dispatch guard called for each physical attempt, after queueing and before transmission. */
+	beforeSend?: (request: $RestRequest) => void;
 	/** Discord API base URL. Defaults to https://discord.com/api/v10; TLS is required outside loopback tests. */
 	baseURL?: string;
 	/** HTTP transport. Defaults to global fetch. */
@@ -40,6 +49,12 @@ export interface $RestOptions {
 }
 /** One JSON request relative to the configured Discord API base URL. */
 export interface $RestRequest {
+	/** Durable business operation key for mutations. Reuse this exact key when querying an ambiguous result. */
+	operationId?: string;
+	/** Ordered business-effect key. Unknown mutations quarantine this key until explicitly reconciled. */
+	executionKey?: string;
+	/** Whole-operation deadline including queue residence, milliseconds. Defaults to 15000. */
+	deadlineMs?: number;
 	/** HTTP method used for the API call. */
 	method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 	/** Absolute API path beginning with one slash. Traversal, fragments, backslashes, and embedded newlines are rejected. */
@@ -95,6 +110,9 @@ async function readResponse(
 
 /** Discord REST over Bun fetch. No environment variables are read by the engine. */
 export class RestClient {
+	private readonly scheduler?: $RestScheduler;
+	private readonly beforeSend?: (request: $RestRequest) => void;
+	private readonly starts: number[] = [];
 	readonly #token: string;
 	private readonly fetcher: $Fetch;
 	private readonly clock: $Clock;
@@ -117,6 +135,8 @@ export class RestClient {
 	 * @throws For an empty token, invalid endpoint, or invalid limits.
 	 */
 	public constructor(token: string, options: $RestOptions = {}) {
+		this.scheduler = options.scheduler;
+		this.beforeSend = options.beforeSend;
 		this.#token = token;
 		if (!token.trim()) throw new TypeError("A bot token is required.");
 		this.base = endpoint(
@@ -182,12 +202,35 @@ export class RestClient {
 					"REST paths must be absolute API paths without traversal.",
 				),
 			);
-		const signal = request.signal
-			? AbortSignal.any([request.signal, this.lifetime.signal])
-			: this.lifetime.signal;
-		if (signal.aborted) return Promise.reject(signal.reason);
-		if (this.pending >= this.maximumPending)
+		const deadlineMs = integer(request.deadlineMs ?? 15000, "deadlineMs", 1);
+		const deadline = new AbortController();
+		const timer = this.clock.setTimeout(
+			() => deadline.abort(new Error("REST operation deadline elapsed.")),
+			deadlineMs,
+		);
+		const signal = AbortSignal.any([
+			...(request.signal ? [request.signal] : []),
+			this.lifetime.signal,
+			deadline.signal,
+		]);
+		if (signal.aborted) {
+			this.clock.clearTimeout(timer);
+			return Promise.reject(signal.reason);
+		}
+		if (this.pending >= this.maximumPending) {
+			this.clock.clearTimeout(timer);
 			return Promise.reject(new Error("REST queue capacity exceeded."));
+		}
+		if (this.scheduler) {
+			this.pending++;
+			return this.scheduler
+				.request({ ...request, signal, deadlineMs })
+				.then((value) => value as T)
+				.finally(() => {
+					this.pending--;
+					this.clock.clearTimeout(timer);
+				});
+		}
 		let body: string | FormData | undefined;
 		try {
 			body =
@@ -203,12 +246,14 @@ export class RestClient {
 				body = form;
 			}
 		} catch (error) {
+			this.clock.clearTimeout(timer);
 			return Promise.reject(error);
 		}
 		const snapshot = { ...request };
 		this.pending++;
 		return this.execute<T>(snapshot, body, signal).finally(() => {
 			this.pending--;
+			this.clock.clearTimeout(timer);
 		});
 	}
 	private async execute<T>(
@@ -277,6 +322,7 @@ export class RestClient {
 		rates: RateLimits,
 	): Promise<{ response: Response; result: unknown }> {
 		signal.throwIfAborted();
+		if (request.auth !== false) await this.globalSlot(signal);
 		const controller = new AbortController();
 		const attemptSignal = AbortSignal.any([signal, controller.signal]);
 		const timer = this.clock.setTimeout(
@@ -292,6 +338,8 @@ export class RestClient {
 				headers.set("Authorization", `Bot ${this.#token}`);
 			if (typeof body === "string")
 				headers.set("Content-Type", "application/json");
+			attemptSignal.throwIfAborted();
+			this.beforeSend?.(request);
 			const response = await this.fetcher(this.base + request.path, {
 				method: request.method,
 				headers,
@@ -308,6 +356,19 @@ export class RestClient {
 			return { response, result };
 		} finally {
 			this.clock.clearTimeout(timer);
+		}
+	}
+	private async globalSlot(signal: AbortSignal): Promise<void> {
+		for (;;) {
+			signal.throwIfAborted();
+			const now = this.clock.now();
+			while (this.starts.length && this.starts[0] <= now - 1000)
+				this.starts.shift();
+			if (this.starts.length < 50) {
+				this.starts.push(now);
+				return;
+			}
+			await delay(this.clock, Math.max(1, this.starts[0] + 1000 - now), signal);
 		}
 	}
 	/**

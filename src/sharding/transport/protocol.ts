@@ -3,6 +3,11 @@
 import { timingSafeEqual } from "node:crypto";
 import { type } from "arktype";
 import { ShardError, type ShardLimits } from "../types";
+import {
+	assignmentSchema,
+	epochSchema,
+	permitOutcomeSchema,
+} from "../authority";
 
 export const identifier = type("string").narrow((v) =>
 	/^[a-zA-Z0-9:_-]{1,128}$/.test(v),
@@ -14,6 +19,9 @@ const outcome = type({ ok: "true", value: "unknown", "+": "reject" }).or({
 	"+": "reject",
 });
 const schemas = {
+	receipt: type({
+		sequence: "number.integer > 0 & number <= 9007199254740991",
+	}),
 	welcome: type({
 		shards: integer.array(),
 		capacity: "number.integer >= 0 & number <= 4096",
@@ -30,15 +38,37 @@ const schemas = {
 		previous: integer.or("null"),
 		generation: identifier,
 		preferred: integer,
+		"assignment?": assignmentSchema,
+		"deploymentId?": identifier,
 	}),
 	assign: type({
 		shard: integer.or("null"),
 		count: "number.integer > 0 & number <= 4096",
 		reason: "string <= 500",
+		"assignment?": assignmentSchema,
+		"rest?": { url: "string", capability: "string" },
 	}),
 	applied: type({}),
 	healthy: type({}),
 	unavailable: type({}),
+	revoke: type({}),
+	gatewayBlock: type({ code: identifier }),
+	permitOutcome: permitOutcomeSchema,
+	drainShard: type({ assignment: assignmentSchema, operationId: identifier }),
+	releaseAssignment: type({
+		assignment: assignmentSchema,
+		timeoutMs: "number.integer > 0 & number <= 300000",
+	}),
+	releaseResult: type({
+		status: "'released' | 'unknown'",
+		reason: "string <= 500",
+	}),
+	releaseState: type({
+		assignment: assignmentSchema,
+		operationId: identifier,
+		status: "'released' | 'unknown'",
+	}),
+	preflight: type({ starts: "number.integer >= 0 & number <= 8192" }),
 	poll: type({}),
 	drain: type({}),
 	drained: type({}),
@@ -47,10 +77,14 @@ const schemas = {
 		count: "number.integer > 0 & number <= 4096",
 	}),
 	metrics: type({
+		"authority?": identifier,
 		shard: integer,
 		generation: identifier,
 		ready: "boolean",
+		"applicationReady?": "boolean",
 		guilds: "number.integer >= 0 & number <= 10000000",
+		"gatewayState?": "string <= 32",
+		"blockedCode?": identifier,
 	}),
 	stop: type({}),
 	ping: type({}),
@@ -58,14 +92,23 @@ const schemas = {
 	release: type({}),
 	released: type({}),
 	ready: type({ shard: integer, generation: identifier }),
+	idle: type({ shard: integer, generation: identifier }),
 	offline: type({ shard: integer.or("null"), generation: identifier }),
-	done: type({ shard: integer, generation: identifier }),
+	done: type({
+		shard: integer,
+		generation: identifier,
+		"authority?": identifier,
+	}),
 	identify: type({
+		"authority?": identifier,
 		shard: integer,
 		generation: identifier,
 		timeoutMs: "number.integer > 0",
+		"attemptId?": identifier,
+		"assignment?": assignmentSchema,
 	}),
 	call: type({
+		"authority?": identifier,
 		source: "number.integer >= -1",
 		target: integer,
 		name: identifier,
@@ -76,6 +119,7 @@ const schemas = {
 		source: "number.integer >= -1",
 		target: integer,
 		generation: identifier,
+		assignment: assignmentSchema,
 		name: identifier,
 		payload: "unknown",
 		timeoutMs: "number.integer > 0",
@@ -90,6 +134,9 @@ export type Frame<K extends Op = Op> = K extends Op
 			v: 1;
 			op: K;
 			id: string;
+			session?: string;
+			term?: string;
+			sequence?: number;
 			data: (typeof schemas)[K]["infer"];
 		}
 	: never;
@@ -98,6 +145,9 @@ const envelope = type({
 	op: identifier,
 	id: identifier,
 	data: "object",
+	"session?": identifier,
+	"term?": epochSchema,
+	"sequence?": "number.integer > 0 & number <= 9007199254740991",
 	"+": "reject",
 });
 export type Limits = Required<ShardLimits>;
@@ -211,29 +261,69 @@ export function decode<K extends Op>(
 	const data = schema.assert(parsed.data);
 	// ArkType validates values; explicitly reject undeclared keys on every message shape.
 	const keys: Record<Op, readonly string[]> = {
+		receipt: ["sequence"],
 		welcome: ["shards", "capacity", "count", "limits"],
 		boot: [],
-		lease: ["previous", "generation", "preferred"],
-		assign: ["shard", "count", "reason"],
+		lease: [
+			"previous",
+			"generation",
+			"preferred",
+			"assignment",
+			"deploymentId",
+		],
+		assign: ["shard", "count", "reason", "assignment", "rest"],
 		applied: [],
 		healthy: [],
 		unavailable: [],
+		revoke: [],
+		gatewayBlock: ["code"],
+		permitOutcome: ["attemptId", "assignment", "kind"],
+		drainShard: ["assignment", "operationId"],
+		releaseAssignment: ["assignment", "timeoutMs"],
+		releaseResult: ["status", "reason"],
+		releaseState: ["assignment", "operationId", "status"],
+		preflight: ["starts"],
 		poll: [],
 		drain: [],
 		drained: [],
 		assignment: ["shards", "count"],
-		metrics: ["shard", "generation", "ready", "guilds"],
+		metrics: [
+			"shard",
+			"generation",
+			"ready",
+			"applicationReady",
+			"guilds",
+			"authority",
+			"gatewayState",
+			"blockedCode",
+		],
 		stop: [],
 		ping: [],
 		pong: [],
 		release: [],
 		released: [],
 		ready: ["shard", "generation"],
+		idle: ["shard", "generation"],
 		offline: ["shard", "generation"],
-		done: ["shard", "generation"],
-		identify: ["shard", "generation", "timeoutMs"],
-		call: ["source", "target", "name", "payload", "timeoutMs"],
-		invoke: ["source", "target", "generation", "name", "payload", "timeoutMs"],
+		done: ["shard", "generation", "authority"],
+		identify: [
+			"shard",
+			"generation",
+			"timeoutMs",
+			"authority",
+			"attemptId",
+			"assignment",
+		],
+		call: ["source", "target", "name", "payload", "timeoutMs", "authority"],
+		invoke: [
+			"source",
+			"target",
+			"generation",
+			"assignment",
+			"name",
+			"payload",
+			"timeoutMs",
+		],
 		reply: ["ok", "value", "error"],
 		result: ["shard", "generation", "result"],
 		cancel: [],

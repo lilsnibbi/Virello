@@ -66,7 +66,7 @@ export class FakeSocket implements $GatewaySocket {
 	}
 	public close(code = 1000): void {
 		this.closed = code;
-		this.readyState = WebSocket.CLOSED;
+		this.disconnect(code);
 	}
 	public raw(data: unknown): void {
 		this.onmessage?.call(

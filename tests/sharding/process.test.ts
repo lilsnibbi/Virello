@@ -100,7 +100,7 @@ describe("independent host supervisor processes over the network transport", () 
 			await s.close();
 		}
 	}, 30000);
-	test("login installs the identify hook and stops on exhausted re-identification allowance", async () => {
+	test("login installs the identify hook and keeps the worker alive while re-identification allowance is exhausted", async () => {
 		const s = await stack({
 			sessionStartLimit: {
 				total: 1,
@@ -119,9 +119,14 @@ describe("independent host supervisor processes over the network transport", () 
 			await until(() => a.processes[0]?.state === "running");
 			await until(async () => await a.request(0, "loginState", null));
 			expect(await a.request(0, "loginState", null)).toBe(true);
-			await expect(a.request(0, "identify", null)).rejects.toThrow();
-			await until(() => a.processes[0]?.state === "failed");
-			expect(a.processes[0].pid).toBeNull();
+			const pid = a.processes[0].pid!;
+			await expect(
+				a.request(0, "identify", null, { timeoutMs: 200 }),
+			).rejects.toThrow();
+			expect(a.processes[0].pid).toBe(pid);
+			expect(alive(pid)).toBe(true);
+			expect(await a.request(0, "loginState", null)).toBe(true);
+			expect(s.coordinator.status.admission.remaining).toBe(0);
 		} finally {
 			await s.close();
 		}

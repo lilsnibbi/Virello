@@ -74,12 +74,12 @@ const summaries: Record<string, Summary> = {
 		fields: ["host", "reason", "attempt"],
 	},
 	"sharding.manager:connection_lost": {
-		message: "Coordinator lost; shards in maintenance",
+		message: "Coordinator lost; existing owners retained",
 		fields: ["host", "reason", "attempt"],
 	},
 	"sharding.client:maintenance_started": {
-		message: "Maintenance; Discord stays connected",
-		fields: ["shard", "maxDisconnectedLifetimeMs"],
+		message: "Control unavailable; fresh admission waiting",
+		fields: ["shard"],
 	},
 	"sharding.client:assignment_reconciled": {
 		message: "Assignment reconciled; maintenance cleared",

@@ -1,4 +1,7 @@
 import { ShardCoordinator } from "virello/sharding";
+import { createInterface } from "node:readline";
+import { logEvent } from "virello/engine";
+import { type } from "virello/validation";
 import {
 	ExampleConfigurationError,
 	integerEnv,
@@ -19,6 +22,7 @@ async function main(): Promise<void> {
 			"Provide both SHARD_TLS_CERT and SHARD_TLS_KEY, or leave both unset.",
 		);
 	const coordinator = new ShardCoordinator({
+		applicationId: requiredEnv("DISCORD_APPLICATION_ID"),
 		shardCount,
 		workers: workerAssignments(shardCount),
 		scaling: scalingOptions(),
@@ -30,15 +34,57 @@ async function main(): Promise<void> {
 		logger: exampleLogger,
 	});
 	let stopping = false;
+	let input: ReturnType<typeof createInterface> | undefined;
 	const detach = onShutdown(
 		() => {
 			stopping = true;
+			input?.close();
 			return coordinator.close();
 		},
 		{ logger: exampleLogger, component: "coordinator" },
 	);
 	try {
 		await coordinator.start();
+		const operationId = coordinator.status.coordinatorTerm!;
+		logEvent(exampleLogger, "notif", {
+			component: "coordinator",
+			event: "recovery_required",
+			message:
+				"Stop or fence every prior host tree and review outstanding effects. Then submit the recovery JSON on stdin; see examples/README.md.",
+			context: {
+				operationId,
+				hosts: coordinator.workers.map((host) => host.id),
+			},
+		});
+		input = createInterface({ input: process.stdin, terminal: false });
+		input.on("line", (line) => {
+			void (async () => {
+				if (line.length > 8192)
+					throw new Error("Recovery input exceeds 8192 characters.");
+				const evidence = type({
+					operationId: "string",
+					hosts: "string[]",
+					evidence: "string",
+					"+": "reject",
+				}).assert(JSON.parse(line));
+				if (evidence.operationId !== operationId)
+					throw new Error("Use this coordinator incarnation's operationId.");
+				await coordinator.confirmFleetStopped(evidence);
+				logEvent(exampleLogger, "notif", {
+					component: "coordinator",
+					event: "recovery_confirmed",
+					message: "Reviewed recovery complete; fresh assignments may start.",
+				});
+			})().catch((error) =>
+				logEvent(exampleLogger, "alert", {
+					component: "coordinator",
+					event: "recovery_rejected",
+					message:
+						"Recovery was not confirmed. Inspect the evidence and current status.",
+					error,
+				}),
+			);
+		});
 	} catch (error) {
 		if (stopping) return;
 		detach();

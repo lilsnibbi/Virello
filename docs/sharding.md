@@ -10,8 +10,11 @@ flowchart TD
     C <-->|authenticated WebSocket| H["Host: ShardManager"]
     H <-->|Bun IPC| S0["bot.ts: shard 0"]
     H <-->|Bun IPC| S1["bot.ts: shard 1"]
-    S0 <--> D["Discord gateway / REST"]
+    S0 <--> D["Discord gateway"]
     S1 <--> D
+    S0 <-->|bounded HTTP| R["Fleet REST at coordinator"]
+    S1 <--> R
+    R <--> A["Discord HTTP API"]
 ```
 
 The coordinator assigns shards and routes calls. A host supervises local Bun
@@ -40,6 +43,7 @@ const token = Bun.env.SHARD_HOST_TOKEN;
 if (!botToken || !token) throw new Error("Set both bot and host tokens.");
 
 const coordinator = new ShardCoordinator({
+	applicationId: Bun.env.DISCORD_APPLICATION_ID!,
 	shardCount: 2,
 	workers: [{ id: "local", token, shards: [0, 1] }],
 	botToken,
@@ -53,11 +57,17 @@ const stop = () => {
 process.once("SIGINT", stop);
 process.once("SIGTERM", stop);
 await coordinator.start();
+// Production admission remains blocked until an operator reviews prior process
+// trees and external effects, then calls confirmFleetStopped. See the runbook.
 ```
 
 Generate a separate host secret of 32–512 printable ASCII characters. The
 coordinator defaults to `127.0.0.1:8080`, with the `/sharding` WebSocket route.
 `workers[].shards` must initially cover every ID in `0..shardCount-1` exactly once.
+Every production start requires the explicit
+[recovery confirmation](sharding-recovery.md#restart-runbook). Contact loss keeps
+existing Gateway ownership sticky; state loss never automatically adopts workers.
+The [example](../examples/README.md) provides a local stdin confirmation flow.
 
 ## Host setup
 
@@ -90,6 +100,12 @@ await manager.start();
 Start `bun coordinator.ts` and `bun host.ts` in separate terminals. The host
 inherits the environment, including `DISCORD_TOKEN`, and starts the bot children.
 Use [one command registration writer](commands.md#registration-behavior).
+Keep global command writes, schema migrations and singleton scheduled jobs in an
+explicit deployment role or a designated owned shard. Importing the worker module
+on every process is not authority to perform global startup work.
+
+Managed REST uses the [fleet HTTP dispatcher](sharding-rest.md). It is independent
+of typed control IPC/WS; do not bypass it with per-worker bot-token fetch calls.
 
 > [!IMPORTANT]
 > Start the host, not the bot entrypoint separately. Do not set `VIRELLO_SHARD`

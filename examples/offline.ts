@@ -9,6 +9,7 @@ async function main(): Promise<void> {
 	// Disposable loopback-only secret. Nothing here contacts Discord.
 	const token = crypto.randomUUID() + crypto.randomUUID();
 	const coordinator = new ShardCoordinator({
+		development: true,
 		shardCount: 2,
 		port: 0,
 		workers: [{ id: "local", token, shards: [0, 1] }],

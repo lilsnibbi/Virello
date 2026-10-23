@@ -19,12 +19,6 @@ async function main(): Promise<void> {
 			50,
 			300000,
 		),
-		maxDisconnectedLifetimeMs: integerEnv(
-			"SHARD_MAX_DISCONNECTED_MS",
-			900000,
-			1,
-			2147483647,
-		),
 		logger: exampleLogger,
 	});
 	let stopping = false;

@@ -3,7 +3,6 @@ import "./fixtures/contracts";
 import {
 	container,
 	VirelloClient,
-	ShardCoordinator,
 	ShardError,
 	type ShardStats,
 } from "../../src/index";
@@ -371,20 +370,22 @@ test("stats honors coordinator default timeouts, request capacity and caller can
 	}
 }, 15000);
 
-test("stats fails during maintenance and returns fresh data after reconciliation without restarting the child", async () => {
+test("stats fails during contact loss and returns fresh data after reconciliation without restarting the child", async () => {
 	const s = await stack();
-	let replacement: ShardCoordinator | undefined;
+
 	try {
 		const a = await s.host("a", { script: fixture });
 		await until(() => a.processes[0]?.state === "running");
 		const pid = a.processes[0].pid;
 		await a.request(0, "statsUpdate", { guilds: 5, ready: true });
 		expect((await a.stats(0)).get(0)?.ok).toBe(true);
-		const port = Number(new URL(s.coordinator.url!).port);
+		a["options"].reconnect = { initialDelayMs: 500, maxDelayMs: 500 };
 		await a.request(0, "statsUpdate", { guilds: 5, ready: true, delayMs: 300 });
 		const inFlight = a.stats(0, { timeoutMs: 1000 });
 		await until(() => s.coordinator.pendingCount === 1);
-		await s.coordinator.close();
+		const peer = [...s.coordinator["sessions"].values()][0];
+		s.coordinator["disconnect"](peer, "peer_closed");
+		peer.socket?.terminate();
 		expect((await inFlight).get(0)).toMatchObject({
 			ok: false,
 			error: { code: "DISCONNECTED" },
@@ -395,8 +396,7 @@ test("stats fails during maintenance and returns fresh data after reconciliation
 			a.stats(0, { waitForCoordinator: true, timeoutMs: 30 }),
 		).rejects.toMatchObject({ code: "TIMEOUT" });
 		const waiting = a.stats(0, { waitForCoordinator: true, timeoutMs: 5000 });
-		replacement = new ShardCoordinator({ ...s.base, port });
-		await replacement.start();
+
 		// Host connectivity can precede child reconciliation, so either a fresh sample or explicit unavailability is valid here.
 		const recovered = (await waiting).get(0)!;
 		if (!recovered.ok) expect(recovered.error.code).toBe("UNAVAILABLE");
@@ -409,7 +409,6 @@ test("stats fails during maintenance and returns fresh data after reconciliation
 		await a.close();
 		await expect(a.stats(0)).rejects.toMatchObject({ code: "CLOSED" });
 	} finally {
-		await replacement?.close();
 		await s.close();
 	}
 }, 15000);

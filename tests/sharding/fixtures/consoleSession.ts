@@ -88,6 +88,7 @@ export async function captureConsoleSession(width: number) {
 		throw new Error("Unexpected fixture folder.");
 	const env = {
 		DISCORD_TOKEN: "fixture-discord-secret-never-use",
+		DISCORD_APPLICATION_ID: "fixture-app",
 		SHARD_HOST_TOKEN: tokenA,
 		SHARD_HOST_ID: "local",
 		SHARD_COUNT: "1",

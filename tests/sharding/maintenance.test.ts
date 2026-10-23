@@ -2,6 +2,8 @@ import { expect, test } from "bun:test";
 import { VirelloClient } from "../../src/core/client/VirelloClient";
 import { ManagedGateway } from "../../src/sharding/client/gateway";
 import { Availability } from "../../src/sharding/transport/availability";
+import { ready } from "../engine/fixtures";
+import { FakeClock, FakeSocket, flush } from "../engine/support";
 import { logger, stack, until } from "./helpers";
 
 test("coordinator waits fail by default and bound capacity, time and cancellation", async () => {
@@ -78,7 +80,7 @@ test("same-ID total changes retire the old gateway and dormant assignments have 
 	}
 });
 
-test("assigned outages terminate the child but full-capacity dormancy survives the same cutoff", async () => {
+test("assigned outages and full-capacity dormancy keep the child alive beyond the old cutoff", async () => {
 	const s = await stack({
 		shardCount: 1,
 		workers: [
@@ -108,9 +110,94 @@ test("assigned outages terminate the child but full-capacity dormancy survives t
 		await until(() => standby.processes[0]?.state === "running");
 		expect(standby.processes[0].pid).toBe(standbyPid);
 		await s.coordinator.close();
-		await until(() => standby.processes[0]?.state === "failed");
-		expect(standby.processes[0].pid).toBeNull();
+		await until(() => standby.processes[0]?.state === "maintenance");
+		await Bun.sleep(750);
+		expect(standby.processes[0].pid).toBe(standbyPid);
+		expect(standby["children"].get(0)!.process.exitCode).toBeNull();
 	} finally {
 		await s.close();
+	}
+});
+
+test("suspension cancels pending native identification and independent gateway reconnection", async () => {
+	const clock = new FakeClock();
+	const sockets: FakeSocket[] = [];
+	const permit = Promise.withResolvers<void>();
+	let authority = Promise.withResolvers<void>();
+	let authorized = true;
+	let deferPermit = true;
+	const client = new VirelloClient({
+		intents: [],
+		logger,
+		clock,
+		waitForIdentify: () => (deferPermit ? permit.promise : Promise.resolve()),
+		rest: {
+			fetch: async () =>
+				Response.json({
+					url: "wss://offline.example.test",
+					shards: 1,
+					session_start_limit: {
+						total: 10,
+						remaining: 10,
+						reset_after: 60000,
+						max_concurrency: 1,
+					},
+				}),
+		},
+		gateway: {
+			socket: () => {
+				const socket = new FakeSocket();
+				sockets.push(socket);
+				return socket;
+			},
+		},
+	});
+	const failures: unknown[] = [];
+	const gateway = new ManagedGateway(
+		client,
+		() => (authorized ? Promise.resolve() : authority.promise),
+		(error) => failures.push(error),
+	);
+	let starting: Promise<string> | undefined;
+	try {
+		await gateway.reconcile(0, 1);
+		starting = gateway.start("offline-placeholder");
+		void starting.catch(() => {});
+		await flush();
+		expect(sockets).toHaveLength(1);
+		sockets[0].receive({ op: 10, d: { heartbeat_interval: 1000 } });
+		await flush();
+		authorized = false;
+		gateway.suspend();
+		expect(sockets[0].closed).toBe(1000);
+		permit.resolve();
+		await clock.advance(30000);
+		expect(sockets[0].sent.some((packet) => packet.op === 2)).toBe(false);
+		expect(sockets).toHaveLength(1);
+		deferPermit = false;
+		await gateway.reconcile(0, 1);
+		authorized = true;
+		authority.resolve();
+		gateway.resume();
+		await flush();
+		expect(sockets).toHaveLength(2);
+		sockets[1].receive({ op: 10, d: { heartbeat_interval: 1000 } });
+		await flush();
+		expect(sockets[1].sent.filter((packet) => packet.op === 2)).toHaveLength(1);
+		sockets[1].receive({ op: 0, t: "READY", s: 1, d: ready() });
+		await starting;
+		sockets[1].receive({ op: 7, d: null });
+		authorized = false;
+		authority = Promise.withResolvers<void>();
+		gateway.suspend();
+		await clock.advance(30000);
+		expect(sockets).toHaveLength(2);
+		expect(failures).toEqual([]);
+	} finally {
+		gateway.stop();
+		authority.resolve();
+		permit.resolve();
+		await starting?.catch(() => {});
+		await client.destroy();
 	}
 });

@@ -8,15 +8,14 @@ import {
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import * as ts from "typescript/unstable/ast";
-import {
-	API,
-	type Symbol as ExportSymbol,
-	SymbolFlags,
-} from "typescript/unstable/sync";
+import { API } from "typescript/unstable/async";
 import baseline from "./public-api.json";
 
 /** Validate the root entrypoint and its public export contract. */
-export function auditExports(root: string, failures: string[]): void {
+export async function auditExports(
+	root: string,
+	failures: string[],
+): Promise<void> {
 	const manifest = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
 	const paths = ["."];
 	if (
@@ -66,13 +65,13 @@ export function auditExports(root: string, failures: string[]): void {
 				},
 			}),
 		);
-		const snapshot = api.updateSnapshot({ openProjects: [config] });
+		const snapshot = await api.updateSnapshot({ openProjects: [config] });
 		const project = snapshot.getProject(config);
 		if (!project)
 			throw new Error("Could not open the public export audit project.");
 		const { program, checker } = project;
 		for (const [path, file] of entries) {
-			const syntax = program.getSourceFile(file);
+			const syntax = await program.getSourceFile(file);
 			if (!syntax) {
 				failures.push(`Missing TypeScript source file: ${path}`);
 				continue;
@@ -95,25 +94,18 @@ export function auditExports(root: string, failures: string[]): void {
 				);
 			}
 		}
-		function exported(file: string): Map<string, ExportSymbol> {
-			const source = program.getSourceFile(file);
-			const symbol = source && checker.getSymbolAtLocation(source);
+		async function exported(file: string): Promise<Set<string>> {
+			const source = await program.getSourceFile(file);
+			const symbol = source && (await checker.getSymbolAtLocation(source));
 			if (!symbol) {
 				failures.push(`No TypeScript module at ${file}`);
-				return new Map();
+				return new Set();
 			}
-			return new Map(
-				checker
-					.getExportsOfModule(symbol)
-					.map((value) => [
-						value.name,
-						value.flags & SymbolFlags.Alias
-							? checker.getAliasedSymbol(value)
-							: value,
-					]),
+			return new Set(
+				(await checker.getExportsOfModule(symbol)).map((value) => value.name),
 			);
 		}
-		const rootSymbols = exported(resolve(root, "index.ts"));
+		const rootSymbols = await exported(resolve(root, "index.ts"));
 		if (
 			JSON.stringify([...rootSymbols.keys()].sort()) !==
 			JSON.stringify(baseline.exports)
@@ -128,7 +120,7 @@ export function auditExports(root: string, failures: string[]): void {
 			);
 	} finally {
 		try {
-			api?.close();
+			await api?.close();
 		} finally {
 			rmSync(temporary, { recursive: true, force: true });
 		}

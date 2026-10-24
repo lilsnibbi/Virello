@@ -21,8 +21,9 @@ async function run(...args: string[]): Promise<void> {
 
 await run("check");
 await run("lint");
+await run("test", "scripts/exports.test.ts");
 const failures: string[] = [];
-auditExports(root, failures);
+await auditExports(root, failures);
 if (failures.length) throw new Error(failures.join("\n"));
 const trackedFiles = Bun.spawnSync(
 	["git", "ls-files", "--cached", "--others", "--exclude-standard", "-z"],

@@ -1,12 +1,12 @@
 [
 	"packages/builders",
-	"packages/logging",
-	"packages/util",
-	"packages/rest",
-	"packages/ws",
-	"packages/cache",
-	"packages/engine",
-	"packages/sharding",
+	"packages/cache", 
 	"packages/core",
+	"packages/engine",
+	"packages/logging",
+	"packages/rest",
+	"packages/sharding",
+	"packages/util",
+	"packages/ws",
 	"."
 ]

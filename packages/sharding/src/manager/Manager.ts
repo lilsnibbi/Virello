@@ -1,5 +1,3 @@
-// Modified host-supervision design from discord-sharding. Apache-2.0; see ../LICENSE.
-
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Logger } from "@lilsnibbi/logger";

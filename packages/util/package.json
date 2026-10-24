@@ -3,7 +3,6 @@
 	"version": "0.1.2",
 	"description": "General helpers, parsing, results, timers, binary codecs and iterators for Bun.",
 	"type": "module",
-	"license": "MIT AND Apache-2.0",
 	"repository": {
 		"type": "git",
 		"url": "https://github.com/lilsnibbi/Virello.git",
@@ -70,10 +69,7 @@
 	"types": "./src/index.ts",
 	"files": [
 		"src",
-		"README.md",
-		"LICENSE",
-		"NOTICE",
-		"UPSTREAM-LICENSE"
+		"README.md"
 	],
 	"engines": {
 		"bun": ">=1.4.2"

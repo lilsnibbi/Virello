@@ -2,9 +2,7 @@
 
 [Docs](README.md) / Builders · [Ticket example](../examples/tickets/README.md)
 
-Install `virello` and import builders from `virello/builders`. These are maintained
-Virello sources adapted from Ovencord's builders, with the applicable
-[source notices](../packages/builders/NOTICE). No Ovencord or discord.js client runs
+Install `virello` and import builders from `virello/builders`. These builders are maintained by Virello. No Ovencord or discord.js client runs
 underneath them. The client, gateway, REST, cache and sharding remain Virello's.
 This surface is unreleased; use the checkout until a release includes it.
 

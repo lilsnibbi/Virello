@@ -1,6 +1,3 @@
-// Adapted from Ovencord (cc6100f8), Apache-2.0.
-// Modified for Virello: local utilities, native payloads and validated serialization.
-// See NOTICE and LICENSE at the root of @virello/builders.
 import { ComponentType } from "discord-api-types/v10";
 import { z } from "zod";
 import { customIdPredicate } from "../../Assertions";

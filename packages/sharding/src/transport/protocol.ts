@@ -1,5 +1,3 @@
-// Modified design adapted from discord-sharding's validated, correlated protocol.
-// Apache-2.0 attribution and full licence: ../LICENSE and https://github.com/lilsnibbi/Virello/blob/main/docs/source-retention.md.
 import { timingSafeEqual } from "node:crypto";
 import { type } from "arktype";
 import { ShardError, type ShardLimits } from "../types";

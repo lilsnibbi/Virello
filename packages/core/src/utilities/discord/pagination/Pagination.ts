@@ -1,4 +1,3 @@
-// Inspired by DiscordPagination. Copyright (c) 2026 lilsnibbi. MIT; see ../../../../LICENSE and ../../../../docs/source-retention.md.
 import { randomUUIDv7 } from "bun";
 import {
 	ActionRowBuilder,

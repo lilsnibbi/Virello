@@ -39,4 +39,4 @@ No numeric coverage threshold is configured. Complete CI requires zero skipped t
 
 ## Commit & Pull Request Guidelines
 
-There is no Git commit history yet. Use Conventional Commits compatible with Release Please, such as `fix(commands): handle missing arguments`. Keep changes focused. PRs should explain behaviour changes, link relevant issues and report validation results. Keep tokens in ignored environment files and preserve distributed licence notices.
+There is no Git commit history yet. Use Conventional Commits compatible with Release Please, such as `fix(commands): handle missing arguments`. Keep changes focused. PRs should explain behaviour changes, link relevant issues and report validation results. Keep tokens in ignored environment files.

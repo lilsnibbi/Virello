@@ -213,7 +213,7 @@ Publishing checks that the stable release exists, is published and not a
 prerelease, matches every package's version, and points to a commit reachable
 from `main`. It installs frozen dependencies without lifecycle scripts, packs
 with the locked Bun snapshot without pack hooks, and checks exports, source
-files, notices and exact internal versions before publishing. Packing uses a
+files and exact internal versions before publishing. Packing uses a
 temporary tree with file permissions normalized to `0644`, so laptop/runner
 umasks do not change tarball integrity. Only stable `x.y.z` / `vx.y.z` releases are
 supported; prereleases need an explicit dist-tag policy before being added.

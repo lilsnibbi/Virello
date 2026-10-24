@@ -95,7 +95,7 @@
 		"arktype": "^2.2.8",
 		"cron-parser": "5.10.2",
 		"discord-api-types": "0.38.57",
-		"i18next": "^26.5.3"
+		"i18next": "^26.5.4"
 	},
 	"publishConfig": {
 		"access": "public",

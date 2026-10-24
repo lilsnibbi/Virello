@@ -143,6 +143,14 @@ private upstream state or start an additional supervisor to compensate.
 
 ## Compatibility findings
 
+The exact type-only import chain is cross-hosting `src/Manager/Shard.ts` ->
+hybrid-sharding `ClusterClient` / `DjsDiscordClient` -> `src/types/shared.ts` ->
+`import type { Client } from "@ovencord/discord.js"`. There is no runtime import
+of that fork in either sharding package. The declared peer still installs it, and
+TypeScript follows its source; Bun erases the type import. Cold-import checks
+verify that the Virello client and exported Discord classes retain official
+`discord.js` identity.
+
 - Hybrid's declared peer is `@ovencord/discord.js >=14.16.0`, despite its README
   showing imports from `discord.js`. Bun installs that fork (14.16.59 in this
   lockfile). Virello's runtime Client still extends official discord.js; the fork
@@ -166,8 +174,9 @@ private upstream state or start an additional supervisor to compensate.
   socket open, before authentication is acknowledged. These are upstream transport
   limitations, not guarantees Virello can repair with different wiring.
 
-These issues block a clean strict and production-readiness claim for the requested
-combination. Resolving them requires upstream fixes or an explicitly chosen
+The type diagnostics are known upstream limitations, not a blocker to using this
+branch. The source-level runtime findings above have not been reproduced in a
+live cluster; they prevent a production-readiness claim for untested paths. Resolving them requires upstream fixes or an explicitly chosen
 patched dependency revision. Virello has not forked, substituted or reimplemented
 the requested libraries.
 

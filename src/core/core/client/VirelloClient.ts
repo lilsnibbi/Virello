@@ -218,6 +218,12 @@ export class VirelloClient extends Client {
 	public constructor(options: VirelloClientOptions) {
 		clientOptionsSchema.assert(options);
 		for (const key of [
+			"clock",
+			"cache",
+			"gateway",
+			"maxPendingHandlers",
+			"onError",
+			"waitForIdentify",
 			"baseUserDirectory",
 			"plugins",
 			"hmr",
@@ -345,7 +351,7 @@ export class VirelloClient extends Client {
 
 	/**
 	 * Load modules, run extension hooks, and log in through discord.js once.
-	 * @param token - Bot token, supplied explicitly; environment variables are not read by the client.
+	 * @param token - Bot token; omission uses the token captured by discord.js from DISCORD_TOKEN during construction.
 	 * @returns The login token. Repeated calls share the same promise.
 	 * @throws On startup or login failure; the client is destroyed before the rejection.
 	 */

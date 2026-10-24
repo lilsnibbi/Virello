@@ -7,7 +7,13 @@ import {
 	Partials,
 	ActivityType,
 } from "discord.js";
-import { VirelloClient, Events, Extension, container } from "virello";
+import {
+	VirelloClient,
+	type VirelloClientOptions,
+	Events,
+	Extension,
+	container,
+} from "virello";
 
 const logger = { debug() {}, notif() {}, alert() {}, error() {} };
 const options = {
@@ -33,6 +39,19 @@ test("Virello owns a real discord.js client and accepts native shard and cache o
 	});
 	try {
 		expect(client).toBeInstanceOf(Client);
+		for (const key of [
+			"clock",
+			"cache",
+			"gateway",
+			"maxPendingHandlers",
+			"onError",
+			"waitForIdentify",
+		]) {
+			expect(
+				() =>
+					new VirelloClient({ ...options, [key]: {} } as VirelloClientOptions),
+			).toThrow(`no longer supports "${key}"`);
+		}
 		expect(client.options.shards).toEqual([1]);
 		expect(client.options.shardCount).toBe(2);
 		expect(client.options.partials).toEqual([Partials.Channel]);

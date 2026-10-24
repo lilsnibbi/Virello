@@ -73,3 +73,19 @@ There is no Virello fleet REST scheduler, IDENTIFY permit service, lease fencing
 worker reuse/reassignment protocol or exactly-once request cache. Do not combine
 the removed managers with ovencord. A source-only install now needs the
 `discord.js` peer. No existing published package or licensing is changed.
+
+Native builder names also follow discord.js: `ChatInputCommandBuilder` becomes
+`SlashCommandBuilder`; its option classes use `SlashCommand*Option` names.
+Use `ContextMenuCommandBuilder().setType(ApplicationCommandType.Message)` or
+`.User` for the former message/user context-command builders. Use
+`ButtonBuilder().setStyle(ButtonStyle.Primary)` (or another style) for the old
+style-specific button subclasses, and `EmbedBuilder.setAuthor/setFooter/addFields`
+for the removed embed-part builders. `Reaction` is now `MessageReaction`.
+The removed `DiscordSnowflake` helper is not a framework transport dependency;
+Discord object IDs and timestamps are provided by discord.js.
+
+Legacy top-level engine options (`clock`, `cache`, `gateway`, `maxPendingHandlers`,
+`onError`, `waitForIdentify`) now throw instead of being silently ignored. Configure
+Discord using `makeCache`, `sweepers`, `ws`, `rest` and its native events. Use
+`client.ws.ping` for Gateway latency. Omitting `login(token)`'s argument follows
+discord.js's environment-token behavior, unlike the removed native engine.

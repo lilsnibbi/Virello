@@ -1,0 +1,6 @@
+{
+	"extends": "../../tsconfig.json",
+	"compilerOptions": { "noImplicitOverride": true },
+	"include": ["consumer.ts"],
+	"exclude": []
+}

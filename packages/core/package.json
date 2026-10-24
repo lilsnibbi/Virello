@@ -92,7 +92,7 @@
 		"@virello/sharding": "workspace:*",
 		"@virello/util": "workspace:*",
 		"@virello/ws": "workspace:*",
-		"arktype": "^2.2.8",
+		"arktype": "^2.2.9",
 		"cron-parser": "5.10.2",
 		"discord-api-types": "0.38.57",
 		"i18next": "^26.5.3"

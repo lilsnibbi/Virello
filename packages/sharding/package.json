@@ -48,7 +48,7 @@
 		"@virello/logging": "workspace:*",
 		"@virello/rest": "workspace:*",
 		"@virello/ws": "workspace:*",
-		"arktype": "^2.2.8",
+		"arktype": "^2.2.9",
 		"discord-api-types": "0.38.57"
 	},
 	"publishConfig": {

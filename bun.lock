@@ -22,16 +22,16 @@
     },
     "packages/builders": {
       "name": "@virello/builders",
-      "version": "0.1.2", // x-release-please-version
+      "version": "0.1.2",
       "dependencies": {
         "discord-api-types": "0.38.57",
         "ts-mixer": "^6.0.4",
-        "zod": "^4.5.4",
+        "zod": "^4.6.7",
       },
     },
     "packages/cache": {
       "name": "@virello/cache",
-      "version": "0.1.2", // x-release-please-version
+      "version": "0.1.2",
       "dependencies": {
         "@virello/util": "workspace:*",
         "@virello/ws": "workspace:*",
@@ -40,7 +40,7 @@
     },
     "packages/core": {
       "name": "@virello/core",
-      "version": "0.1.2", // x-release-please-version
+      "version": "0.1.2",
       "dependencies": {
         "@lilsnibbi/logger": "1.2.0",
         "@virello/builders": "workspace:*",
@@ -59,7 +59,7 @@
     },
     "packages/engine": {
       "name": "@virello/engine",
-      "version": "0.1.2", // x-release-please-version
+      "version": "0.1.2",
       "dependencies": {
         "@virello/cache": "workspace:*",
         "@virello/logging": "workspace:*",
@@ -71,14 +71,14 @@
     },
     "packages/logging": {
       "name": "@virello/logging",
-      "version": "0.1.2", // x-release-please-version
+      "version": "0.1.2",
       "dependencies": {
         "@lilsnibbi/logger": "1.2.0",
       },
     },
     "packages/rest": {
       "name": "@virello/rest",
-      "version": "0.1.2", // x-release-please-version
+      "version": "0.1.2",
       "dependencies": {
         "@virello/util": "workspace:*",
         "discord-api-types": "0.38.57",
@@ -86,7 +86,7 @@
     },
     "packages/sharding": {
       "name": "@virello/sharding",
-      "version": "0.1.2", // x-release-please-version
+      "version": "0.1.2",
       "dependencies": {
         "@lilsnibbi/logger": "1.2.0",
         "@virello/cache": "workspace:*",
@@ -99,14 +99,14 @@
     },
     "packages/util": {
       "name": "@virello/util",
-      "version": "0.1.2", // x-release-please-version
+      "version": "0.1.2",
       "dependencies": {
         "@virello/logging": "workspace:*",
       },
     },
     "packages/ws": {
       "name": "@virello/ws",
-      "version": "0.1.2", // x-release-please-version
+      "version": "0.1.2",
       "dependencies": {
         "@virello/util": "workspace:*",
         "discord-api-types": "0.38.57",

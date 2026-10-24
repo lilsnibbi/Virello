@@ -1,0 +1,121 @@
+{
+	"name": "virello",
+	"version": "0.1.0",
+	"description": "entry point for the modular Virello Discord framework for Bun.",
+	"type": "module",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/lilsnibbi/Virello.git"
+	},
+	"exports": {
+		".": {
+			"types": "./src/index.ts",
+			"bun": "./src/index.ts"
+		},
+		"./client": {
+			"types": "./src/public/client.ts",
+			"bun": "./src/public/client.ts"
+		},
+		"./modules": {
+			"types": "./src/public/modules.ts",
+			"bun": "./src/public/modules.ts"
+		},
+		"./commands": {
+			"types": "./src/public/commands.ts",
+			"bun": "./src/public/commands.ts"
+		},
+		"./events": {
+			"types": "./src/public/events.ts",
+			"bun": "./src/public/events.ts"
+		},
+		"./extensions": {
+			"types": "./src/public/extensions.ts",
+			"bun": "./src/public/extensions.ts"
+		},
+		"./localisation": {
+			"types": "./src/public/localisation.ts",
+			"bun": "./src/public/localisation.ts"
+		},
+		"./scheduling": {
+			"types": "./src/public/scheduling.ts",
+			"bun": "./src/public/scheduling.ts"
+		},
+		"./services": {
+			"types": "./src/public/services.ts",
+			"bun": "./src/public/services.ts"
+		},
+		"./sharding": {
+			"types": "./src/public/sharding.ts",
+			"bun": "./src/public/sharding.ts"
+		},
+		"./discord": {
+			"types": "./src/public/discord.ts",
+			"bun": "./src/public/discord.ts"
+		},
+		"./utilities": {
+			"types": "./src/public/utilities.ts",
+			"bun": "./src/public/utilities.ts"
+		},
+		"./time": {
+			"types": "./src/public/time.ts",
+			"bun": "./src/public/time.ts"
+		},
+		"./validation": {
+			"types": "./src/public/validation.ts",
+			"bun": "./src/public/validation.ts"
+		},
+		"./engine": {
+			"types": "./src/public/engine.ts",
+			"bun": "./src/public/engine.ts"
+		},
+		"./builders": {
+			"types": "./src/public/builders.ts",
+			"bun": "./src/public/builders.ts"
+		}
+	},
+	"types": "./src/index.ts",
+	"files": [
+		"src",
+		"docs",
+		"examples",
+		"README.md",
+		"BREAKING_CHANGES.md"
+	],
+	"engines": {
+		"bun": ">=1.4.2"
+	},
+	"packageManager": "bun@canary",
+	"scripts": {
+		"test": "bun test",
+		"typecheck": "bun check",
+		"lint:check": "bun lint && bun fmt --check",
+		"format": "bun fmt",
+		"engine:test": "bun test tests/engine",
+		"release:check": "bun scripts/release.ts check",
+		"release:sync": "bun scripts/release.ts sync",
+		"release:pack": "bun scripts/release.ts pack",
+		"release:verify": "bun scripts/release.ts verify"
+	},
+	"dependencies": {
+		"@virello/builders": "workspace:*",
+		"@virello/core": "workspace:*",
+		"@virello/engine": "workspace:*",
+		"@virello/sharding": "workspace:*",
+		"@virello/util": "workspace:*"
+	},
+	"devDependencies": {
+		"@types/bun": "1.4.3",
+		"@types/lodash": "4.17.26",
+		"@types/ws": "8.18.2",
+		"expect-type": "1.4.0",
+		"lodash": "4.18.1",
+		"typescript": "7.0.2"
+	},
+	"workspaces": [
+		"packages/*"
+	],
+	"publishConfig": {
+		"access": "public",
+		"registry": "https://registry.npmjs.org"
+	}
+}

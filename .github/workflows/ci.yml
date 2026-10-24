@@ -1,0 +1,191 @@
+name: Checks
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+permissions: {}
+# PR updates supersede old PR checks; default-branch pushes must not cancel releases.
+concurrency:
+  group: checks-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+defaults:
+  run:
+    shell: bash
+jobs:
+  validate:
+    name: Validate
+    # Identify the PR or commit author, never the actor who started this run.
+    if: >-
+      ${{ !(
+        (github.event_name == 'pull_request' &&
+         github.event.pull_request.user.login == 'github-actions[bot]') ||
+        (github.event_name == 'push' &&
+         github.event.head_commit.author.username == 'github-actions[bot]') ||
+        startsWith(github.head_ref || github.ref_name, 'release-please-')
+      ) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    services:
+      redis:
+        image: redis:7.4.11-bookworm@sha256:026c880268ce52fb3a63b66150af583108a38c13af7633e325ae82a145f53a87
+        ports:
+          - 6379/tcp
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
+    env:
+      CI: "true"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1, Node 24
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0, Node 24
+        with:
+          bun-version-file: package.json
+      - name: Runner and toolchain diagnostics
+        run: |
+          uname -a
+          cat /etc/os-release
+          bun --version
+          bun --revision
+          docker version
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+      - name: Disable Redis persistence
+        env:
+          REDIS_CONTAINER: ${{ job.services.redis.id }}
+        run: |
+          docker exec "$REDIS_CONTAINER" redis-cli CONFIG SET save ''
+          docker exec "$REDIS_CONTAINER" redis-cli CONFIG SET appendonly no
+          docker exec "$REDIS_CONTAINER" redis-cli INFO server
+      - name: Clean frozen install
+        run: |
+          test ! -d node_modules
+          bun install --frozen-lockfile
+          git diff --exit-code -- package.json bun.lock
+      - name: Workflow syntax and expressions
+        run: bash scripts/checkActions.sh
+      - name: Shared version and public package contents
+        run: |
+          npm ci --prefix scripts/release-tools --no-audit --no-fund
+          bun release:check
+          scripts/release-tools/node_modules/.bin/bun scripts/release.ts pack
+          scripts/release-tools/node_modules/.bin/bun scripts/release.ts verify
+      - name: Complete validation (Redis required; no skipped tests)
+        env:
+          VIRELLO_TEST_REDIS_URL: redis://127.0.0.1:${{ job.services.redis.ports['6379'] }}
+        run: bun scripts/ci.ts
+      - name: Redis diagnostics
+        if: failure()
+        env:
+          REDIS_CONTAINER: ${{ job.services.redis.id }}
+        run: docker logs --tail 100 "$REDIS_CONTAINER"
+      - name: Verify locked inputs remain unchanged
+        run: git diff --exit-code -- package.json bun.lock
+      - name: Record validated commit
+        id: validated
+        run: echo "sha=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+    outputs:
+      sha: ${{ steps.validated.outputs.sha }}
+
+  required:
+    name: Required checks
+    needs: [validate]
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    outputs:
+      validation_skipped: ${{ steps.require_validation.outputs.validation_skipped }}
+    steps:
+      - name: Require validation or allow the configured skip
+        id: require_validation
+        env:
+          RESULT: ${{ needs.validate.result }}
+          VALIDATED_SHA: ${{ needs.validate.outputs.sha }}
+          SKIP_VALIDATION: >-
+            ${{
+              (github.event_name == 'pull_request' &&
+               github.event.pull_request.user.login == 'github-actions[bot]') ||
+              (github.event_name == 'push' &&
+               github.event.head_commit.author.username == 'github-actions[bot]') ||
+              startsWith(github.head_ref || github.ref_name, 'release-please-')
+            }}
+        run: |
+          if [[ "$SKIP_VALIDATION" == "true" ]]; then
+            echo "validation_skipped=true" >> "$GITHUB_OUTPUT"
+            echo "Validation intentionally skipped for $GITHUB_REF" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          test "$RESULT" = success
+          test "$VALIDATED_SHA" = "$GITHUB_SHA"
+          echo "validation_skipped=false" >> "$GITHUB_OUTPUT"
+          echo "All required checks passed for $GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
+
+  release:
+    name: Release Please
+    needs: [validate, required]
+    if: >-
+      ${{ always() && needs.required.result == 'success' &&
+          ((needs.validate.result == 'success' && needs.validate.outputs.sha == github.sha) ||
+           (needs.validate.result == 'skipped' &&
+            needs.required.outputs.validation_skipped == 'true')) &&
+          github.event_name == 'push' && github.ref_type == 'branch' &&
+          github.ref_name == github.event.repository.default_branch &&
+          vars.VIRELLO_RELEASES == 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    concurrency:
+      group: release-please
+      cancel-in-progress: false
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    outputs:
+      release_created: ${{ steps.release_please.outputs.release_created }}
+      tag_name: ${{ steps.release_please.outputs.tag_name }}
+    steps:
+      # No checkout or repository code is executed with the write token.
+      - name: Reject a stale default-branch run
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          EXPECTED_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          default_branch=$(gh api "repos/$GH_REPO" --jq .default_branch)
+          test "$default_branch" = "$EXPECTED_BRANCH"
+          encoded_branch=$(jq -rn --arg branch "$default_branch" '$branch | @uri')
+          # Do not let a later green push publish an older unvalidated release merge.
+          pending_shas=$(gh api --paginate "repos/$GH_REPO/pulls?state=closed&base=$encoded_branch&per_page=100" \
+            --jq '.[] | select(.merged_at != null and any(.labels[]; .name == "autorelease: pending")) | .merge_commit_sha')
+          while IFS= read -r pending_sha; do
+            test -z "$pending_sha" || test "$pending_sha" = "$GITHUB_SHA"
+          done <<< "$pending_shas"
+          current_sha=$(gh api "repos/$GH_REPO/git/ref/heads/$encoded_branch" --jq .object.sha)
+          test "$current_sha" = "$GITHUB_SHA"
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0, Node 24
+        id: release_please
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          target-branch: ${{ github.event.repository.default_branch }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  publish:
+    name: Publish to npm
+    needs: [release]
+    if: ${{ !cancelled() && needs.release.result == 'success' &&
+      needs.release.outputs.release_created == 'true' }}
+    # Release Please uses GITHUB_TOKEN, so its release event cannot start a workflow.
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/publish.yml
+    with:
+      tag_name: ${{ needs.release.outputs.tag_name }}

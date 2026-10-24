@@ -1,0 +1,8 @@
+{
+	"name": "virello-release-tools",
+	"private": true,
+	"bunRevision": "1.4.4-canary.1+5c6d4e24c",
+	"dependencies": {
+		"bun": "1.4.4-canary.20261023.1"
+	}
+}

@@ -297,6 +297,7 @@ export class FleetRestScheduler {
 					data.auth,
 					data.executionKey ?? null,
 					data.reason ?? null,
+					data.form ?? null,
 				]),
 			);
 			if (mutation) {
@@ -361,7 +362,10 @@ export class FleetRestScheduler {
 				signal,
 				files: data.files?.map((file) => ({
 					name: file.name,
-					data: new Blob([Buffer.from(file.data, "base64")]),
+					key: file.key,
+					data: new Blob([Buffer.from(file.data, "base64")], {
+						type: file.contentType ?? "",
+					}),
 				})),
 			});
 			const result = { ok: true, value: value ?? null };

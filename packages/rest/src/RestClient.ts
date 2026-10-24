@@ -17,6 +17,7 @@ import {
 import { type $RouteKey, RateLimits, routeKey } from "./RateLimits";
 import { RequestQueue } from "./RequestQueue";
 import { RestError } from "./RestError";
+import { prepareRequestBody } from "./RequestBody";
 
 /** Fetch-compatible HTTP transport returning a Response promise. It must honor the supplied abort signal. */
 export type $Fetch = (
@@ -53,7 +54,16 @@ export interface $RestOptions {
 	/** Positive integer cap on response body bytes. Defaults to 8388608. */
 	maxResponseBytes?: number;
 }
-/** One JSON request relative to the configured Discord API base URL. */
+/** One binary part in a Discord multipart request. */
+export interface $RestFile {
+	/** Filename sent in Content-Disposition, 1–256 characters without control characters. */
+	name: string;
+	/** File contents and MIME type. Supports Blobs, Files and Bun.file(). */
+	data: Blob;
+	/** Multipart field name. Defaults to files[index]; use file or target_users_file where documented. */
+	key?: string;
+}
+/** One JSON or multipart request relative to the configured Discord API base URL. */
 export interface $RestRequest {
 	/** Durable business operation key for mutations. Reuse this exact key when querying an ambiguous result. */
 	operationId?: string;
@@ -67,10 +77,12 @@ export interface $RestRequest {
 	path: string;
 	/** Optional JSON-serializable body, serialized when the request is queued. */
 	body?: unknown;
+	/** Direct multipart text fields. Mutually exclusive with body; use {} for a file-only form without payload_json. */
+	form?: Readonly<Record<string, string>>;
 	/** Unencoded Discord audit-log reason, 1–512 Unicode characters. Encoded once as X-Audit-Log-Reason. */
 	reason?: string;
-	/** Optional file uploads. Blobs (including Bun.file) are sent as Discord multipart files with payload_json. */
-	files?: readonly { name: string; data: Blob }[];
+	/** Optional multipart uploads. Without form, body is sent in payload_json. */
+	files?: readonly $RestFile[];
 	/** Send the bot token unless false. Defaults to true; interaction callbacks use false. */
 	auth?: boolean;
 	/** Optional cancellation signal for the full operation, including queue and retry waits. */
@@ -186,8 +198,8 @@ export class RestClient {
 	}
 
 	/**
-	 * Queue a Discord JSON request with route and global rate-limit handling.
-	 * @param request - Method, API path, body, audit reason, authentication, and cancellation settings.
+	 * Queue a Discord JSON or multipart request with route and global rate-limit handling.
+	 * @param request - Method, API path, JSON body or form fields, files, audit reason, authentication, and cancellation.
 	 * @returns Parsed JSON cast to T, or undefined for an empty successful response.
 	 * @throws For invalid paths or JSON, exhausted queue capacity, cancellation, transport/response failures, or RestError
 	 * for a rejected HTTP response. POST/PATCH transport failures are not retried.
@@ -246,35 +258,24 @@ export class RestClient {
 			this.clock.clearTimeout(timer);
 			return Promise.reject(new Error("REST queue capacity exceeded."));
 		}
+		let body: string | FormData | undefined;
+		let snapshot: $RestRequest;
+		try {
+			({ body, request: snapshot } = prepareRequestBody(request));
+		} catch (error) {
+			this.clock.clearTimeout(timer);
+			return Promise.reject(error);
+		}
 		if (this.scheduler) {
 			this.pending++;
 			return this.scheduler
-				.request({ ...request, signal, deadlineMs })
+				.request({ ...snapshot, signal, deadlineMs })
 				.then((value) => value as T)
 				.finally(() => {
 					this.pending--;
 					this.clock.clearTimeout(timer);
 				});
 		}
-		let body: string | FormData | undefined;
-		try {
-			body =
-				request.body === undefined ? undefined : JSON.stringify(request.body);
-			if (request.files?.length) {
-				const form = new FormData();
-				form.set("payload_json", body ?? "{}");
-				request.files.forEach((file, index) => {
-					if (!(file.data instanceof Blob) || !file.name)
-						throw new TypeError("Uploads require a name and Blob data.");
-					form.set(`files[${index}]`, file.data, file.name);
-				});
-				body = form;
-			}
-		} catch (error) {
-			this.clock.clearTimeout(timer);
-			return Promise.reject(error);
-		}
-		const snapshot = { ...request };
 		this.pending++;
 		return this.execute<T>(snapshot, body, signal).finally(() => {
 			this.pending--;

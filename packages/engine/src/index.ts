@@ -28,6 +28,7 @@ export {
 } from "@virello/ws";
 export {
 	type $Fetch,
+	type $RestFile,
 	type $RestOptions,
 	type $RestRequest,
 	RestClient,

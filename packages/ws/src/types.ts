@@ -4,7 +4,30 @@ import type {
 	GatewayMessageUpdateDispatch,
 	GatewayMessageUpdateDispatchData,
 	GatewayReceivePayload,
+	GatewaySendPayload,
+	GatewayOpcodes,
 } from "discord-api-types/v10";
+
+/** Application Gateway commands. Authentication and heartbeats remain transport-owned. */
+export type $GatewayCommand = Extract<
+	GatewaySendPayload,
+	{
+		op:
+			| GatewayOpcodes.PresenceUpdate
+			| GatewayOpcodes.VoiceStateUpdate
+			| GatewayOpcodes.RequestGuildMembers
+			| GatewayOpcodes.RequestSoundboardSounds
+			| GatewayOpcodes.RequestChannelInfo;
+	}
+>;
+
+/** Bounds and cancellation for a queued Gateway command. */
+export interface $GatewaySendOptions {
+	/** Queue deadline in milliseconds, 1–300000. Defaults to 15000. */
+	deadlineMs?: number;
+	/** Cancels an unsent command. A successful write cannot be recalled. */
+	signal?: AbortSignal;
+}
 
 /** Partial Discord message update with the message and channel IDs always present. */
 export type $MessageUpdateData = Partial<GatewayMessageUpdateDispatchData> &

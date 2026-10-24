@@ -10,6 +10,10 @@ import {
 } from "../Assertions";
 import { fileUploadPredicate } from "../fileUpload/Assertions";
 import { textInputPredicate } from "../textInput/Assertions";
+import {
+	radioGroupPredicate,
+	checkboxGroupPredicate,
+} from "../choices/Assertions";
 
 export const labelPredicate = z.object({
 	id: idPredicate,
@@ -24,5 +28,7 @@ export const labelPredicate = z.object({
 		selectMenuMentionablePredicate,
 		selectMenuChannelPredicate,
 		fileUploadPredicate,
+		radioGroupPredicate,
+		checkboxGroupPredicate,
 	]),
 });

@@ -82,7 +82,20 @@ export class RemoteRestScheduler implements $RestScheduler {
 			// Reserve before copying Blobs or constructing base64 strings. Account for both representations.
 			const estimate =
 				total * 3 +
-				Buffer.byteLength(encode(request.body ?? null, restPayloadLimit)) +
+				Buffer.byteLength(
+					encode(
+						{
+							body: request.body ?? null,
+							form: request.form ?? null,
+							files: (request.files ?? []).map((file) => ({
+								name: file.name,
+								key: file.key ?? null,
+								contentType: file.data.type,
+							})),
+						},
+						restPayloadLimit,
+					),
+				) +
 				16384;
 			if (this.bytes + estimate > 64 * 1024 * 1024)
 				throw new ShardError(
@@ -94,6 +107,8 @@ export class RemoteRestScheduler implements $RestScheduler {
 			const files = await Promise.all(
 				(request.files ?? []).map(async (file) => ({
 					name: file.name,
+					...(file.key === undefined ? {} : { key: file.key }),
+					...(file.data.type ? { contentType: file.data.type } : {}),
 					data: Buffer.from(await file.data.arrayBuffer()).toString("base64"),
 				})),
 			);
@@ -120,6 +135,8 @@ export class RemoteRestScheduler implements $RestScheduler {
 					auth: request.auth !== false,
 					deadlineMs,
 					...(request.body === undefined ? {} : { body: request.body }),
+					...(request.form === undefined ? {} : { form: request.form }),
+					...(request.reason === undefined ? {} : { reason: request.reason }),
 					...(request.executionKey
 						? { executionKey: request.executionKey }
 						: {}),

@@ -16,16 +16,19 @@ export * from "./client/index";
 export type { $Clock } from "@virello/util/runtime";
 export {
 	type $GatewayCallbacks,
+	type $GatewayCommand,
 	type $GatewayDispatch,
 	type $GatewayOptions,
 	type $GatewayPacket,
 	type $GatewaySocket,
 	type $GatewayState,
+	type $GatewaySendOptions,
 	type $MessageUpdateData,
 	GatewayShard,
 } from "@virello/ws";
 export {
 	type $Fetch,
+	type $RestFile,
 	type $RestOptions,
 	type $RestRequest,
 	RestClient,

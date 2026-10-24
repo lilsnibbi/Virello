@@ -116,7 +116,7 @@ export class Collector<
 			),
 		);
 	}
-	[captureRejectionSymbol](error: unknown): void {
+	override [captureRejectionSymbol](error: unknown): void {
 		this.fail(error);
 	}
 	protected watchScope(

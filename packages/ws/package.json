@@ -1,0 +1,41 @@
+{
+	"name": "@virello/ws",
+	"version": "0.3.0",
+	"description": "Independent Discord Gateway WebSocket transport, heartbeats and identify admission for Bun.",
+	"type": "module",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/lilsnibbi/Virello.git",
+		"directory": "packages/ws"
+	},
+	"exports": {
+		".": {
+			"types": "./src/index.ts",
+			"bun": "./src/index.ts"
+		},
+		"./types": {
+			"types": "./src/types.ts",
+			"bun": "./src/types.ts"
+		},
+		"./identify": {
+			"types": "./src/IdentifyGate.ts",
+			"bun": "./src/IdentifyGate.ts"
+		}
+	},
+	"types": "./src/index.ts",
+	"files": [
+		"src",
+		"README.md"
+	],
+	"engines": {
+		"bun": ">=1.4.2"
+	},
+	"dependencies": {
+		"@virello/util": "workspace:*",
+		"discord-api-types": "0.38.57"
+	},
+	"publishConfig": {
+		"access": "public",
+		"registry": "https://registry.npmjs.org"
+	}
+}

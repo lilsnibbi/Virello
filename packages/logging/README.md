@@ -1,0 +1,12 @@
+# @virello/logging
+
+Shared Bun logging, console formatting and redacted diagnostics for Virello.
+
+```sh
+bun add @virello/logging
+```
+
+Ships raw TypeScript for Bun >=1.4.2; no build step or Node runtime support.
+This package owns its implementation and depends only on the smaller packages
+listed in its manifest. It never depends on the aggregate `virello` package.
+All public Virello packages use the same version.

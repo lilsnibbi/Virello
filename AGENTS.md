@@ -1,0 +1,37 @@
+# Repository Guidelines
+
+## Project Structure & Module Organization
+
+Virello is a modular Discord framework shipped as raw TypeScript for Bun. There is no build step or Node runtime support.
+
+- `index.ts`: single framework barrel; feature entrypoints live in workspaces.
+- `packages/core/src/`: application client, commands, modules, events, extensions and framework Discord helpers.
+- `packages/engine/`, `packages/rest/`, `packages/ws/`, `packages/cache/`: native client, transports and cache stores.
+- `packages/sharding/`: coordinator, host manager, IPC and fleet REST scheduling.
+- `packages/util/`, `packages/logging/`, `packages/builders/`: independent helpers, logging and payload builders.
+- `release-packages.json`: dependency-first public release order; all packages share one version.
+- `scripts/`: validation and packaging checks; `.github/workflows/ci.yml`: CI and releases.
+
+## Build, Test, and Development Commands
+
+Use Bun canary (`bun upgrade --canary`), the project's standard toolchain. From the repository root:
+
+- `bun install --frozen-lockfile`: install locked dependencies.
+- `bun check`: check TypeScript without emitting files.
+- `bun lint`: run Bun's built-in lint rules.
+- `bun fmt --check`: check formatting without writing files.
+- `bun fmt`: apply formatting; review changes before committing.
+- `bun scripts/ci.ts`: validate types, lint, public exports and formatting.
+- `bun release:check`: validate publish inputs and shared release metadata.
+
+## Coding Style & Naming Conventions
+
+Use strict TypeScript and the Bun formatting settings in `bunfig.toml`: tabs and an 80-column print width, with Bun's defaults for quotes, semicolons and trailing commas. Bun's built-in linter defines lint rules. Use camelCase directories and functions, and PascalCase classes and class filenames. Keep relative code imports extensionless. Implementation files must import internal modules directly rather than the root or public barrels. Expose supported APIs through the existing named exports.
+
+## Release Validation
+
+Keep release checks independent of test fixtures and examples. Validate package contents and isolated imports with the locked release toolchain before publishing. Do not describe static checks or import probes as runtime test coverage.
+
+## Commit & Pull Request Guidelines
+
+Use Conventional Commits compatible with Release Please, such as `fix(commands): handle missing arguments`. Keep changes focused. PRs should explain behaviour changes, link relevant issues and report validation results. Keep tokens in ignored environment files.

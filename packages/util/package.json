@@ -1,6 +1,6 @@
 {
 	"name": "@virello/util",
-	"version": "0.2.0",
+	"version": "0.3.0",
 	"description": "General helpers, parsing, results, timers, binary codecs and iterators for Bun.",
 	"type": "module",
 	"repository": {

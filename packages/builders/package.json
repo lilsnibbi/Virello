@@ -1,6 +1,6 @@
 {
 	"name": "@virello/builders",
-	"version": "0.2.0",
+	"version": "0.3.0",
 	"description": "Virello-owned Discord command, message, component and modal builders.",
 	"type": "module",
 	"repository": {

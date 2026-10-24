@@ -1,6 +1,8 @@
 import type {
 	APIChannelSelectComponent,
 	APIFileUploadComponent,
+	APIRadioGroupComponent,
+	APICheckboxGroupComponent,
 	APILabelComponent,
 	APIMentionableSelectComponent,
 	APIMessageComponent,
@@ -15,6 +17,8 @@ import { validate } from "../../util/validation";
 import { ComponentBuilder } from "../Component";
 import { createComponentBuilder } from "../Components";
 import { FileUploadBuilder } from "../fileUpload/FileUpload";
+import { RadioGroupBuilder } from "../radioGroup/RadioGroup";
+import { CheckboxGroupBuilder } from "../checkboxGroup/CheckboxGroup";
 import { ChannelSelectMenuBuilder } from "../selectMenu/ChannelSelectMenu";
 import { MentionableSelectMenuBuilder } from "../selectMenu/MentionableSelectMenu";
 import { RoleSelectMenuBuilder } from "../selectMenu/RoleSelectMenu";
@@ -29,6 +33,8 @@ export interface LabelBuilderData extends Partial<
 	component?:
 		| ChannelSelectMenuBuilder
 		| FileUploadBuilder
+		| RadioGroupBuilder
+		| CheckboxGroupBuilder
 		| MentionableSelectMenuBuilder
 		| RoleSelectMenuBuilder
 		| StringSelectMenuBuilder
@@ -214,6 +220,28 @@ export class LabelBuilder extends ComponentBuilder<APILabelComponent> {
 			| ((builder: FileUploadBuilder) => FileUploadBuilder),
 	): this {
 		this.data.component = resolveBuilder(input, FileUploadBuilder);
+		return this;
+	}
+
+	/** Set a single-choice radio group, using raw API data, a builder or a callback. */
+	public setRadioGroupComponent(
+		input:
+			| APIRadioGroupComponent
+			| RadioGroupBuilder
+			| ((builder: RadioGroupBuilder) => RadioGroupBuilder),
+	): this {
+		this.data.component = resolveBuilder(input, RadioGroupBuilder);
+		return this;
+	}
+
+	/** Set a multiple-choice checkbox group, using raw API data, a builder or a callback. */
+	public setCheckboxGroupComponent(
+		input:
+			| APICheckboxGroupComponent
+			| CheckboxGroupBuilder
+			| ((builder: CheckboxGroupBuilder) => CheckboxGroupBuilder),
+	): this {
+		this.data.component = resolveBuilder(input, CheckboxGroupBuilder);
 		return this;
 	}
 

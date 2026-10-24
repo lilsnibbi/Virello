@@ -69,6 +69,16 @@ export class ModalInteractionOptionResolver {
 		return this.getTyped(customId, ComponentType.StringSelect).values;
 	}
 
+	/** Selected radio option, or null when an optional group was left empty. */
+	public getRadioGroupValue(customId: string): string | null {
+		return this.getTyped(customId, ComponentType.RadioGroup).value;
+	}
+
+	/** Selected checkbox options, or an empty array when none were selected. */
+	public getCheckboxGroupValues(customId: string): string[] {
+		return this.getTyped(customId, ComponentType.CheckboxGroup).values;
+	}
+
 	/** Get selected users. */
 	public getSelectedUsers(customId: string): APIUser[] {
 		const component = this.getTyped(customId, ComponentType.UserSelect);

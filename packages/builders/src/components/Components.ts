@@ -7,6 +7,8 @@ import type {
 	APIContainerComponent,
 	APIFileComponent,
 	APIFileUploadComponent,
+	APIRadioGroupComponent,
+	APICheckboxGroupComponent,
 	APILabelComponent,
 	APIMediaGalleryComponent,
 	APIMentionableSelectComponent,
@@ -38,6 +40,8 @@ export { ButtonBuilder };
 import { LinkButtonBuilder } from "./button/LinkButton";
 import { PremiumButtonBuilder } from "./button/PremiumButton";
 import { FileUploadBuilder } from "./fileUpload/FileUpload";
+import { RadioGroupBuilder } from "./radioGroup/RadioGroup";
+import { CheckboxGroupBuilder } from "./checkboxGroup/CheckboxGroup";
 import { LabelBuilder } from "./label/Label";
 import { ChannelSelectMenuBuilder } from "./selectMenu/ChannelSelectMenu";
 import { MentionableSelectMenuBuilder } from "./selectMenu/MentionableSelectMenu";
@@ -79,6 +83,8 @@ export type MessageComponentBuilder =
 export type ModalComponentBuilder =
 	| ActionRowBuilder
 	| FileUploadBuilder
+	| RadioGroupBuilder
+	| CheckboxGroupBuilder
 	| LabelBuilder
 	| ModalActionRowComponentBuilder;
 
@@ -190,6 +196,10 @@ export interface MappedComponentTypes {
 	 * The file upload component type is associated with a {@link FileUploadBuilder}.
 	 */
 	[ComponentType.FileUpload]: FileUploadBuilder;
+	/** Single-choice modal control, placed inside a label. */
+	[ComponentType.RadioGroup]: RadioGroupBuilder;
+	/** Multiple-choice modal control, placed inside a label. */
+	[ComponentType.CheckboxGroup]: CheckboxGroupBuilder;
 }
 
 /**
@@ -266,6 +276,10 @@ export function createComponentBuilder(
 			return new LabelBuilder(rawData as APILabelComponent);
 		case ComponentType.FileUpload:
 			return new FileUploadBuilder(rawData as APIFileUploadComponent);
+		case ComponentType.RadioGroup:
+			return new RadioGroupBuilder(rawData as APIRadioGroupComponent);
+		case ComponentType.CheckboxGroup:
+			return new CheckboxGroupBuilder(rawData as APICheckboxGroupComponent);
 		default:
 			// This case can still occur if we get a newer unsupported component type
 			throw new Error(

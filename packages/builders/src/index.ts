@@ -25,6 +25,10 @@ export {
 	type MappedComponentTypes,
 } from "./components/Components";
 export { FileUploadBuilder } from "./components/fileUpload/FileUpload";
+export { RadioGroupBuilder } from "./components/radioGroup/RadioGroup";
+export { RadioGroupOptionBuilder } from "./components/radioGroup/RadioGroupOption";
+export { CheckboxGroupBuilder } from "./components/checkboxGroup/CheckboxGroup";
+export { CheckboxGroupOptionBuilder } from "./components/checkboxGroup/CheckboxGroupOption";
 export { LabelBuilder } from "./components/label/Label";
 export { BaseSelectMenuBuilder } from "./components/selectMenu/BaseSelectMenu";
 export { ChannelSelectMenuBuilder } from "./components/selectMenu/ChannelSelectMenu";

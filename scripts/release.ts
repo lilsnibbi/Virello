@@ -39,7 +39,8 @@ const scanFiles = (pattern: string, cwd: string, dot = false) =>
 		new Bun.Glob(pattern).scanSync({ cwd, dot, onlyFiles: true }),
 		packagePath,
 	);
-const paths: string[] = json(join(root, "release-packages.json"));
+// There is exactly one publishable package.
+const paths = ["."];
 const packages = paths.map((path) => ({
 	path,
 	directory: resolve(root, path),
@@ -49,9 +50,9 @@ const main = packages.find((pkg) => pkg.path === ".");
 if (!main) throw new Error("The release plan must include the root package.");
 const version = main.manifest.version;
 const [command, output = ".release"] = process.argv.slice(2);
-if (!["sync", "check", "pack", "verify", "publish"].includes(command ?? ""))
+if (!["check", "pack", "verify", "publish"].includes(command ?? ""))
 	throw new Error(
-		"Usage: bun scripts/release.ts check|sync|pack|verify|publish [directory]",
+		"Usage: bun scripts/release.ts check|pack|verify|publish [directory]",
 	);
 
 function run(args: string[], cwd = root): string {
@@ -61,27 +62,6 @@ function run(args: string[], cwd = root): string {
 	return result.stdout.toString().trim();
 }
 
-// Bun regenerates this JSONC file without comments. Restore the Release Please
-// annotation after dependency edits, without resolving or upgrading dependencies.
-if (command === "sync") {
-	let lock = readFileSync(join(root, "bun.lock"), "utf8");
-	for (const pkg of packages.filter((pkg) => pkg.path !== ".")) {
-		pkg.manifest.version = version;
-		writeFileSync(
-			join(pkg.directory, "package.json"),
-			`${JSON.stringify(pkg.manifest, null, "\t")}\n`,
-		);
-		const escaped = pkg.manifest.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-		const pattern = new RegExp(
-			`("name": "${escaped}",\\r?\\n\\s*"version": ")[^"]+(",)[^\\r\\n]*`,
-		);
-		if (!pattern.test(lock))
-			throw new Error(`Missing lockfile workspace: ${pkg.manifest.name}`);
-		lock = lock.replace(pattern, `$1${version}$2 // x-release-please-version`);
-	}
-	writeFileSync(join(root, "bun.lock"), lock);
-}
-
 const stableVersion = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
 if (!stableVersion.test(version))
 	throw new Error(
@@ -89,13 +69,16 @@ if (!stableVersion.test(version))
 	);
 if (json(join(root, ".release-please-manifest.json"))["."] !== version)
 	throw new Error("Release Please manifest and root version differ.");
-const extraFiles = json(join(root, "release-please-config.json")).packages["."][
-	"extra-files"
-] as (string | { type: string; path: string })[];
 const lockText = readFileSync(join(root, "bun.lock"), "utf8");
 const lock = Bun.JSONC.parse(lockText) as {
-	workspaces: Record<string, { version?: string }>;
+	workspaces: Record<string, { name?: string }>;
 };
+if (
+	"workspaces" in main.manifest ||
+	Object.keys(lock.workspaces).join() !== "" ||
+	lock.workspaces[""]?.name !== "virello"
+)
+	throw new Error("Only the root virello package may be a workspace.");
 const names = new Map(packages.map((pkg) => [pkg.manifest.name, pkg]));
 if (names.size !== packages.length || new Set(paths).size !== paths.length)
 	throw new Error("Duplicate release package.");
@@ -106,13 +89,15 @@ const publicPaths = [
 		.map((file) => file.slice(0, -"/package.json".length)),
 ];
 if (JSON.stringify([...paths].sort()) !== JSON.stringify(publicPaths.sort()))
-	throw new Error("List every public workspace in release-packages.json.");
+	throw new Error(
+		"Remove scoped workspace manifests; only virello is published.",
+	);
 const seen = new Set<string>();
 for (const pkg of packages) {
 	const manifest = pkg.manifest;
 	if (
 		manifest.private ||
-		(manifest.name !== "virello" && !manifest.name.startsWith("@virello/")) ||
+		manifest.name !== "virello" ||
 		manifest.version !== version ||
 		manifest.repository.url !== repository ||
 		manifest.publishConfig?.access !== "public" ||
@@ -131,43 +116,18 @@ for (const pkg of packages) {
 		if (!existsSync(resolve(pkg.directory, file)))
 			throw new Error(`Missing publish input in ${pkg.path}: ${file}`);
 	}
-	if (pkg.path !== ".") {
-		if (
-			!extraFiles.includes(`${pkg.path}/package.json`) ||
-			!extraFiles.some(
-				(file) =>
-					typeof file !== "string" &&
-					file.type === "generic" &&
-					file.path === "bun.lock",
-			) ||
-			lock.workspaces[pkg.path]?.version !== version
-		)
-			throw new Error(`Missing synchronized release metadata: ${pkg.path}`);
-	}
 	for (const group of groups) {
 		for (const [name, spec] of Object.entries(manifest[group] ?? {})) {
-			if (names.has(name)) {
-				if (spec !== "workspace:*" || !seen.has(name))
-					throw new Error(
-						`Use workspace:* and publish ${name} before ${manifest.name}.`,
-					);
-			} else if (
+			if (
 				/^(workspace:|file:|link:)/.test(spec) ||
 				name.startsWith("@virello/")
 			)
-				throw new Error(`Unlisted local dependency: ${name} in ${pkg.path}`);
+				throw new Error(`Unpublished local dependency: ${name}`);
 		}
 	}
 	seen.add(manifest.name);
 }
-if (
-	lockText.split("x-release-please-version").length - 1 !==
-	packages.length - 1
-)
-	throw new Error(
-		"Run bun release:sync to restore lockfile version annotations.",
-	);
-console.log(`Shared version ${version}: ${[...seen].join(" → ")}`);
+console.log(`Single public package: virello@${version}`);
 
 if (command === "pack" || command === "verify" || command === "publish") {
 	const expected = json(
@@ -231,7 +191,10 @@ if (command === "pack") {
 					entry.bun,
 				]),
 				...scanFiles("src/**", pkg.directory),
-				...pkg.manifest.files.filter((file) => file !== "src"),
+				...scanFiles("docs/**", pkg.directory),
+				...pkg.manifest.files.filter(
+					(file) => file !== "src" && file !== "docs",
+				),
 			];
 			for (const file of required) {
 				if (!entries.has(`package/${packagePath(file).replace(/^\.\//, "")}`))
@@ -261,76 +224,43 @@ if (command === "pack") {
 }
 
 if (command === "verify") {
-	// Each consumer gets only its requested tarball and the dependencies it needs.
-	// Overrides resolve unpublished siblings locally without a registry publish.
-	const overrides = Object.fromEntries(
-		packages.map((pkg) => [
-			pkg.manifest.name,
-			`file:${packagePath(resolve(root, output, `${pkg.manifest.name.replace(/^@/, "").replaceAll("/", "-")}-${version}.tgz`))}`,
-		]),
-	);
-	for (const pkg of packages) {
-		const consumer = mkdtempSync(join(tmpdir(), "virello-consumer-"));
-		try {
-			writeFileSync(
-				join(consumer, "package.json"),
-				JSON.stringify({
-					private: true,
-					dependencies: { [pkg.manifest.name]: overrides[pkg.manifest.name] },
-					overrides,
-				}),
-			);
-			run(
-				[
-					process.execPath,
-					"install",
-					"--ignore-scripts",
-					`--registry=${registry}`,
-				],
-				consumer,
-			);
-			if (
-				pkg.path !== "." &&
-				existsSync(join(consumer, "node_modules/virello"))
-			)
-				throw new Error(
-					`Standalone ${pkg.manifest.name} installed the aggregate.`,
-				);
-			cpSync(join(root, "scripts/imports.ts"), join(consumer, "imports.ts"));
-			for (const path of Object.keys(pkg.manifest.exports)) {
-				const spec = pkg.manifest.name + (path === "." ? "" : path.slice(1));
-				run(
-					[
-						process.execPath,
-						"imports.ts",
-						spec,
-						pkg.path === "." ? "" : "standalone",
-					],
-					consumer,
-				);
-			}
-			if (pkg.path === ".") {
-				const identityCheck = `
-					const root = await import("virello");
-					const engine = await import("@virello/engine");
-					for (const name of ${JSON.stringify(packages.filter((value) => value.path !== ".").map((value) => value.manifest.name))}) {
-						const owned = await import(name);
-						let shared = 0;
-						for (const [key, value] of Object.entries(owned)) {
-							const reference = [root, engine, root.Utils].find((entry) => key in entry);
-							if (!reference) continue;
-							if (value !== reference[key]) throw new Error("Duplicate identity: " + name + " " + key);
-							shared++;
-						}
-						if (!shared) throw new Error("No aggregate identity checked for " + name);
-					}
-				`;
-				run([process.execPath, "-e", identityCheck], consumer);
-			}
-			console.log(`Verified isolated imports: ${pkg.manifest.name}`);
-		} finally {
-			rmSync(consumer, { recursive: true, force: true });
+	const consumer = mkdtempSync(join(tmpdir(), "virello-consumer-"));
+	try {
+		const tarball = resolve(root, output, `virello-${version}.tgz`);
+		if (!existsSync(tarball))
+			throw new Error("Pack virello before verifying it.");
+		writeFileSync(
+			join(consumer, "package.json"),
+			JSON.stringify({
+				private: true,
+				type: "module",
+				dependencies: {
+					virello: `file:${packagePath(tarball)}`,
+					"discord.js": main.manifest.devDependencies!["discord.js"],
+				},
+			}),
+		);
+		run(
+			[
+				process.execPath,
+				"install",
+				"--ignore-scripts",
+				`--registry=${registry}`,
+			],
+			consumer,
+		);
+		if (existsSync(join(consumer, "node_modules/@virello")))
+			throw new Error("Isolated virello installed a removed scoped package.");
+		cpSync(join(root, "scripts/imports.ts"), join(consumer, "imports.ts"));
+		for (const path of Object.keys(main.manifest.exports)) {
+			const spec = "virello" + (path === "." ? "" : path.slice(1));
+			run([process.execPath, "imports.ts", spec], consumer);
 		}
+		console.log(
+			"Verified isolated virello imports and upstream class identity.",
+		);
+	} finally {
+		rmSync(consumer, { recursive: true, force: true });
 	}
 }
 
@@ -391,7 +321,7 @@ if (command === "publish") {
 			);
 		pending.push({ spec, tarball });
 	}
-	// Check every package before starting an irreversible, non-atomic release.
+	// Publish only the verified root tarball.
 	for (const { spec, tarball } of pending) {
 		console.log(`Publishing ${spec}`);
 		console.log(

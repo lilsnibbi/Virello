@@ -1,153 +1,76 @@
-import { expect, spyOn, test } from "bun:test";
-import { RestClient, type $RestRequest } from "../packages/rest/src/index";
-import { ControlStore } from "../packages/sharding/src/coordinator/ControlStore";
-import { FleetRestScheduler } from "../packages/sharding/src/rest/FleetRestScheduler";
-import { RemoteRestScheduler } from "../packages/sharding/src/rest/RemoteRestScheduler";
-import type { ShardAssignment } from "../packages/sharding/src/authority";
+import { expect, test } from "bun:test";
+import { REST } from "virello";
 
-test("retries and multipart uploads retain the correct unencoded audit reason", async () => {
-	const headers: string[] = [];
+const restOptions = { hashSweepInterval: 0, handlerSweepInterval: 0 };
+
+test("retries and multipart uploads retain each request's encoded audit reason", async () => {
+	const reasons: (string | null)[] = [];
 	const bodies: unknown[] = [];
-	const reason = "Case 42 / café 🔒: 50%";
-	const rest = new RestClient("test-token", {
-		maxConcurrentRequests: 1,
-		fetch: async (_url, init) => {
-			headers.push(new Headers(init?.headers).get("X-Audit-Log-Reason")!);
-			bodies.push(init?.body);
-			return headers.length === 1
-				? Response.json({ retry_after: 0.001 }, { status: 429 })
+	const reason = "Case 42 / caf\u00e9 \u{1f44b}: 50%";
+	const rest = new REST({
+		...restOptions,
+		makeRequest: async (_url, init) => {
+			reasons.push(new Headers(init.headers).get("X-Audit-Log-Reason"));
+			bodies.push(init.body);
+			return reasons.length === 1
+				? Response.json(
+						{ retry_after: 0.001 },
+						{
+							status: 429,
+							headers: {
+								"X-RateLimit-Remaining": "0",
+								"X-RateLimit-Reset-After": "0.001",
+							},
+						},
+					)
 				: new Response(null, { status: 204 });
 		},
+	}).setToken("test-token");
+	await rest.put("/guilds/1/bans/2", {
+		reason,
+		body: { delete_message_seconds: 0 },
+		files: [{ name: "evidence.txt", data: Buffer.from("evidence") }],
 	});
-	try {
-		const request: $RestRequest = {
-			method: "PUT",
-			path: "/guilds/1/bans/2",
-			reason,
-			body: { delete_message_seconds: 0 },
-			files: [{ name: "evidence.txt", data: new Blob(["evidence"]) }],
-		};
-		const first = rest.request(request);
-		request.reason = "changed after queueing";
-		const second = rest.request({
-			method: "PUT",
-			path: "/guilds/1/bans/3",
-			reason: "Case 43",
-		});
-		await Promise.all([first, second]);
-		expect(
-			headers.filter((header) => header === encodeURIComponent(reason)),
-		).toHaveLength(2);
-		expect(
-			headers.filter((header) => header === encodeURIComponent("Case 43")),
-		).toHaveLength(1);
-		expect(bodies[0]).toBeInstanceOf(FormData);
-		expect(headers).not.toContain(encodeURIComponent(request.reason));
-	} finally {
-		rest.close();
-	}
+	await rest.put("/guilds/1/bans/3", { reason: "Case 43" });
+	expect(reasons).toEqual([
+		encodeURIComponent(reason),
+		encodeURIComponent(reason),
+		"Case%2043",
+	]);
+	expect(bodies[0]).toBeInstanceOf(FormData);
 });
 
-test("invalid reasons never reach the scheduler and Unicode reasons are encoded once", async () => {
-	const received: $RestRequest[] = [];
-	const rest = new RestClient("test-token", {
-		scheduler: {
-			request: async (request) => {
-				received.push(request);
-			},
-		},
-	});
-	try {
-		for (const reason of [
-			"",
-			"a".repeat(513),
-			"🔒".repeat(513),
-			"\ud800",
-			42,
-		]) {
-			await expect(
-				rest.request({
-					method: "DELETE",
-					path: "/channels/1",
-					reason: reason as string,
-				}),
-			).rejects.toThrow();
-		}
-		expect(received).toHaveLength(0);
-		await rest.request({
-			method: "DELETE",
-			path: "/channels/1",
-			reason: "🔒".repeat(512),
-		});
-		expect(received[0].reason).toBe("🔒".repeat(512));
-	} finally {
-		rest.close();
-	}
-});
-
-test("managed REST preserves audit attribution and rejects operation reuse with a different reason", async () => {
-	const store = new ControlStore(
-		"app",
-		1,
-		new Map([[0, "host"]]),
-		"config",
-		true,
-	);
-	await store.ready;
-	const assignment: ShardAssignment = {
-		applicationId: "app",
-		layoutVersion: store.state.layoutVersion,
-		shardId: 0,
-		totalShards: 1,
-		assignmentEpoch: "1",
-		hostId: "host",
-		hostBootId: "host-boot",
-		workerBootId: "worker-boot",
-		deploymentId: "test",
-	};
-	const capability = "test-capability".padEnd(32, "0");
-	store.change((state) => {
-		state.leases["0"] = { assignment, capability, phase: "owned" };
-	});
-	const reasons: string[] = [];
-	const fleet = new FleetRestScheduler(store, "test-token", {
-		fetch: async (_url, init) => {
-			reasons.push(new Headers(init?.headers).get("X-Audit-Log-Reason")!);
+test("Unicode reasons encode once and invalid Unicode fails before transport", async () => {
+	const reasons: (string | null)[] = [];
+	const rest = new REST({
+		...restOptions,
+		makeRequest: async (_url, init) => {
+			reasons.push(new Headers(init.headers).get("X-Audit-Log-Reason"));
 			return new Response(null, { status: 204 });
 		},
-	});
-	const remote = new RemoteRestScheduler();
-	remote.configure(assignment, {
-		url: "https://fleet.invalid/rest",
-		capability,
-	});
-	const rest = new RestClient("test-token", { scheduler: remote });
-	const transport = spyOn(globalThis, "fetch").mockImplementation(
-		Object.assign(
-			async (
-				url: Parameters<typeof fetch>[0],
-				init?: Parameters<typeof fetch>[1],
-			) => fleet.handle(new Request(url, init)),
-			{ preconnect: fetch.preconnect },
-		),
-	);
-	try {
-		const request: $RestRequest = {
-			operationId: "case:42",
-			method: "PUT",
-			path: "/guilds/1/bans/2",
-			reason: "Case 42 🔒",
-		};
-		await rest.request(request);
-		await rest.request(request);
-		await expect(
-			rest.request({ ...request, reason: "Case 99" }),
-		).rejects.toThrow("different payload");
-		expect(reasons).toEqual([encodeURIComponent(request.reason!)]);
-	} finally {
-		transport.mockRestore();
-		rest.close();
-		await fleet.close();
-		await store.close();
-	}
+	}).setToken("test-token");
+	await expect(
+		rest.delete("/channels/1", { reason: "\ud800" }),
+	).rejects.toThrow();
+	expect(reasons).toEqual([]);
+	const reason = "\u{1f44b} 100%";
+	await rest.delete("/channels/1", { reason });
+	expect(reasons).toEqual([encodeURIComponent(reason)]);
+});
+
+test("independent discord.js REST clients do not share audit attribution", async () => {
+	const reasons: (string | null)[] = [];
+	const makeRequest: NonNullable<
+		ConstructorParameters<typeof REST>[0]
+	>["makeRequest"] = async (_url, init) => {
+		reasons.push(new Headers(init.headers).get("X-Audit-Log-Reason"));
+		return new Response(null, { status: 204 });
+	};
+	const first = new REST({ ...restOptions, makeRequest }).setToken("test-one");
+	const second = new REST({ ...restOptions, makeRequest }).setToken("test-two");
+	await Promise.all([
+		first.put("/guilds/1/bans/2", { reason: "Case 42" }),
+		second.put("/guilds/1/bans/3", { reason: "Case 99" }),
+	]);
+	expect(reasons.sort()).toEqual(["Case%2042", "Case%2099"]);
 });

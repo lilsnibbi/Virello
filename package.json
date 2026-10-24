@@ -11,12 +11,71 @@
 		".": {
 			"types": "./index.ts",
 			"bun": "./index.ts"
+		},
+		"./discord": {
+			"types": "./src/core/public/discord.ts",
+			"bun": "./src/core/public/discord.ts"
+		},
+		"./extensions": {
+			"types": "./src/core/public/extensions.ts",
+			"bun": "./src/core/public/extensions.ts"
+		},
+		"./utilities": {
+			"types": "./src/core/public/utilities.ts",
+			"bun": "./src/core/public/utilities.ts"
+		},
+		"./time": {
+			"types": "./src/core/public/time.ts",
+			"bun": "./src/core/public/time.ts"
+		},
+		"./sharding": {
+			"types": "./src/core/public/sharding.ts",
+			"bun": "./src/core/public/sharding.ts"
+		},
+		"./localisation": {
+			"types": "./src/core/public/localisation.ts",
+			"bun": "./src/core/public/localisation.ts"
+		},
+		"./builders": {
+			"types": "./src/core/public/builders.ts",
+			"bun": "./src/core/public/builders.ts"
+		},
+		"./validation": {
+			"types": "./src/core/public/validation.ts",
+			"bun": "./src/core/public/validation.ts"
+		},
+		"./commands": {
+			"types": "./src/core/public/commands.ts",
+			"bun": "./src/core/public/commands.ts"
+		},
+		"./scheduling": {
+			"types": "./src/core/public/scheduling.ts",
+			"bun": "./src/core/public/scheduling.ts"
+		},
+		"./events": {
+			"types": "./src/core/public/events.ts",
+			"bun": "./src/core/public/events.ts"
+		},
+		"./client": {
+			"types": "./src/core/public/client.ts",
+			"bun": "./src/core/public/client.ts"
+		},
+		"./modules": {
+			"types": "./src/core/public/modules.ts",
+			"bun": "./src/core/public/modules.ts"
+		},
+		"./services": {
+			"types": "./src/core/public/services.ts",
+			"bun": "./src/core/public/services.ts"
 		}
 	},
 	"types": "./index.ts",
 	"files": [
 		"index.ts",
-		"README.md"
+		"src",
+		"README.md",
+		"BREAKING_CHANGES.md",
+		"docs"
 	],
 	"engines": {
 		"bun": ">=1.4.4"
@@ -27,25 +86,28 @@
 		"lint:check": "bun lint && bun fmt --check",
 		"format": "bun fmt",
 		"release:check": "bun scripts/release.ts check",
-		"release:sync": "bun scripts/release.ts sync",
 		"release:pack": "bun scripts/release.ts pack",
 		"release:verify": "bun scripts/release.ts verify",
 		"release:publish": "bun scripts/publish.ts"
 	},
 	"dependencies": {
-		"@virello/builders": "workspace:*",
-		"@virello/core": "workspace:*",
-		"@virello/engine": "workspace:*",
-		"@virello/sharding": "workspace:*",
-		"@virello/util": "workspace:*"
+		"@lilsnibbi/logger": "1.2.0",
+		"arktype": "^2.2.8",
+		"cron-parser": "5.10.2",
+		"discord-api-types": "0.38.57",
+		"i18next": "^26.5.3",
+		"@ovencord/hybrid-sharding": "1.1.0",
+		"@ovencord/cross-hosting": "1.0.8",
+		"redis": "5.11.0"
 	},
 	"devDependencies": {
 		"@types/bun": "1.4.4",
+		"discord.js": "14.27.0",
 		"typescript": "7.0.2"
 	},
-	"workspaces": [
-		"packages/*"
-	],
+	"peerDependencies": {
+		"discord.js": "^14.27.0"
+	},
 	"publishConfig": {
 		"access": "public",
 		"registry": "https://registry.npmjs.org"

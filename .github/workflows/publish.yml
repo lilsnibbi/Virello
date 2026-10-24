@@ -20,7 +20,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   publish:
-    name: Publish synchronized packages
+    name: Publish virello
     if: ${{ github.repository == 'lilsnibbi/Virello' &&
       (github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/main') }}
     runs-on: ubuntu-24.04
@@ -76,15 +76,15 @@ jobs:
         run: |
           npm ci --prefix scripts/release-tools --no-audit --no-fund
           echo "$GITHUB_WORKSPACE/scripts/release-tools/node_modules/.bin" >> "$GITHUB_PATH"
-      - name: Verify locked dependencies and shared versions
+      - name: Verify locked dependencies and package metadata
         run: |
           bun install --frozen-lockfile --ignore-scripts
           bun release:check
-          git diff --exit-code -- package.json packages bun.lock
-      - name: Pack and verify public packages
+          git diff --exit-code -- package.json bun.lock
+      - name: Pack and verify virello
         run: |
           bun release:pack
           bun release:verify
-      - name: Publish packages with npm trusted publishing
-        # Uses npm publish --access public on the verified Bun tarballs, dependency first.
+      - name: Publish virello with npm trusted publishing
+        # Uses npm publish --access public on the verified virello tarball.
         run: bun scripts/release.ts publish

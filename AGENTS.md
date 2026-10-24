@@ -4,13 +4,13 @@
 
 Virello is a modular Discord framework shipped as raw TypeScript for Bun. There is no build step or Node runtime support.
 
-- `index.ts`: single framework barrel; feature entrypoints live in workspaces.
-- `packages/core/src/`: application client, commands, modules, events, extensions and framework Discord helpers.
-- `packages/engine/`, `packages/rest/`, `packages/ws/`, `packages/cache/`: native client, transports and cache stores.
-- `packages/sharding/`: coordinator, host manager, IPC and fleet REST scheduling.
-- `packages/util/`, `packages/logging/`, `packages/builders/`: independent helpers, logging and payload builders.
-- `release-packages.json`: dependency-first public release order; all packages share one version.
-- `scripts/`: validation and packaging checks; `.github/workflows/ci.yml`: CI and releases.
+- `index.ts`: framework barrel; `src/core/public/` contains feature subpaths.
+- `src/core/`: client, commands, modules, events, extensions and framework utilities.
+- `src/util/`, `src/logging/`: shared helpers and framework logging.
+- Discord Gateway, REST, entities, caches, collectors and builders belong to the `discord.js` peer.
+- Sharding uses the actual `@ovencord/hybrid-sharding` and `@ovencord/cross-hosting` dependencies, re-exported by `virello/sharding`.
+- Only the root `virello` package is published. No public workspaces or scoped Virello packages.
+- `scripts/`: validation and single-package release checks; `docs/`: API and integration guidance.
 
 ## Build, Test, and Development Commands
 
@@ -22,7 +22,7 @@ Use Bun canary (`bun upgrade --canary`), the project's standard toolchain. From 
 - `bun fmt --check`: check formatting without writing files.
 - `bun fmt`: apply formatting; review changes before committing.
 - `bun scripts/ci.ts`: validate types, lint, public exports and formatting.
-- `bun release:check`: validate publish inputs and shared release metadata.
+- `bun release:check`: validate single-package inputs and release metadata.
 
 ## Coding Style & Naming Conventions
 

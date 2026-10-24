@@ -17,7 +17,7 @@ export async function auditExports(
 	failures: string[],
 ): Promise<void> {
 	const manifest = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
-	const paths = ["."];
+	const paths = baseline.paths;
 	if (
 		JSON.stringify(Object.keys(manifest.exports).sort()) !==
 		JSON.stringify(paths.sort())
@@ -27,7 +27,8 @@ export async function auditExports(
 		failures.push("Root type fallback changed.");
 	const entries = new Map<string, string>();
 	for (const path of paths) {
-		const expected = "./index.ts";
+		const expected =
+			path === "." ? "./index.ts" : `./src/core/public/${path.slice(2)}.ts`;
 		const conditions = manifest.exports[path];
 		if (
 			!conditions ||
@@ -71,6 +72,7 @@ export async function auditExports(
 			throw new Error("Could not open the public export audit project.");
 		const { program, checker } = project;
 		for (const [path, file] of entries) {
+			if (path !== ".") continue;
 			const syntax = await program.getSourceFile(file);
 			if (!syntax) {
 				failures.push(`Missing TypeScript source file: ${path}`);
@@ -85,12 +87,12 @@ export async function auditExports(
 					!statement.exportClause &&
 					statement.moduleSpecifier &&
 					ts.isStringLiteral(statement.moduleSpecifier) &&
-					statement.moduleSpecifier.text === "@virello/core"
+					statement.moduleSpecifier.text === "./src/core/index"
 				) {
 					continue;
 				}
 				failures.push(
-					`Public entrypoint must re-export @virello/core: ${path}`,
+					`Public entrypoint must re-export ./src/core/index: ${path}`,
 				);
 			}
 		}

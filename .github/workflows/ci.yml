@@ -53,7 +53,7 @@ jobs:
           git diff --exit-code -- package.json bun.lock
       - name: Workflow syntax and expressions
         run: bash scripts/checkActions.sh
-      - name: Shared version and public package contents
+      - name: Single-package release contents
         run: |
           npm ci --prefix scripts/release-tools --no-audit --no-fund
           bun release:check

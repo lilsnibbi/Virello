@@ -8,12 +8,10 @@ import {
 	ModalBuilder,
 	ComponentType,
 	createComponentBuilder,
-	InteractionContext,
-	type VirelloClient,
+	ModalSubmitInteraction,
+	Client,
 	DiscordAPI,
 } from "virello";
-import { EngineInteraction } from "@virello/engine/client";
-import { RestClient } from "../packages/rest/src/index";
 
 const options = [
 	{ label: "Account", value: "account" },
@@ -25,7 +23,10 @@ test("ticket controls serialize through labels and round-trip through the modal 
 		.setCustomId("topic")
 		.setRequired(false)
 		.addOptions(
-			(builder) => builder.setLabel("Account").setValue("account").setDefault(),
+			new RadioGroupOptionBuilder()
+				.setLabel("Account")
+				.setValue("account")
+				.setDefault(true),
 			new RadioGroupOptionBuilder(options[1]),
 		);
 	const checkbox = new CheckboxGroupBuilder()
@@ -34,9 +35,9 @@ test("ticket controls serialize through labels and round-trip through the modal 
 		.setMinValues(0)
 		.setMaxValues(2)
 		.addOptions(
-			new CheckboxGroupOptionBuilder(options[0])
+			new CheckboxGroupOptionBuilder({ ...options[0] })
 				.setDescription("Account help")
-				.setDefault(),
+				.setDefault(true),
 			options[1],
 		);
 	const modal = new ModalBuilder()
@@ -78,7 +79,7 @@ test("ticket controls serialize through labels and round-trip through the modal 
 	);
 });
 
-test("invalid ticket choices and inconsistent requiredness are rejected before display", () => {
+test("invalid ticket choices and selection limits are rejected before display", () => {
 	const invalid = [
 		new RadioGroupBuilder({ custom_id: "topic", options: [options[0]] }),
 		new RadioGroupBuilder({
@@ -93,7 +94,6 @@ test("invalid ticket choices and inconsistent requiredness are rejected before d
 			custom_id: "topic",
 			options: options.map((option) => ({ ...option, label: "x".repeat(101) })),
 		}),
-		new CheckboxGroupBuilder({ custom_id: "details", options, min_values: 0 }),
 		new CheckboxGroupBuilder({
 			custom_id: "details",
 			options,
@@ -126,7 +126,7 @@ test("invalid ticket choices and inconsistent requiredness are rejected before d
 	}
 });
 
-test("raw controls, optional selection limits and option snapshots retain their API meaning", () => {
+test("raw controls and explicitly copied inputs retain their API meaning", () => {
 	const data = {
 		type: ComponentType.CheckboxGroup as const,
 		custom_id: "details",
@@ -138,10 +138,10 @@ test("raw controls, optional selection limits and option snapshots retain their 
 	const label = new LabelBuilder({
 		label: "Details",
 		type: ComponentType.Label,
-		component: data,
+		component: structuredClone(data),
 	});
 	data.options[0].value = "changed";
-	const first = label.toJSON();
+	const first = structuredClone(label.toJSON());
 	expect(first.component).toMatchObject({
 		options,
 		required: false,
@@ -156,70 +156,76 @@ test("raw controls, optional selection limits and option snapshots retain their 
 	).toBeUndefined();
 });
 
-test("modal fields preserve selected and optional empty group values with type checks", () => {
-	const rest = new RestClient("test-token");
-	const fields = new InteractionContext(
-		{} as VirelloClient,
-		new EngineInteraction(
-			{
-				type: DiscordAPI.InteractionType.ModalSubmit,
-				data: {
-					components: [
-						{
-							type: ComponentType.Label,
-							id: 1,
-							component: {
-								type: ComponentType.RadioGroup,
-								id: 2,
-								custom_id: "topic",
-								value: "billing",
-							},
-						},
-						{
-							type: ComponentType.Label,
-							id: 3,
-							component: {
-								type: ComponentType.RadioGroup,
-								id: 4,
-								custom_id: "optional-topic",
-								value: null,
-							},
-						},
-						{
-							type: ComponentType.Label,
-							id: 5,
-							component: {
-								type: ComponentType.CheckboxGroup,
-								id: 6,
-								custom_id: "details",
-								values: ["account", "billing"],
-							},
-						},
-						{
-							type: ComponentType.Label,
-							id: 7,
-							component: {
-								type: ComponentType.CheckboxGroup,
-								id: 8,
-								custom_id: "optional-details",
-								values: [],
-							},
-						},
-					],
+test("modal fields preserve selected and optional empty group values with type checks", async () => {
+	const client = new Client({ intents: [] });
+	const fields = new ModalSubmitInteraction(client, {
+		id: "123456789012345678",
+		application_id: "123456789012345679",
+		token: "test",
+		version: 1,
+		locale: "en-US",
+		app_permissions: "0",
+		entitlements: [],
+		authorizing_integration_owners: {},
+		user: {
+			id: "123456789012345670",
+			username: "tester",
+			discriminator: "0",
+			avatar: null,
+		},
+		type: DiscordAPI.InteractionType.ModalSubmit,
+		data: {
+			custom_id: "support",
+			components: [
+				{
+					type: ComponentType.Label,
+					id: 1,
+					component: {
+						type: ComponentType.RadioGroup,
+						id: 2,
+						custom_id: "topic",
+						value: "billing",
+					},
 				},
-			} as DiscordAPI.APIModalSubmitInteraction,
-			rest,
-		),
-	).fields;
-	rest.close();
-	expect(fields.getRadioGroupValue("topic")).toBe("billing");
-	expect(fields.getRadioGroupValue("optional-topic")).toBeNull();
-	expect(fields.getCheckboxGroupValues("details")).toEqual([
-		"account",
-		"billing",
-	]);
-	expect(fields.getCheckboxGroupValues("optional-details")).toEqual([]);
-	expect(() => fields.getCheckboxGroupValues("topic")).toThrow("allowed type");
-	expect(() => fields.getRadioGroupValue("details")).toThrow("allowed type");
-	expect(() => fields.getRadioGroupValue("missing")).toThrow("not found");
+				{
+					type: ComponentType.Label,
+					id: 3,
+					component: {
+						type: ComponentType.RadioGroup,
+						id: 4,
+						custom_id: "optional-topic",
+						value: null,
+					},
+				},
+				{
+					type: ComponentType.Label,
+					id: 5,
+					component: {
+						type: ComponentType.CheckboxGroup,
+						id: 6,
+						custom_id: "details",
+						values: ["account", "billing"],
+					},
+				},
+				{
+					type: ComponentType.Label,
+					id: 7,
+					component: {
+						type: ComponentType.CheckboxGroup,
+						id: 8,
+						custom_id: "optional-details",
+						values: [],
+					},
+				},
+			],
+		},
+	} as DiscordAPI.APIModalSubmitInteraction).fields;
+	await client.destroy();
+	expect(fields.getRadioGroup("topic")).toBe("billing");
+	expect(fields.getRadioGroup("optional-topic")).toBeNull();
+	expect(fields.getCheckboxGroup("details")).toEqual(["account", "billing"]);
+	expect(fields.getCheckboxGroup("optional-details")).toEqual([]);
+	expect(() => fields.getCheckboxGroup("topic")).toThrow();
+	expect(() => fields.getRadioGroup("details")).toThrow();
+	expect(() => fields.getRadioGroup("missing")).toThrow("not found");
 });

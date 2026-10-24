@@ -42,11 +42,41 @@ try {
 		console.log(`Cold import passed: ${path}`);
 	} else {
 		const root = await import("virello");
-		const reference = root;
+		const reference =
+			path === "virello/discord"
+				? { ...root, ...(await import("discord.js")) }
+				: root;
 		for (const [name, value] of Object.entries(first)) {
 			if (value !== Reflect.get(reference, name))
 				throw new Error(`Identity differs: ${path} ${name}`);
 		}
+		const discord = await import("discord.js");
+		for (const name of [
+			"Client",
+			"Message",
+			"Guild",
+			"User",
+			"InteractionCollector",
+			"MessageCollector",
+			"EmbedBuilder",
+			"RadioGroupBuilder",
+			"REST",
+		] as const) {
+			if (root[name] !== discord[name])
+				throw new Error(`Wrapped Discord object: ${name}`);
+		}
+		if (Object.getPrototypeOf(root.VirelloClient) !== discord.Client)
+			throw new Error("VirelloClient must extend discord.js Client directly.");
+		const hybrid = await import("@ovencord/hybrid-sharding");
+		const crosshost = await import("@ovencord/cross-hosting");
+		if (
+			root.ClusterManager !== hybrid.ClusterManager ||
+			root.ClusterClient !== hybrid.ClusterClient ||
+			root.Bridge !== crosshost.Bridge ||
+			root.CrossHostClient !== crosshost.Client ||
+			root.CrossHostShard !== crosshost.Shard
+		)
+			throw new Error("Sharding exports must retain upstream identity.");
 		if (opened.length)
 			throw new Error(`Import attempted resources: ${opened.join(", ")}`);
 		if (

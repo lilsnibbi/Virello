@@ -1,6 +1,6 @@
 {
 	"name": "@virello/sharding",
-	"version": "0.3.0",
+	"version": "0.3.1",
 	"description": "Discord shard coordinator, host manager, typed IPC and fleet REST scheduling for Bun.",
 	"type": "module",
 	"repository": {

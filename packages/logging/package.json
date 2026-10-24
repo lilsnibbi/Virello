@@ -1,6 +1,6 @@
 {
 	"name": "@virello/logging",
-	"version": "0.3.0",
+	"version": "0.3.1",
 	"description": "Shared Bun logging, console formatting and redacted diagnostics for Virello.",
 	"type": "module",
 	"repository": {

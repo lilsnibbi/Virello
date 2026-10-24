@@ -296,6 +296,7 @@ export class FleetRestScheduler {
 					data.files ?? [],
 					data.auth,
 					data.executionKey ?? null,
+					data.reason ?? null,
 				]),
 			);
 			if (mutation) {

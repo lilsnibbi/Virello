@@ -10,6 +10,7 @@ export const restRequestSchema = type({
 	method: "'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'",
 	path: "string >= 1 & string <= 8192",
 	"body?": "unknown",
+	"reason?": "string >= 1 & string <= 1024",
 	"files?": type({
 		name: "string >= 1 & string <= 256",
 		data: "string",

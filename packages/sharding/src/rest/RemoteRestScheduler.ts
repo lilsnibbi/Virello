@@ -120,6 +120,7 @@ export class RemoteRestScheduler implements $RestScheduler {
 					auth: request.auth !== false,
 					deadlineMs,
 					...(request.body === undefined ? {} : { body: request.body }),
+					...(request.reason === undefined ? {} : { reason: request.reason }),
 					...(request.executionKey
 						? { executionKey: request.executionKey }
 						: {}),

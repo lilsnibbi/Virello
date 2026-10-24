@@ -67,6 +67,8 @@ export interface $RestRequest {
 	path: string;
 	/** Optional JSON-serializable body, serialized when the request is queued. */
 	body?: unknown;
+	/** Unencoded Discord audit-log reason, 1–512 Unicode characters. Encoded once as X-Audit-Log-Reason. */
+	reason?: string;
 	/** Optional file uploads. Blobs (including Bun.file) are sent as Discord multipart files with payload_json. */
 	files?: readonly { name: string; data: Blob }[];
 	/** Send the bot token unless false. Defaults to true; interaction callbacks use false. */
@@ -185,7 +187,7 @@ export class RestClient {
 
 	/**
 	 * Queue a Discord JSON request with route and global rate-limit handling.
-	 * @param request - Method, API path, body, authentication, and cancellation settings.
+	 * @param request - Method, API path, body, audit reason, authentication, and cancellation settings.
 	 * @returns Parsed JSON cast to T, or undefined for an empty successful response.
 	 * @throws For invalid paths or JSON, exhausted queue capacity, cancellation, transport/response failures, or RestError
 	 * for a rejected HTTP response. POST/PATCH transport failures are not retried.
@@ -208,6 +210,23 @@ export class RestClient {
 					"REST paths must be absolute API paths without traversal.",
 				),
 			);
+		try {
+			if (request.reason !== undefined) {
+				if (
+					typeof request.reason !== "string" ||
+					!request.reason.length ||
+					request.reason.length > 1024 ||
+					[...request.reason].length > 512
+				)
+					throw new TypeError(
+						"Audit reasons require 1–512 Unicode characters.",
+					);
+				// Reject malformed UTF-16 before queueing or forwarding to a scheduler.
+				encodeURIComponent(request.reason);
+			}
+		} catch (error) {
+			return Promise.reject(error);
+		}
 		const deadlineMs = integer(request.deadlineMs ?? 15000, "deadlineMs", 1);
 		const deadline = new AbortController();
 		const timer = this.clock.setTimeout(
@@ -344,6 +363,8 @@ export class RestClient {
 				headers.set("Authorization", `Bot ${this.#token}`);
 			if (typeof body === "string")
 				headers.set("Content-Type", "application/json");
+			if (request.reason !== undefined)
+				headers.set("X-Audit-Log-Reason", encodeURIComponent(request.reason));
 			attemptSignal.throwIfAborted();
 			this.beforeSend?.(request);
 			const response = await this.fetcher(this.base + request.path, {

@@ -1,6 +1,6 @@
 {
 	"name": "virello",
-	"version": "0.3.0",
+	"version": "0.3.1",
 	"description": "Modular Discord framework for Bun.",
 	"type": "module",
 	"repository": {

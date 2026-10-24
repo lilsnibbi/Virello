@@ -1,6 +1,6 @@
 {
 	"name": "@virello/cache",
-	"version": "0.3.0",
+	"version": "0.3.1",
 	"description": "Discord entity cache stores and gateway dispatch application for Bun.",
 	"type": "module",
 	"repository": {

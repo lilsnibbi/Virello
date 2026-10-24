@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/lilsnibbi/Virello/compare/v0.3.0...v0.3.1) (2026-10-24)
+
+
+### Bug Fixes
+
+* **core:** address framework gaps ([#46](https://github.com/lilsnibbi/Virello/issues/46)) ([3e4a646](https://github.com/lilsnibbi/Virello/commit/3e4a6463bdb4441eb018eb5ff334f675289a8757))
+
 ## [0.3.0](https://github.com/lilsnibbi/Virello/compare/v0.2.0...v0.3.0) (2026-10-24)
 
 

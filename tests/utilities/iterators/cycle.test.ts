@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { cycle, take } from "../../../src/utilities/iterators/index";
+import { cycle, take } from "../../../packages/util/src/iterators/index";
 
 describe("cycle", () => {
 	test("GIVEN iterable with elements THEN returns infinite iterable cycling through the elements", () => {

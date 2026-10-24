@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { reverse } from "../../../src/utilities/iterators/index";
+import { reverse } from "../../../packages/util/src/iterators/index";
 
 describe("reverse", () => {
 	test("GIVEN iterable with elements THEN returns reversed iterable", () => {

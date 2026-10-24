@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { zip } from "../../../src/utilities/iterators/index";
+import { zip } from "../../../packages/util/src/iterators/index";
 
 describe("zip", () => {
 	test("GIVEN no input iterables THEN terminates immediately", () => {

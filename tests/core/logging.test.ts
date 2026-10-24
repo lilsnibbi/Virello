@@ -6,18 +6,18 @@ import {
 	Logger,
 	type LoggerLike,
 } from "virello";
-import { Extension } from "../../src/core/lifecycle/Extension";
-import { consoleEventOptions } from "../../src/core/logging/console";
-import { writeEvent, writeLog } from "../../src/core/logging/diagnostics";
+import { Extension } from "../../packages/core/src/core/lifecycle/Extension";
+import { consoleEventOptions } from "../../packages/logging/src/console";
+import { writeEvent, writeLog } from "../../packages/logging/src/diagnostics";
 import {
 	errorDiagnostic,
 	type LogEntry,
 	makeRecord,
 	serializeRecord,
 	supportsColor,
-} from "../../src/core/logging/format";
-import { safeContext, safeText } from "../../src/core/logging/redact";
-import { RestError } from "../../src/engine/rest/RestError";
+} from "../../packages/logging/src/format";
+import { safeContext, safeText } from "../../packages/logging/src/redact";
+import { RestError } from "../../packages/rest/src/RestError";
 
 const date = new Date("2026-10-14T12:30:45.123Z");
 const entry: LogEntry = {

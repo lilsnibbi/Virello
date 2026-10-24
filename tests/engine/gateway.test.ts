@@ -6,10 +6,10 @@ import {
 import {
 	type $GatewayOptions,
 	GatewayShard,
-} from "../../src/engine/gateway/GatewayShard";
-import { IdentifyGate } from "../../src/engine/gateway/IdentifyGate";
-import { decodeFrame, gatewayURL } from "../../src/engine/gateway/protocol";
-import type { $GatewayDispatch } from "../../src/engine/gateway/types";
+} from "../../packages/ws/src/GatewayShard";
+import { IdentifyGate } from "../../packages/ws/src/IdentifyGate";
+import { decodeFrame, gatewayURL } from "../../packages/ws/src/protocol";
+import type { $GatewayDispatch } from "../../packages/ws/src/types";
 import { dispatch, ready } from "./fixtures";
 import { FakeClock, FakeSocket, flush } from "./support";
 

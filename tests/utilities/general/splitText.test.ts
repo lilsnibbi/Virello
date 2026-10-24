@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { splitText } from "../../../src/utilities/index";
+import { splitText } from "../../../packages/util/src/general";
 
 describe("splitText", () => {
 	test("GIVEN text without spaces THEN hard cuts off", () => {

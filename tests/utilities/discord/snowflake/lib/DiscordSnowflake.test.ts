@@ -2,7 +2,7 @@ import { afterAll, beforeEach, describe, expect, jest, test } from "bun:test";
 import {
 	type DeconstructedSnowflake,
 	DiscordSnowflake,
-} from "../../../../../src/utilities/discord/snowflake/index";
+} from "../../../../../packages/core/src/utilities/discord/snowflake/index";
 
 describe("Discord Snowflakes", () => {
 	beforeEach(() => {

@@ -11,8 +11,8 @@ import { tmpdir } from "node:os";
 import { join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import "./fixtures/contracts";
-import { ShardCoordinator } from "../../src/sharding/coordinator/Coordinator";
-import { ShardManager } from "../../src/sharding/manager/Manager";
+import { ShardCoordinator } from "../../packages/sharding/src/coordinator/Coordinator";
+import { ShardManager } from "../../packages/sharding/src/manager/Manager";
 
 import { fixture, logger, sessionLimit, tokenA, until } from "./helpers";
 

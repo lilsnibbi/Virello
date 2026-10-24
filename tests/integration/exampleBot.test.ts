@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { createBot } from "../../examples/client";
 import { formatStats } from "../../examples/stats";
-import { ShardError } from "../../src/sharding/types";
+import { ShardError } from "../../packages/sharding/src/types";
 
 const previousGuildId = Bun.env.DEV_GUILD_ID;
 afterEach(() => {

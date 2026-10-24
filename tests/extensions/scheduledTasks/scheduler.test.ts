@@ -6,7 +6,7 @@ import {
 	type TaskRunContext,
 	TaskScheduler,
 } from "virello";
-import { nextOccurrence } from "../../../src/extensions/scheduledTasks/timing";
+import { nextOccurrence } from "../../../packages/core/src/extensions/scheduledTasks/timing";
 
 declare module "virello" {
 	interface Tasks {

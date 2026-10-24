@@ -12,7 +12,7 @@ import {
 	MessageFlags,
 	TextDisplayBuilder,
 } from "virello/builders";
-import { RestClient } from "../../src/engine/rest/RestClient";
+import { RestClient } from "../../packages/rest/src/RestClient";
 import { ticketPanel } from "../../examples/tickets/flow";
 
 describe("message builder validation", () => {

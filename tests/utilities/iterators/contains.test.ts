@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { contains } from "../../../src/utilities/iterators/index";
+import { contains } from "../../../packages/util/src/iterators/index";
 
 describe("contains", () => {
 	test("GIVEN iterable containing the value THEN returns true", () => {

@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
-import { VirelloClient } from "../../src/core/client/VirelloClient";
-import { ManagedGateway } from "../../src/sharding/client/gateway";
-import { Availability } from "../../src/sharding/transport/availability";
+import { VirelloClient } from "../../packages/core/src/core/client/VirelloClient";
+import { ManagedGateway } from "../../packages/sharding/src/client/gateway";
+import { Availability } from "../../packages/sharding/src/transport/availability";
 import { ready } from "../engine/fixtures";
 import { FakeClock, FakeSocket, flush } from "../engine/support";
 import { logger, stack, until } from "./helpers";

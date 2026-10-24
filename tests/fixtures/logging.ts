@@ -1,5 +1,5 @@
-import { createConsoleLogger } from "../../src/core/logging/console";
-import { writeEvent } from "../../src/core/logging/diagnostics";
+import { createConsoleLogger } from "../../packages/logging/src/console";
+import { writeEvent } from "../../packages/logging/src/diagnostics";
 
 // Synthetic subprocess fixture: no clients, services or network requests.
 const logger = createConsoleLogger("fixture");

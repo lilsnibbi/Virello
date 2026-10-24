@@ -13,7 +13,7 @@ import {
 	ResultError,
 	type Some,
 	some,
-} from "../../../src/utilities/result/index";
+} from "../../../packages/util/src/result/index";
 import { error, makeThrow } from "./shared";
 
 describe("Result", () => {

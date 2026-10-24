@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { Lexer, Parser } from "../../src/utilities/parsing/index";
-import { FlagUnorderedStrategy } from "../../src/utilities/parsing/strategies/FlagUnorderedStrategy";
+import { Lexer, Parser } from "../../packages/util/src/parsing/index";
+import { FlagUnorderedStrategy } from "../../packages/util/src/parsing/strategies/FlagUnorderedStrategy";
 
 const parse = (testString: string) =>
 	new Parser(

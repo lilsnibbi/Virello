@@ -1,10 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import { ChannelType, GatewayDispatchEvents as E } from "discord-api-types/v10";
 import type { APIVoiceState } from "discord-api-types/v10";
-import { CacheStore } from "../../src/engine/cache/CacheStore";
-import { EngineCache } from "../../src/engine/cache/EngineCache";
-import { ScopedCache } from "../../src/engine/cache/ScopedCache";
-import type { $GatewayDispatch } from "../../src/engine/gateway/types";
+import { CacheStore } from "../../packages/cache/src/CacheStore";
+import { EngineCache } from "../../packages/cache/src/EngineCache";
+import { ScopedCache } from "../../packages/cache/src/ScopedCache";
+import type { $GatewayDispatch } from "../../packages/ws/src/types";
 import {
 	dispatch,
 	guild,

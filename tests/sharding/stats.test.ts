@@ -5,15 +5,15 @@ import {
 	VirelloClient,
 	ShardError,
 	type ShardStats,
-} from "../../src/index";
-import { ShardLink } from "../../src/sharding/client/Link";
-import { ShardMessenger } from "../../src/sharding/messaging";
+} from "../../packages/core/src/index";
+import { ShardLink } from "../../packages/sharding/src/client/Link";
+import { ShardMessenger } from "../../packages/sharding/src/messaging";
 import {
 	statsMap,
 	statsRequest,
 	statsSnapshot,
-} from "../../src/sharding/stats";
-import type { ShardCallOptions } from "../../src/sharding/types";
+} from "../../packages/sharding/src/stats";
+import type { ShardCallOptions } from "../../packages/sharding/src/types";
 import { logger, stack, until } from "./helpers";
 
 const fixture = new URL("./fixtures/stats.ts", import.meta.url);

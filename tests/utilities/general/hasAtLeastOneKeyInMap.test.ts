@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { hasAtLeastOneKeyInMap } from "../../../src/utilities/index";
+import { hasAtLeastOneKeyInMap } from "../../../packages/util/src/general";
 
 const mapWithKey = new Map([
 	["one", "one"],

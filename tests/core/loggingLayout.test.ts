@@ -6,9 +6,12 @@ import { Logger, type LogLayout, type LogLevel } from "@lilsnibbi/logger";
 import {
 	consoleEventOptions,
 	createConsoleLogger,
-} from "../../src/core/logging/console";
-import { writeEvent } from "../../src/core/logging/diagnostics";
-import { errorDiagnostic, type LogEntry } from "../../src/core/logging/format";
+} from "../../packages/logging/src/console";
+import { writeEvent } from "../../packages/logging/src/diagnostics";
+import {
+	errorDiagnostic,
+	type LogEntry,
+} from "../../packages/logging/src/format";
 
 const requestId = "8efd2288-ed6e-4c61-abdc-a69c283449c6";
 const connectionId = "68f0d1d7-8bc9-489a-b381-031a9c6e9ae6";

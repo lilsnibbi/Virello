@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import {
 	Admission,
 	admissionCooldownMs,
-} from "../../src/sharding/coordinator/Admission";
+} from "../../packages/sharding/src/coordinator/Admission";
 import { assignment, authority } from "./fixtures/authority";
 const limit = {
 	total: 10,

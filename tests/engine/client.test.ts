@@ -8,9 +8,9 @@ import {
 } from "discord-api-types/v10";
 import { EngineClient } from "virello/engine";
 import { MockDiscord } from "../../examples/engine/MockDiscord";
-import { EngineInteraction } from "../../src/engine/client/EngineInteraction";
-import { EventHub } from "../../src/engine/client/EventHub";
-import { RestClient } from "../../src/engine/rest/RestClient";
+import { EngineInteraction } from "../../packages/engine/src/client/EngineInteraction";
+import { EventHub } from "../../packages/engine/src/client/EventHub";
+import { RestClient } from "../../packages/rest/src/RestClient";
 import {
 	dispatch,
 	member,

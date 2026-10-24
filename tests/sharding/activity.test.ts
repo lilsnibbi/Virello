@@ -2,19 +2,19 @@ import { afterEach, expect, spyOn, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve, sep } from "node:path";
-import type { ConsoleRecord } from "../../src/core/logging/format";
-import type { LoggerLike } from "../../src/core/logging/LoggerLike";
+import type { ConsoleRecord } from "../../packages/logging/src/format";
+import type { LoggerLike } from "../../packages/logging/src/LoggerLike";
 import {
 	encode,
 	type Frame,
 	frame,
 	type Op,
-} from "../../src/sharding/transport/protocol";
-import { Socket } from "../../src/sharding/transport/socket";
+} from "../../packages/sharding/src/transport/protocol";
+import { Socket } from "../../packages/sharding/src/transport/socket";
 import {
 	assignmentSchema,
 	type ShardAssignment,
-} from "../../src/sharding/authority";
+} from "../../packages/sharding/src/authority";
 import { stack, tokenA, tokenB, until } from "./helpers";
 
 const stacks: Awaited<ReturnType<typeof stack>>[] = [];

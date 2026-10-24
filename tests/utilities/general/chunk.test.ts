@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { chunk } from "../../../src/utilities/index";
+import { chunk } from "../../../packages/util/src/general";
 
 describe("chunk", () => {
 	test("GIVEN input not an array THEN throws TypeError", () => {

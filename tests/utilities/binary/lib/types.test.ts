@@ -5,7 +5,7 @@ import {
 	StringType,
 	t,
 	UnalignedUint16Array,
-} from "../../../../src/utilities/binary/index";
+} from "../../../../packages/util/src/binary/index";
 
 describe("types", () => {
 	describe("Boolean", () => {

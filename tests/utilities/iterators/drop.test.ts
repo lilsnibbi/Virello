@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { drop } from "../../../src/utilities/iterators/index";
+import { drop } from "../../../packages/util/src/iterators/index";
 
 describe("drop", () => {
 	test("GIVEN iterable and count greater than zero THEN returns iterable with dropped elements", () => {

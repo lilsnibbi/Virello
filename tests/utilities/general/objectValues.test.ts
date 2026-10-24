@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { objectValues } from "../../../src/utilities/index";
+import { objectValues } from "../../../packages/util/src/general";
 
 describe("objectValues", () => {
 	test("GIVEN basic readonly THEN returns expected", () => {

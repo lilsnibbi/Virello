@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { capitalizeFirstLetter } from "../../../src/utilities/text/capitalizeFirstLetter";
+import { capitalizeFirstLetter } from "../../../packages/util/src/text/capitalizeFirstLetter";
 
 describe("capitalizeFirstLetter", () => {
 	test("GIVEN single word THEN first letter is capitalized", () => {

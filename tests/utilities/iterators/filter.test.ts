@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { filter } from "../../../src/utilities/iterators/index";
+import { filter } from "../../../packages/util/src/iterators/index";
 
 describe("filter", () => {
 	test("GIVEN iterable and callback function THEN returns filtered iterable", () => {

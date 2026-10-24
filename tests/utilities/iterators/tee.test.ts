@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { tee } from "../../../src/utilities/iterators/index";
+import { tee } from "../../../packages/util/src/iterators/index";
 
 describe("tee", () => {
 	test("GIVEN iterable and count THEN returns an array of iterables", () => {

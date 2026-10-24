@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { setTimeout as sleep } from "node:timers/promises";
-import { EventIterator } from "../../../../src/utilities/async/events/index";
+import { EventIterator } from "../../../../packages/util/src/async/events/index";
 import { PeopleEmitter, people } from "./lib/MockEmitter";
 import type { Person } from "./lib/Person";
 

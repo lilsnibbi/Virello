@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
 	compare,
 	type LexicographicComparison,
-} from "../../../src/utilities/iterators/index";
+} from "../../../packages/util/src/iterators/index";
 
 describe("compare", () => {
 	test("GIVEN two equal iterables THEN returns 0", () => {

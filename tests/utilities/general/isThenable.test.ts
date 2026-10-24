@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { isThenable } from "../../../src/utilities/index";
+import { isThenable } from "../../../packages/util/src/general";
 
 describe("isThenable", () => {
 	test("GIVEN string THEN returns false", () => {

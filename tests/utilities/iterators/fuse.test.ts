@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { fuse } from "../../../src/utilities/iterators/index";
+import { fuse } from "../../../packages/util/src/iterators/index";
 
 describe("fuse", () => {
 	function makeAlternatingIterable(): Iterator<number> {

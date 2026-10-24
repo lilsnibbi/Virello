@@ -1,7 +1,7 @@
 import { afterEach, expect, spyOn, test } from "bun:test";
-import { ApplicationCommands } from "../../../src/discord/ApplicationCommands";
-import { RestClient } from "../../../src/engine/rest/RestClient";
-import { DiscordRuntime } from "../../../src/core/client/DiscordRuntime";
+import { ApplicationCommands } from "../../../packages/core/src/discord/ApplicationCommands";
+import { RestClient } from "../../../packages/rest/src/RestClient";
+import { DiscordRuntime } from "../../../packages/core/src/core/client/DiscordRuntime";
 import * as Virello from "virello";
 import {
 	ApplicationCommandRegistry,
@@ -10,7 +10,7 @@ import {
 	VirelloClient,
 	type LoggerLike,
 } from "virello";
-import { handleRegistryAPICalls } from "../../../src/commands/registration/registries";
+import { handleRegistryAPICalls } from "../../../packages/core/src/commands/registration/registries";
 
 let client: VirelloClient | undefined;
 const restores: (() => void)[] = [];
@@ -131,7 +131,7 @@ test("native command client serialises translated registry payloads for global/g
 	client.addDisposer(() => rest.close());
 	const post = spyOn(rest, "request").mockImplementation(
 		async <T>(
-			options: import("../../../src/engine/rest/RestClient").$RestRequest,
+			options: import("../../../packages/rest/src/RestClient").$RestRequest,
 		): Promise<T> => {
 			const route = options.path;
 			sent.push({ route, body: structuredClone(options?.body) });

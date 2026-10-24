@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { cutText } from "../../../src/utilities/index";
+import { cutText } from "../../../packages/util/src/general";
 
 describe("cutText", () => {
 	test("GIVEN length much smaller than the first word THEN cuts up string", () => {

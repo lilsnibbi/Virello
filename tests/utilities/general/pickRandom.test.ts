@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { pickRandom } from "../../../src/utilities/index";
+import { pickRandom } from "../../../packages/util/src/general";
 
 describe("pickRandom", () => {
 	test("GIVEN array THEN picks one random element", () => {

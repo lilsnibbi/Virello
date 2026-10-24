@@ -1,7 +1,7 @@
 {
 	"name": "virello",
 	"version": "0.1.2",
-	"description": "A modular Discord framework for Bun, written in TypeScript.",
+	"description": "Aggregate entry point for the modular Virello Discord framework for Bun.",
 	"type": "module",
 	"license": "MIT AND Apache-2.0",
 	"repository": {
@@ -95,15 +95,15 @@
 		"engine:test": "bun test tests/engine",
 		"release:check": "bun scripts/release.ts check",
 		"release:sync": "bun scripts/release.ts sync",
-		"release:pack": "bun scripts/release.ts pack"
+		"release:pack": "bun scripts/release.ts pack",
+		"release:verify": "bun scripts/release.ts verify"
 	},
 	"dependencies": {
-		"@lilsnibbi/logger": "1.2.0",
-		"arktype": "^2.2.8",
-		"cron-parser": "5.10.2",
-		"discord-api-types": "0.38.57",
-		"i18next": "^26.5.3",
-		"@virello/builders": "workspace:*"
+		"@virello/builders": "workspace:*",
+		"@virello/core": "workspace:*",
+		"@virello/engine": "workspace:*",
+		"@virello/sharding": "workspace:*",
+		"@virello/util": "workspace:*"
 	},
 	"devDependencies": {
 		"@types/bun": "1.4.3",

@@ -1,12 +1,12 @@
 import { afterEach, expect, test } from "bun:test";
 import { ApplicationCommandType } from "discord-api-types/v10";
-import { ApplicationCommands } from "../../../src/discord/ApplicationCommands";
-import { RestClient } from "../../../src/engine/rest/RestClient";
+import { ApplicationCommands } from "../../../packages/core/src/discord/ApplicationCommands";
+import { RestClient } from "../../../packages/rest/src/RestClient";
 import { Command, VirelloClient } from "virello";
 import {
 	handleBulkOverwrite,
 	setBulkOverwriteRetries,
-} from "../../../src/commands/registration/registries";
+} from "../../../packages/core/src/commands/registration/registries";
 
 let client: VirelloClient | undefined;
 afterEach(async () => {

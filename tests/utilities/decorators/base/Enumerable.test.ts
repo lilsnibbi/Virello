@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { Enumerable } from "../../../../src/utilities/decorators/index";
+import { Enumerable } from "../../../../packages/core/src/utilities/decorators/index";
 
 describe("enumerable", () => {
 	test("GIVEN enumerable=false THEN should not be enumerable", () => {

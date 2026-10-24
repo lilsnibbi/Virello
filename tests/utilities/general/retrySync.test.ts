@@ -1,5 +1,5 @@
 import { describe, expect, jest, test } from "bun:test";
-import { retrySync } from "../../../src/utilities/index";
+import { retrySync } from "../../../packages/util/src/general";
 
 describe("retry", () => {
 	test("GIVEN a simple string return THEN returns the same on first attempt", () => {

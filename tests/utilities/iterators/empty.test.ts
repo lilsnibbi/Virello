@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { empty } from "../../../src/utilities/iterators/index";
+import { empty } from "../../../packages/util/src/iterators/index";
 
 describe("empty", () => {
 	test("GIVEN empty iterable THEN returns an empty iterable", () => {

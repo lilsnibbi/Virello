@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { makeObject } from "../../../src/utilities/index";
+import { makeObject } from "../../../packages/util/src/general";
 
 describe("makeObject", () => {
 	test("GIVEN basic THEN returns expected", () => {

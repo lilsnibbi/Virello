@@ -11,8 +11,8 @@ import {
 	container,
 	type InternalRegistryAPIType,
 	type RegisterBehavior,
-} from "../../../../src/core/index";
-import { RegisterChatInputCommand } from "../../../../src/utilities/decorators/index";
+} from "../../../../packages/core/src/core/index";
+import { RegisterChatInputCommand } from "../../../../packages/core/src/utilities/decorators/index";
 
 describe("RegisterChatInputCommand", () => {
 	beforeAll(() => {

@@ -6,7 +6,7 @@ import {
 	QuotedParameter,
 	TokenStream,
 	WordParameter,
-} from "../../../../../../src/utilities/parsing/index";
+} from "../../../../../../packages/util/src/parsing/index";
 
 describe("ParameterStream", () => {
 	describe("default lexer", () => {

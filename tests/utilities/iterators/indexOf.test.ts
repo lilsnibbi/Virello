@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { indexOf } from "../../../src/utilities/iterators/index";
+import { indexOf } from "../../../packages/util/src/iterators/index";
 
 describe("indexOf", () => {
 	test("GIVEN iterable and value that exists in the iterable THEN returns the index of the value", () => {

@@ -12,7 +12,7 @@ import {
 import {
 	normalizeChatInputCommand,
 	normalizeContextMenuCommand,
-} from "../../src/commands/registration/normalizeInputs";
+} from "../../packages/core/src/commands/registration/normalizeInputs";
 
 describe("first-party command compatibility", () => {
 	test.each([

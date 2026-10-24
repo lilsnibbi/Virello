@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { QuotedParameter } from "../../../../../../../src/utilities/parsing/index";
+import { QuotedParameter } from "../../../../../../../packages/util/src/parsing/index";
 
 describe("QuotedParameter", () => {
 	const parameter = new QuotedParameter([" ", " "], {

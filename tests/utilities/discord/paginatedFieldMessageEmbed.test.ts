@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { PaginatedFieldMessageEmbed } from "../../../src/utilities/discord/pagination/PaginatedFieldMessageEmbed";
+import { PaginatedFieldMessageEmbed } from "../../../packages/core/src/utilities/discord/pagination/PaginatedFieldMessageEmbed";
 
 test("field formatters carry transformed item types through the same paginator", () => {
 	const original = new PaginatedFieldMessageEmbed<{ label: string }>()

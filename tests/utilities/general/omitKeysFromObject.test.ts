@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { omitKeysFromObject } from "../../../src/utilities/object/omitKeysFromObject";
+import { omitKeysFromObject } from "../../../packages/util/src/object/omitKeysFromObject";
 
 describe("omitKeysFromObject", () => {
 	test("GIVEN object and keys THEN returns object without specified keys", () => {

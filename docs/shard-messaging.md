@@ -127,4 +127,4 @@ Coordinator `limits` defaults:
 Other transport errors can occur; do not assume this is an exhaustive enum.
 Use [fresh stats](sharding-stats.md) for diagnostics and
 [maintenance](sharding-recovery.md) for outage policy.
-[Messaging implementation →](../src/sharding/messaging.ts)
+[Messaging implementation →](../packages/sharding/src/messaging.ts)

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { TimerManager } from "../../../../../src/utilities/time/timers/index";
+import { TimerManager } from "../../../../../packages/util/src/time/timers/index";
 
 describe("TimerManager", () => {
 	afterEach(() => {

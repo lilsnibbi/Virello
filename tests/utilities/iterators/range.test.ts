@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { range } from "../../../src/utilities/iterators/index";
+import { range } from "../../../packages/util/src/iterators/index";
 
 describe("range", () => {
 	test("GIVEN start and end THEN returns range from start to end", () => {

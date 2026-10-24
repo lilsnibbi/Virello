@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { intersect } from "../../../src/utilities/iterators/index";
+import { intersect } from "../../../packages/util/src/iterators/index";
 
 describe("intersect", () => {
 	test("GIVEN two arrays with common elements THEN returns an iterable with the common elements", () => {

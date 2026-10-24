@@ -1,8 +1,8 @@
 import { afterEach, expect, test } from "bun:test";
 import { dm, message as nativeMessage } from "../../fixtures/discord";
 import { VirelloClient, PatternCommand, PatternCommandEvents } from "virello";
-import type { MessageParseListener } from "../../../src/extensions/patternCommands/listeners/messageParse";
-import type { PatternCommandPrePayload } from "../../../src/extensions/patternCommands/types";
+import type { MessageParseListener } from "../../../packages/core/src/extensions/patternCommands/listeners/messageParse";
+import type { PatternCommandPrePayload } from "../../../packages/core/src/extensions/patternCommands/types";
 
 let client: VirelloClient | undefined;
 afterEach(async () => {

@@ -1,0 +1,88 @@
+{
+	"name": "@virello/util",
+	"version": "0.1.2",
+	"description": "General helpers, parsing, results, timers, binary codecs and iterators for Bun.",
+	"type": "module",
+	"license": "MIT AND Apache-2.0",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/lilsnibbi/Virello.git",
+		"directory": "packages/util"
+	},
+	"exports": {
+		".": {
+			"types": "./src/index.ts",
+			"bun": "./src/index.ts"
+		},
+		"./general": {
+			"types": "./src/general.ts",
+			"bun": "./src/general.ts"
+		},
+		"./runtime": {
+			"types": "./src/runtime.ts",
+			"bun": "./src/runtime.ts"
+		},
+		"./bun": {
+			"types": "./src/bun.ts",
+			"bun": "./src/bun.ts"
+		},
+		"./async": {
+			"types": "./src/async/index.ts",
+			"bun": "./src/async/index.ts"
+		},
+		"./binary": {
+			"types": "./src/binary/index.ts",
+			"bun": "./src/binary/index.ts"
+		},
+		"./collections": {
+			"types": "./src/collections/bitfield/index.ts",
+			"bun": "./src/collections/bitfield/index.ts"
+		},
+		"./filesystem": {
+			"types": "./src/filesystem/index.ts",
+			"bun": "./src/filesystem/index.ts"
+		},
+		"./http": {
+			"types": "./src/http/index.ts",
+			"bun": "./src/http/index.ts"
+		},
+		"./iterators": {
+			"types": "./src/iterators/index.ts",
+			"bun": "./src/iterators/index.ts"
+		},
+		"./parsing": {
+			"types": "./src/parsing/index.ts",
+			"bun": "./src/parsing/index.ts"
+		},
+		"./result": {
+			"types": "./src/result/index.ts",
+			"bun": "./src/result/index.ts"
+		},
+		"./time": {
+			"types": "./src/time/index.ts",
+			"bun": "./src/time/index.ts"
+		},
+		"./parsing/flags": {
+			"types": "./src/parsing/strategies/FlagUnorderedStrategy.ts",
+			"bun": "./src/parsing/strategies/FlagUnorderedStrategy.ts"
+		}
+	},
+	"types": "./src/index.ts",
+	"files": [
+		"src",
+		"README.md",
+		"LICENSE",
+		"NOTICE",
+		"UPSTREAM-LICENSE"
+	],
+	"engines": {
+		"bun": ">=1.4.2"
+	},
+	"dependencies": {
+		"@virello/logging": "workspace:*"
+	},
+	"publishConfig": {
+		"access": "public",
+		"registry": "https://registry.npmjs.org"
+	}
+}

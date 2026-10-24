@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { resolveFloat } from "../../../src/commands/arguments/resolvers/float";
-import { Identifiers } from "../../../src/commands/errors/Identifiers";
-import { Result } from "../../../src/utilities/result/index";
+import { resolveFloat } from "../../../packages/core/src/commands/arguments/resolvers/float";
+import { Identifiers } from "../../../packages/core/src/commands/errors/Identifiers";
+import { Result } from "../../../packages/util/src/result/index";
 
 describe("Float resolver tests", () => {
 	test("GIVEN a valid float THEN returns its parsed value", () => {

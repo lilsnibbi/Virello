@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { average } from "../../../src/utilities/iterators/index";
+import { average } from "../../../packages/util/src/iterators/index";
 
 describe("average", () => {
 	test("GIVEN iterable with numbers THEN returns the average", () => {

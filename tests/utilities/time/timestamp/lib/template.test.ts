@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
 	Timestamp,
 	type TimestampTemplateEntry,
-} from "../../../../../src/utilities/time/timestamp/index";
+} from "../../../../../packages/util/src/time/timestamp/index";
 
 function extractParsedTemplate(timestamp: Timestamp): TimestampTemplateEntry[] {
 	return timestamp["template"];

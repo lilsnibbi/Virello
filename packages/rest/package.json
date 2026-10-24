@@ -1,0 +1,41 @@
+{
+	"name": "@virello/rest",
+	"version": "0.1.2",
+	"description": "Independent Discord REST client with bounded queues, retries and rate limits for Bun.",
+	"type": "module",
+	"license": "MIT AND Apache-2.0",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/lilsnibbi/Virello.git",
+		"directory": "packages/rest"
+	},
+	"exports": {
+		".": {
+			"types": "./src/index.ts",
+			"bun": "./src/index.ts"
+		},
+		"./routes": {
+			"types": "./src/RateLimits.ts",
+			"bun": "./src/RateLimits.ts"
+		}
+	},
+	"types": "./src/index.ts",
+	"files": [
+		"src",
+		"README.md",
+		"LICENSE",
+		"NOTICE",
+		"UPSTREAM-LICENSE"
+	],
+	"engines": {
+		"bun": ">=1.4.2"
+	},
+	"dependencies": {
+		"@virello/util": "workspace:*",
+		"discord-api-types": "0.38.57"
+	},
+	"publishConfig": {
+		"access": "public",
+		"registry": "https://registry.npmjs.org"
+	}
+}

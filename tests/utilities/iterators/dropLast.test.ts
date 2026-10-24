@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { dropLast } from "../../../src/utilities/iterators/index";
+import { dropLast } from "../../../packages/util/src/iterators/index";
 
 describe("dropLast", () => {
 	test("GIVEN iterable and count less than or equal to iterable length THEN returns empty iterable", () => {

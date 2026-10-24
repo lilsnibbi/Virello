@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { lessThan } from "../../../src/utilities/iterators/index";
+import { lessThan } from "../../../packages/util/src/iterators/index";
 
 describe("lessOrEqualThan", () => {
 	test("GIVEN two equal iterables THEN returns false", () => {

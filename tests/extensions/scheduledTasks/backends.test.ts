@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { RedisClient } from "bun";
-import { MemoryBackend } from "../../../src/extensions/scheduledTasks/backends/MemoryBackend";
-import { RedisBackend } from "../../../src/extensions/scheduledTasks/backends/RedisBackend";
-import type { TaskBackend } from "../../../src/extensions/scheduledTasks/backends/TaskBackend";
-import type { TaskRecord } from "../../../src/extensions/scheduledTasks/types/TaskTypes";
+import { MemoryBackend } from "../../../packages/core/src/extensions/scheduledTasks/backends/MemoryBackend";
+import { RedisBackend } from "../../../packages/core/src/extensions/scheduledTasks/backends/RedisBackend";
+import type { TaskBackend } from "../../../packages/core/src/extensions/scheduledTasks/backends/TaskBackend";
+import type { TaskRecord } from "../../../packages/core/src/extensions/scheduledTasks/types/TaskTypes";
 
 const backends: TaskBackend[] = [];
 const records: { backend: TaskBackend; id: string }[] = [];

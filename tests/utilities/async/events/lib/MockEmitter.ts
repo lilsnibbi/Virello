@@ -2,7 +2,7 @@ import { EventEmitter } from "node:events";
 import {
 	EventIterator,
 	type EventIteratorOptions,
-} from "../../../../../src/utilities/async/events/index";
+} from "../../../../../packages/util/src/async/events/index";
 import { Person } from "./Person";
 
 export class PeopleIterator extends EventIterator<[Person]> {}

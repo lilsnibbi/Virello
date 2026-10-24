@@ -47,3 +47,5 @@ Already have one? Pick the task below.
 - Each topic links to the relevant public types or implementation for details.
   `client.engine` is the same native engine that powers the framework. Use
   `virello/engine` when you need its lower-level types or a standalone client.
+
+[Standalone packages and dependency ownership](packages.md) · [npm release setup](releasing.md)

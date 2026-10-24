@@ -16,7 +16,7 @@ import {
 	GatewayOpcodes,
 	Locale,
 } from "discord-api-types/v10";
-import type { $GatewayDispatch } from "../../src/engine/gateway/types";
+import type { $GatewayDispatch } from "../../packages/ws/src/types";
 
 export function user(id = "1"): APIUser {
 	return {

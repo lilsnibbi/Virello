@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { toTitleCase } from "../../../src/utilities/index";
+import { toTitleCase } from "../../../packages/util/src/general";
 
 describe("toTitleCase", () => {
 	test("GIVEN basic THEN returns expected", () => {

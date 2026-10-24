@@ -15,12 +15,12 @@ import {
 	container,
 	InternalRegistryAPIType,
 	type RegisterBehavior,
-} from "../../../../src/core/index";
+} from "../../../../packages/core/src/core/index";
 import {
 	RegisterChatInputCommand,
 	RegisterMessageContextMenuCommand,
 	RegisterUserContextMenuCommand,
-} from "../../../../src/utilities/decorators/index";
+} from "../../../../packages/core/src/utilities/decorators/index";
 
 describe("RegisterALLCommand", () => {
 	beforeAll(() => {

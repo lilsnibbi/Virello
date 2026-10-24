@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { append } from "../../../src/utilities/iterators/index";
+import { append } from "../../../packages/util/src/iterators/index";
 
 describe("append", () => {
 	test("GIVEN iterable and one iterable THEN returns concatenated iterable", () => {

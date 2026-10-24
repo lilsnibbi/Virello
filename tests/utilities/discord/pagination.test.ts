@@ -23,7 +23,7 @@ import {
 	Events,
 	InteractionCollector,
 } from "virello";
-import { RestError } from "../../../src/engine/rest/RestError";
+import { RestError } from "../../../packages/rest/src/RestError";
 import { container, Pagination, type PaginationTarget } from "virello";
 
 type Snapshot = {

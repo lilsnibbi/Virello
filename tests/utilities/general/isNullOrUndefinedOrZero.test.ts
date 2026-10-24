@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { isNullOrUndefinedOrZero } from "../../../src/utilities/index";
+import { isNullOrUndefinedOrZero } from "../../../packages/util/src/general";
 
 describe("isNullOrUndefinedOrZero", () => {
 	test("GIVEN empty string THEN returns false", () => {

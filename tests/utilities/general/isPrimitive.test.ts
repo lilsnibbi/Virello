@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { isPrimitive } from "../../../src/utilities/index";
+import { isPrimitive } from "../../../packages/util/src/general";
 
 describe("isPrimitive", () => {
 	test("GIVEN string THEN returns false", () => {

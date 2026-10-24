@@ -3,7 +3,7 @@ import {
 	compareBy,
 	defaultCompare,
 	type LexicographicComparison,
-} from "../../../src/utilities/iterators/index";
+} from "../../../packages/util/src/iterators/index";
 
 describe("compareBy", () => {
 	test("GIVEN two equal iterables THEN returns 0", () => {

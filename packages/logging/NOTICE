@@ -1,0 +1,5 @@
+Virello — Shared Bun logging, console formatting and redacted diagnostics for Virello.
+
+Copyright and licence notices retained in individual source files and nested
+LICENSE files remain applicable. Virello's MIT licence is in LICENSE; retained
+Apache-2.0 source is covered by UPSTREAM-LICENSE.

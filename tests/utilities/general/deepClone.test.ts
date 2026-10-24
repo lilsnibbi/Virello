@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { deepClone } from "../../../src/utilities/index";
+import { deepClone } from "../../../packages/util/src/general";
 
 describe("deepClone", () => {
 	test("clones dictionaries with a null prototype", () => {

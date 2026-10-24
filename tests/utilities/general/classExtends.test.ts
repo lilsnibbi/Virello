@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { classExtends } from "../../../src/utilities/index";
+import { classExtends } from "../../../packages/util/src/general";
 
 describe("classExtends", () => {
 	class BaseClass {

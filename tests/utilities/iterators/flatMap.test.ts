@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { flatMap } from "../../../src/utilities/iterators/index";
+import { flatMap } from "../../../packages/util/src/iterators/index";
 
 describe("flatMap", () => {
 	test("GIVEN iterable and callback function THEN returns flattened iterable", () => {

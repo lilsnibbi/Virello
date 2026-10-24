@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { min } from "../../../src/utilities/iterators/index";
+import { min } from "../../../packages/util/src/iterators/index";
 
 describe("min", () => {
 	test("GIVEN iterable with numbers THEN returns the lexicographic minimum value", () => {

@@ -1,5 +1,5 @@
 import { describe, expect, jest, test } from "bun:test";
-import { reduce } from "../../../src/utilities/iterators/index";
+import { reduce } from "../../../packages/util/src/iterators/index";
 
 describe("reduce", () => {
 	test("GIVEN iterable and callback function THEN returns reduced value", () => {

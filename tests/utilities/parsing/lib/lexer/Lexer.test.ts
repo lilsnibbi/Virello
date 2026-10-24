@@ -6,7 +6,7 @@ import {
 	type Token,
 	TokenType,
 	WordParameter,
-} from "../../../../../src/utilities/parsing/index";
+} from "../../../../../packages/util/src/parsing/index";
 
 describe("Lexer", () => {
 	describe("run", () => {

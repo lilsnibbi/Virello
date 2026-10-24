@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { sum } from "../../../src/utilities/iterators/index";
+import { sum } from "../../../packages/util/src/iterators/index";
 
 describe("sum", () => {
 	test("GIVEN iterable of numbers THEN returns the sum of all numbers", () => {

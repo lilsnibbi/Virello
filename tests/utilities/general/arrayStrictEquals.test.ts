@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { arrayStrictEquals } from "../../../src/utilities/index";
+import { arrayStrictEquals } from "../../../packages/util/src/general";
 
 describe("arrayStrictEquals", () => {
 	test("GIVEN same array THEN returns true", () => {

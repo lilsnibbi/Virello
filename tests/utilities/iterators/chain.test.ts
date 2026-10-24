@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { chain } from "../../../src/utilities/iterators/index";
+import { chain } from "../../../packages/util/src/iterators/index";
 
 describe("chain", () => {
 	test("GIVEN multiple iterables THEN returns concatenated iterable", () => {

@@ -1,5 +1,5 @@
 import "./contracts";
-import { VirelloClient } from "../../../src/core/client/VirelloClient";
+import { VirelloClient } from "../../../packages/core/src/core/client/VirelloClient";
 import { logger } from "../helpers";
 
 // Native gateway and IPC, with all HTTP/WebSocket traffic confined to the test's loopback server.

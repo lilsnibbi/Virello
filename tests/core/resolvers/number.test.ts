@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { resolveNumber } from "../../../src/commands/arguments/resolvers/number";
-import { Identifiers } from "../../../src/commands/errors/Identifiers";
-import { Result } from "../../../src/utilities/result/index";
+import { resolveNumber } from "../../../packages/core/src/commands/arguments/resolvers/number";
+import { Identifiers } from "../../../packages/core/src/commands/errors/Identifiers";
+import { Result } from "../../../packages/util/src/result/index";
 
 describe("Number resolver tests", () => {
 	test("GIVEN a valid number THEN returns its parsed value", () => {

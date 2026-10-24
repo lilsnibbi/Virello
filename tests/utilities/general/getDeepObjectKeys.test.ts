@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
 	type GetDeepObjectKeysOptions,
 	getDeepObjectKeys,
-} from "../../../src/utilities/index";
+} from "../../../packages/util/src/general";
 
 describe("getDeepObjectKeys", () => {
 	const scenarios: Scenario[] = [

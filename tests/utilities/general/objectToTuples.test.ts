@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { objectToTuples } from "../../../src/utilities/index";
+import { objectToTuples } from "../../../packages/util/src/general";
 
 describe("objectToTuples", () => {
 	test("GIVEN basic THEN returns expected", () => {

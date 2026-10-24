@@ -5,12 +5,12 @@
 Virello's package licence is `MIT AND Apache-2.0`. Keep distributed notices
 when copying or modifying the affected files.
 
-| Location                                                       | Notice                                       |
-| -------------------------------------------------------------- | -------------------------------------------- |
-| [Root LICENSE](../LICENSE)                                     | Project MIT licence                          |
-| [Sharding LICENSE](../src/sharding/LICENSE)                    | Sharding source licence                      |
-| [Debounce LICENSE](../src/utilities/function/debounce/LICENSE) | Retained utility licence                     |
-| Source comments                                                | Per-file attribution and upstream references |
+| Location                                                           | Notice                                       |
+| ------------------------------------------------------------------ | -------------------------------------------- |
+| [Root LICENSE](../LICENSE)                                         | Project MIT licence                          |
+| [Sharding LICENSE](../packages/sharding/src/LICENSE)               | Sharding source licence                      |
+| [Debounce LICENSE](../packages/util/src/function/debounce/LICENSE) | Retained utility licence                     |
+| Source comments                                                    | Per-file attribution and upstream references |
 
 The first-party builders are adapted from Ovencord revision
 `cc6100f8eb01f82509c74b06427a87fea9880911`, including inherited discord.js source.

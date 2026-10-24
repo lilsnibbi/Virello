@@ -7,7 +7,7 @@ import {
 	StringType,
 	t,
 	UnalignedUint16Array,
-} from "../../../../src/utilities/binary/index";
+} from "../../../../packages/util/src/binary/index";
 
 describe("Schema", () => {
 	test("GIVEN a new instance THEN it has the correct properties", () => {

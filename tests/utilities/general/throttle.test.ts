@@ -1,5 +1,5 @@
 import { describe, expect, jest, test } from "bun:test";
-import { sleep, throttle } from "../../../src/utilities/index";
+import { sleep, throttle } from "../../../packages/util/src/general";
 
 describe("throttle", () => {
 	test("GIVEN number callback THEN returns the same output until the delay", async () => {

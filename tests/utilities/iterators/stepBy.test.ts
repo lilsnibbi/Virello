@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { stepBy, toArray } from "../../../src/utilities/iterators/index";
+import { stepBy, toArray } from "../../../packages/util/src/iterators/index";
 
 describe("stepBy", () => {
 	test("GIVEN [0, 1, 2, 3, 4, 5] and 2 THEN returns [0, 2, 4]", () => {

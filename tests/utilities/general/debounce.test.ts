@@ -1,5 +1,5 @@
 import { describe, expect, jest, test } from "bun:test";
-import { debounce } from "../../../src/utilities/function/debounce/debounce";
+import { debounce } from "../../../packages/util/src/function/debounce/debounce";
 
 describe("debounce timer lifecycle", () => {
 	test("flush consumes the pending call without a later duplicate timer invocation", () => {

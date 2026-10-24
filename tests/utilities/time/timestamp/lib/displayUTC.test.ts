@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { Timestamp } from "../../../../../src/utilities/time/timestamp/index";
+import { Timestamp } from "../../../../../packages/util/src/time/timestamp/index";
 
 // Saturday 9th March 2019, at 16:20:35:500
 const date = new Date(2019, 2, 9, 16, 20, 35, 1);

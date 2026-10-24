@@ -1,6 +1,10 @@
 import { expect, test } from "bun:test";
-import { IpcWindow } from "../../src/sharding/transport/IpcWindow";
-import { decode, frame, limits } from "../../src/sharding/transport/protocol";
+import { IpcWindow } from "../../packages/sharding/src/transport/IpcWindow";
+import {
+	decode,
+	frame,
+	limits,
+} from "../../packages/sharding/src/transport/protocol";
 
 test("IPC credits bound native queued bytes and duplicate receipts cannot manufacture capacity", () => {
 	const window = new IpcWindow(

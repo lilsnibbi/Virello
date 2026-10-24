@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { regExpEsc } from "../../../src/utilities/index";
+import { regExpEsc } from "../../../packages/util/src/general";
 
 describe("regExpEsc", () => {
 	test("GIVEN hyphen THEN returns expected", () => {

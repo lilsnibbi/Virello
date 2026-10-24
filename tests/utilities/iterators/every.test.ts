@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { every } from "../../../src/utilities/iterators/index";
+import { every } from "../../../packages/util/src/iterators/index";
 
 describe("every", () => {
 	test("GIVEN iterable and callback function that returns true for all elements THEN returns true", () => {

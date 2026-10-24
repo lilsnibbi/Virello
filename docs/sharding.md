@@ -1,6 +1,6 @@
 # Run multiple shard processes
 
-[Docs](README.md) / Sharding · [Options](../src/sharding/types.ts)
+[Docs](README.md) / Sharding · [Options](../packages/sharding/src/types.ts)
 
 **[Run the coordinator + host example →](../examples/README.md)**
 

@@ -82,7 +82,9 @@ jobs:
           bun release:check
           git diff --exit-code -- package.json packages bun.lock
       - name: Pack and verify public packages
-        run: bun release:pack
+        run: |
+          bun release:pack
+          bun release:verify
       - name: Publish packages with npm trusted publishing
         # Uses npm publish --access public on the verified Bun tarballs, dependency first.
         run: bun scripts/release.ts publish

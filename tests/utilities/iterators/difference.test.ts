@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { difference } from "../../../src/utilities/iterators/index";
+import { difference } from "../../../packages/util/src/iterators/index";
 
 describe("difference", () => {
 	test("GIVEN two iterables with common elements THEN returns iterable with elements from first iterable except common elements", () => {

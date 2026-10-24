@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { EnumerableMethod } from "../../../../src/utilities/decorators/index";
+import { EnumerableMethod } from "../../../../packages/core/src/utilities/decorators/index";
 
 describe("enumerable", () => {
 	test("GIVEN enumerable=false THEN should not be enumerable", () => {

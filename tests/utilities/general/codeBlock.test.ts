@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { codeBlock } from "../../../src/utilities/index";
+import { codeBlock } from "../../../packages/util/src/general";
 
 const zeroWidthSpace = String.fromCharCode(8203);
 

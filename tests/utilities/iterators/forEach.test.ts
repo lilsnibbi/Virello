@@ -1,5 +1,5 @@
 import { describe, expect, jest, test } from "bun:test";
-import { forEach } from "../../../src/utilities/iterators/index";
+import { forEach } from "../../../packages/util/src/iterators/index";
 
 describe("forEach", () => {
 	test("GIVEN iterable and callback function THEN calls the callback function for each element", () => {

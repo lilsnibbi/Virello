@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { mergeDefault } from "../../../src/utilities/index";
+import { mergeDefault } from "../../../packages/util/src/general";
 
 describe("mergeDefault", () => {
 	test("applies prototype-named JSON defaults without changing prototypes", () => {

@@ -1,9 +1,9 @@
 import { expect, spyOn, test } from "bun:test";
 import "./fixtures/contracts";
-import { ShardCoordinator } from "../../src/sharding/coordinator/Coordinator";
-import { ShardManager } from "../../src/sharding/manager/Manager";
-import { decode, frame } from "../../src/sharding/transport/protocol";
-import type { ShardScalingOptions } from "../../src/sharding/types";
+import { ShardCoordinator } from "../../packages/sharding/src/coordinator/Coordinator";
+import { ShardManager } from "../../packages/sharding/src/manager/Manager";
+import { decode, frame } from "../../packages/sharding/src/transport/protocol";
+import type { ShardScalingOptions } from "../../packages/sharding/src/types";
 import {
 	fixture,
 	logger,

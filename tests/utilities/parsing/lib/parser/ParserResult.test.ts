@@ -4,7 +4,7 @@ import {
 	ParserResult,
 	PrefixedStrategy,
 	WordParameter,
-} from "../../../../../src/utilities/parsing/index";
+} from "../../../../../packages/util/src/parsing/index";
 
 describe("ParserResult", () => {
 	const parser = new Parser(new PrefixedStrategy(["--", "/"], ["=", ":"]));

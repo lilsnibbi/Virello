@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { windows } from "../../../src/utilities/iterators/index";
+import { windows } from "../../../packages/util/src/iterators/index";
 
 describe("windows", () => {
 	test("GIVEN iterable and limit greater than iterable length THEN returns an empty iterable", () => {

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { Pending } from "../../src/sharding/transport/pending";
+import { Pending } from "../../packages/sharding/src/transport/pending";
 import {
 	decode,
 	encode,
@@ -8,8 +8,8 @@ import {
 	limits,
 	sendSocket,
 	tokenMatches,
-} from "../../src/sharding/transport/protocol";
-import { ShardError } from "../../src/sharding/types";
+} from "../../packages/sharding/src/transport/protocol";
+import { ShardError } from "../../packages/sharding/src/types";
 
 describe("sharding transport boundaries", () => {
 	test("validates versions, operations, exact fields, types and encoded bytes", () => {

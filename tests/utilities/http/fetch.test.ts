@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { HttpError, request } from "../../../src/utilities/http/index";
+import { HttpError, request } from "../../../packages/util/src/http/index";
 
 let server: ReturnType<typeof Bun.serve>;
 let url: string;

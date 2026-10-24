@@ -16,10 +16,11 @@ import * as Time from "virello/time";
 import * as Utilities from "virello/utilities";
 import * as Validation from "virello/validation";
 import manifest from "../../package.json";
-import { CorePreconditions } from "../../src/commands/checks/core";
-import { ApplicationCommandRegistries } from "../../src/commands/registration/api";
-import { registries } from "../../src/commands/registration/registries";
-import { container } from "../../src/core/Container";
+import coreManifest from "../../packages/core/package.json";
+import { CorePreconditions } from "../../packages/core/src/commands/checks/core";
+import { ApplicationCommandRegistries } from "../../packages/core/src/commands/registration/api";
+import { registries } from "../../packages/core/src/commands/registration/registries";
+import { container } from "../../packages/core/src/core/Container";
 import baseline from "../fixtures/public.json";
 
 const categories = {
@@ -73,8 +74,10 @@ test("sharding exposes supported APIs without exporting stats transport plumbing
 		"ShardLink",
 	])
 		expect(name in Root).toBe(false);
-	expect(manifest.dependencies.arktype).toBeString();
-	expect(Reflect.get(manifest, "peerDependencies")?.arktype).toBeUndefined();
+	expect(coreManifest.dependencies.arktype).toBeString();
+	expect(
+		Reflect.get(coreManifest, "peerDependencies")?.arktype,
+	).toBeUndefined();
 });
 
 for (const [name, category] of Object.entries(categories)) {

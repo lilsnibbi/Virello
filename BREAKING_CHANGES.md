@@ -1,5 +1,19 @@
 # Breaking changes
 
+## Standalone packages (unreleased)
+
+Implementations now live in nine public `@virello/*` workspaces; `virello` is the
+aggregate. Existing root and category imports retain their exported names and
+class/singleton identities. The existing `declare module "virello"` augmentation
+contract is retained. No runtime API break is intended by this extraction.
+
+Repository source paths have moved from `src/...` to their owning workspace.
+Unsupported deep imports and tools relying on those physical paths must migrate;
+use the [supported package entrypoints](docs/packages.md). Update every first-party
+package together to the same version. Sharding now accepts narrow structural
+client contracts rather than importing the framework client type; behavior is
+unchanged. No collection, voice, broker or other missing subsystem is invented.
+
 ## First-party builders (unreleased)
 
 `virello/builders` replaces the `@discordjs/builders` dependency. Developers

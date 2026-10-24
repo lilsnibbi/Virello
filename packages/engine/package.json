@@ -1,0 +1,45 @@
+{
+	"name": "@virello/engine",
+	"version": "0.1.2",
+	"description": "Native Discord client combining REST, Gateway transport and entity caches for Bun.",
+	"type": "module",
+	"license": "MIT AND Apache-2.0",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/lilsnibbi/Virello.git",
+		"directory": "packages/engine"
+	},
+	"exports": {
+		".": {
+			"types": "./src/index.ts",
+			"bun": "./src/index.ts"
+		},
+		"./client": {
+			"types": "./src/client/index.ts",
+			"bun": "./src/client/index.ts"
+		}
+	},
+	"types": "./src/index.ts",
+	"files": [
+		"src",
+		"README.md",
+		"LICENSE",
+		"NOTICE",
+		"UPSTREAM-LICENSE"
+	],
+	"engines": {
+		"bun": ">=1.4.2"
+	},
+	"dependencies": {
+		"@virello/cache": "workspace:*",
+		"@virello/logging": "workspace:*",
+		"@virello/rest": "workspace:*",
+		"@virello/util": "workspace:*",
+		"@virello/ws": "workspace:*",
+		"discord-api-types": "0.38.57"
+	},
+	"publishConfig": {
+		"access": "public",
+		"registry": "https://registry.npmjs.org"
+	}
+}

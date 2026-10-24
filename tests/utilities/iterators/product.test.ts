@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { product } from "../../../src/utilities/iterators/index";
+import { product } from "../../../packages/util/src/iterators/index";
 
 describe("product", () => {
 	test("GIVEN iterable with numbers THEN returns the product of all numbers", () => {

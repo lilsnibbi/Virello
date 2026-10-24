@@ -4,7 +4,7 @@ import {
 	defaultCompare,
 	descString,
 	isSortedByKey,
-} from "../../../src/utilities/iterators/index";
+} from "../../../packages/util/src/iterators/index";
 
 describe("isSortedByKey", () => {
 	test("GIVEN iterable with values in ascending order with a asc function THEN returns true", () => {

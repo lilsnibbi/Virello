@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { BitField } from "../../../../../src/utilities/collections/bitfield/index";
+import { BitField } from "../../../../../packages/util/src/collections/bitfield/index";
 
 describe("BitField", () => {
 	const NumberFlags = {

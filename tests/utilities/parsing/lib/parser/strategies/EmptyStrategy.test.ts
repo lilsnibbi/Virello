@@ -2,8 +2,8 @@ import { describe, expect, test } from "bun:test";
 import {
 	EmptyStrategy,
 	type IUnorderedStrategy,
-} from "../../../../../../src/utilities/parsing/index";
-import { Option } from "../../../../../../src/utilities/result/index";
+} from "../../../../../../packages/util/src/parsing/index";
+import { Option } from "../../../../../../packages/util/src/result/index";
 
 describe("EmptyStrategy", () => {
 	const strategy: IUnorderedStrategy = new EmptyStrategy();

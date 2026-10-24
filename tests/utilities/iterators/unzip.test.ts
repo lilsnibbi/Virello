@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { unzip } from "../../../src/utilities/iterators/index";
+import { unzip } from "../../../packages/util/src/iterators/index";
 
 describe("unzip", () => {
 	test("GIVEN iterable with valid arrays THEN returns unzipped iterables", () => {

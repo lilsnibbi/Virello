@@ -1,5 +1,5 @@
 import { describe, expect, jest, test } from "bun:test";
-import { poll } from "../../../src/utilities/index";
+import { poll } from "../../../packages/util/src/general";
 
 describe("poll", () => {
 	const pass = "success!";

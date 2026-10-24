@@ -2,7 +2,7 @@ import { describe, expect, jest, test } from "bun:test";
 import {
 	isFunction,
 	isPromise,
-} from "../../../../src/utilities/result/common/utils";
+} from "../../../../packages/util/src/result/common/utils";
 
 describe("utils", () => {
 	describe("isFunction", () => {

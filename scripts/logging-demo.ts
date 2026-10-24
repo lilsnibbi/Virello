@@ -1,9 +1,9 @@
 import {
 	consoleEventOptions,
 	createConsoleLogger,
-} from "../src/core/logging/console";
-import type { LogEntry } from "../src/core/logging/format";
-import type { LogLevel } from "../src/core/logging/index";
+} from "../packages/logging/src/console";
+import type { LogEntry } from "../packages/logging/src/format";
+import type { LogLevel } from "../packages/logging/src/index";
 
 // Synthetic preview through the framework's real native logger. No clients, credentials, services, timers or network.
 const format = process.argv.includes("--json") ? "json" : "text";

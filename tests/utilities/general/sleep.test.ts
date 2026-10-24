@@ -1,5 +1,5 @@
 import { describe, expect, jest, test } from "bun:test";
-import { sleep } from "../../../src/utilities/index";
+import { sleep } from "../../../packages/util/src/general";
 
 describe("sleep", () => {
 	test("GIVEN a number of ms THEN resolve the promise after that time", async () => {

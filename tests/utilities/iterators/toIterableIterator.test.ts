@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { toIterableIterator } from "../../../src/utilities/iterators/index";
+import { toIterableIterator } from "../../../packages/util/src/iterators/index";
 
 describe("toIterableIterator", () => {
 	test("GIVEN an array THEN returns an iterable iterator", () => {

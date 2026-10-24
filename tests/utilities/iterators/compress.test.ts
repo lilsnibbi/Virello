@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { compress } from "../../../src/utilities/iterators/index";
+import { compress } from "../../../packages/util/src/iterators/index";
 
 describe("compress", () => {
 	test("GIVEN iterable and selectors of the same length THEN returns compressed iterable", () => {

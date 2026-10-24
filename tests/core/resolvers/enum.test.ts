@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { resolveEnum } from "../../../src/commands/arguments/resolvers/enum";
-import { Identifiers } from "../../../src/commands/errors/Identifiers";
-import { Result } from "../../../src/utilities/result/index";
+import { resolveEnum } from "../../../packages/core/src/commands/arguments/resolvers/enum";
+import { Identifiers } from "../../../packages/core/src/commands/errors/Identifiers";
+import { Result } from "../../../packages/util/src/result/index";
 
 describe("Enum resolver tests", () => {
 	test("GIVEN good lowercase enum from one option THEN returns string", () => {

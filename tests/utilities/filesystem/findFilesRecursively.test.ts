@@ -6,7 +6,7 @@ import {
 	findFilesRecursivelyStringEndsWith,
 	findFilesRecursivelyStringIncludes,
 	findFilesRecursivelyStringStartsWith,
-} from "../../../src/utilities/filesystem/index";
+} from "../../../packages/util/src/filesystem/index";
 
 describe("findFilesRecursively", () => {
 	test("GIVEN a directory name THEN returns all files in that directory", async () => {

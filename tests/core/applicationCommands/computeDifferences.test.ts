@@ -7,7 +7,7 @@ import {
 	InteractionContextType,
 	type RESTPostAPIChatInputApplicationCommandsJSONBody,
 } from "discord-api-types/v10";
-import { getCommandDifferences as getCommandDifferencesRaw } from "../../../src/commands/registration/computeDifferences";
+import { getCommandDifferences as getCommandDifferencesRaw } from "../../../packages/core/src/commands/registration/computeDifferences";
 
 function getCommandDifferences(
 	...args: Parameters<typeof getCommandDifferencesRaw>

@@ -1,6 +1,6 @@
 # Scheduled tasks
 
-[Docs](README.md) / Scheduling · [Options and records](../src/extensions/scheduledTasks/types/TaskTypes.ts)
+[Docs](README.md) / Scheduling · [Options and records](../packages/core/src/extensions/scheduledTasks/types/TaskTypes.ts)
 
 ## Queue work for later
 
@@ -113,4 +113,4 @@ task fails; the scheduler does not locate a different worker by task capability.
 
 Records are snapshots, not live job objects. Refresh with `get()`.
 Task events live in `TaskEvents`; errors and missing tasks have built-in log
-listeners. [Scheduler implementation →](../src/extensions/scheduledTasks/TaskScheduler.ts)
+listeners. [Scheduler implementation →](../packages/core/src/extensions/scheduledTasks/TaskScheduler.ts)

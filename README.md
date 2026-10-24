@@ -52,11 +52,15 @@ The offline example loads the bot's modules in two child processes, checks shard
 messaging, then cleans up. It needs no Discord token. For a real bot, follow the
 [example setup](examples/README.md).
 
+Need only a transport, cache, builder or utilities? See the
+[standalone packages](docs/packages.md). Installing `virello` still includes the
+complete framework through those same implementations.
+
 Working on Virello itself? See [development](docs/development.md),
 [repository conventions](AGENTS.md) and [migration notes](BREAKING_CHANGES.md).
 
 ## Licence
 
 `MIT AND Apache-2.0`. See the [root licence](LICENSE),
-[sharding licence](src/sharding/LICENSE), [debounce licence](src/utilities/function/debounce/LICENSE)
+[sharding licence](packages/sharding/src/LICENSE), [debounce licence](packages/util/src/function/debounce/LICENSE)
 and attribution comments retained in source files.

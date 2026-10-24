@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { fileURLToPath } from "node:url";
 import "./fixtures/contracts";
-import { Pending } from "../../src/sharding/transport/pending";
+import { Pending } from "../../packages/sharding/src/transport/pending";
 import { stack, tokenA, tokenB, until } from "./helpers";
 
 async function host(id: "a" | "b", url: string) {

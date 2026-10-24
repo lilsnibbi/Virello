@@ -1,6 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import "./fixtures/contracts";
-import { VirelloClient, ShardCoordinator, ShardManager } from "../../src/index";
+import {
+	VirelloClient,
+	ShardCoordinator,
+	ShardManager,
+} from "../../packages/core/src/index";
 import { fixture, logger, stack, tokenA, until } from "./helpers";
 
 describe("real loopback coordinator, supervisors and Bun shard processes", () => {

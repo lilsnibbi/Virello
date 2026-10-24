@@ -4,11 +4,12 @@
 
 Virello is a modular Discord framework shipped as raw TypeScript for Bun. There is no build step or Node runtime support.
 
-- `src/core/`: client configuration and module lifecycle.
-- `packages/builders/`: standalone first-party builders; `virello/builders` re-exports this workspace.
-- `src/commands/`, `src/events/`, `src/extensions/`: commands, listeners and built-in extensions.
-- `src/sharding/`: transport, coordination and process supervision.
-- `src/utilities/`: shared helpers; `src/public/`: category exports exposed through `src/index.ts` and the package export map.
+- `src/`: compatibility aggregate entrypoints; implementations live in workspaces.
+- `packages/core/src/`: application client, commands, modules, events, extensions and framework Discord helpers.
+- `packages/engine/`, `packages/rest/`, `packages/ws/`, `packages/cache/`: native client, transports and cache stores.
+- `packages/sharding/`: coordinator, host manager, IPC and fleet REST scheduling.
+- `packages/util/`, `packages/logging/`, `packages/builders/`: independent helpers, logging and payload builders.
+- `release-packages.json`: dependency-first public release order; all packages share one version.
 - `tests/`: feature suites, integration tests and `fixtures/`; `examples/`: runnable usage examples.
 - `scripts/`: validation and packaging checks; `.github/workflows/ci.yml`: CI and releases.
 

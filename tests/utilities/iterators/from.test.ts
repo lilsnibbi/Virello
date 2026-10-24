@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { from } from "../../../src/utilities/iterators/index";
+import { from } from "../../../packages/util/src/iterators/index";
 
 describe("from", () => {
 	test("GIVEN an array THEN returns an iterable with the same elements", () => {

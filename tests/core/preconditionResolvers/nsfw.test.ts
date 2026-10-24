@@ -1,8 +1,8 @@
-import type { PreconditionContainerSingle } from "../../../src/commands/checks/containers/Entry";
+import type { PreconditionContainerSingle } from "../../../packages/core/src/commands/checks/containers/Entry";
 import { describe, expect, test } from "bun:test";
-import { PreconditionContainerArray } from "../../../src/commands/checks/containers/Group";
-import { parseConstructorPreConditionsNsfw } from "../../../src/commands/checks/resolvers/nsfw";
-import { CommandPreConditions } from "../../../src/commands/enums";
+import { PreconditionContainerArray } from "../../../packages/core/src/commands/checks/containers/Group";
+import { parseConstructorPreConditionsNsfw } from "../../../packages/core/src/commands/checks/resolvers/nsfw";
+import { CommandPreConditions } from "../../../packages/core/src/commands/enums";
 
 describe("parseConstructorPreConditionsNsfw", () => {
 	test("GIVEN nsfw true THEN appends to preconditionContainerArray", () => {

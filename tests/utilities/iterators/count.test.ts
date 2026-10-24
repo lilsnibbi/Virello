@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { count } from "../../../src/utilities/iterators/index";
+import { count } from "../../../packages/util/src/iterators/index";
 
 describe("count", () => {
 	test("GIVEN non-empty iterable THEN returns the correct count", () => {

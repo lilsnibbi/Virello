@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import "./fixtures/contracts";
-import { ShardLink } from "../../src/sharding/client/Link";
+import { ShardLink } from "../../packages/sharding/src/client/Link";
 import { logger } from "./helpers";
 import { assignment as identity } from "./fixtures/authority";
 import {
@@ -8,7 +8,7 @@ import {
 	type Frame,
 	frame,
 	limits,
-} from "../../src/sharding/transport/protocol";
+} from "../../packages/sharding/src/transport/protocol";
 
 function linkFixture(
 	assignment: (

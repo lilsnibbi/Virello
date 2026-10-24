@@ -1,10 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import { PermissionFlagsBits } from "discord-api-types/v10";
-import type { PermissionPreconditionContext } from "../../../src/commands/checks/builtins/ClientPermissions";
-import type { PreconditionContainerSingle } from "../../../src/commands/checks/containers/Entry";
-import { PreconditionContainerArray } from "../../../src/commands/checks/containers/Group";
-import { parseConstructorPreConditionsRequiredClientPermissions } from "../../../src/commands/checks/resolvers/clientPermissions";
-import { CommandPreConditions } from "../../../src/commands/enums";
+import type { PermissionPreconditionContext } from "../../../packages/core/src/commands/checks/builtins/ClientPermissions";
+import type { PreconditionContainerSingle } from "../../../packages/core/src/commands/checks/containers/Entry";
+import { PreconditionContainerArray } from "../../../packages/core/src/commands/checks/containers/Group";
+import { parseConstructorPreConditionsRequiredClientPermissions } from "../../../packages/core/src/commands/checks/resolvers/clientPermissions";
+import { CommandPreConditions } from "../../../packages/core/src/commands/enums";
 
 describe("parseConstructorPreConditionsRequiredClientPermissions", () => {
 	test("GIVEN valid permissions THEN appends to preconditionContainerArray", () => {

@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve, sep } from "node:path";
-import { Socket } from "../../../src/sharding/transport/socket";
+import { Socket } from "../../../packages/sharding/src/transport/socket";
 import { tokenA, until } from "../helpers";
 
 async function example(

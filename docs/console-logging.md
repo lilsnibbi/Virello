@@ -1,6 +1,6 @@
 # Read the logs
 
-[Docs](README.md) / Logging · [Logging exports](../src/core/logging/index.ts)
+[Docs](README.md) / Logging · [Logging exports](../packages/logging/src/index.ts)
 
 ```ts
 import { VirelloClient, logEvent } from "virello/client";
@@ -93,7 +93,7 @@ format/serialize hooks take ownership of presentation and redaction.
 
 Native themes, symbols, transports and file rotation remain available through
 `LoggerOptions`. File JSON uses the logger's envelope; its message contains the
-canonical Virello JSON record. [Formatting implementation](../src/core/logging/format.ts)
+canonical Virello JSON record. [Formatting implementation](../packages/logging/src/format.ts)
 
 ## Preview without connecting
 

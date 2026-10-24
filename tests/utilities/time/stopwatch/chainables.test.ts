@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { Stopwatch } from "../../../../src/utilities/time/stopwatch/index";
+import { Stopwatch } from "../../../../packages/util/src/time/stopwatch/index";
 import { sleep } from "./shared";
 
 describe("Chainables", () => {

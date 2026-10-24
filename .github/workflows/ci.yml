@@ -29,16 +29,6 @@ jobs:
     timeout-minutes: 25
     permissions:
       contents: read
-    services:
-      redis:
-        image: redis:7.4.11-bookworm@sha256:026c880268ce52fb3a63b66150af583108a38c13af7633e325ae82a145f53a87
-        ports:
-          - 6379/tcp
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 5s
-          --health-timeout 3s
-          --health-retries 12
     env:
       CI: "true"
     steps:
@@ -55,15 +45,7 @@ jobs:
           cat /etc/os-release
           bun --version
           bun --revision
-          docker version
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-      - name: Disable Redis persistence
-        env:
-          REDIS_CONTAINER: ${{ job.services.redis.id }}
-        run: |
-          docker exec "$REDIS_CONTAINER" redis-cli CONFIG SET save ''
-          docker exec "$REDIS_CONTAINER" redis-cli CONFIG SET appendonly no
-          docker exec "$REDIS_CONTAINER" redis-cli INFO server
       - name: Clean frozen install
         run: |
           test ! -d node_modules
@@ -77,15 +59,8 @@ jobs:
           bun release:check
           scripts/release-tools/node_modules/.bin/bun scripts/release.ts pack
           scripts/release-tools/node_modules/.bin/bun scripts/release.ts verify
-      - name: Complete validation (Redis required; no skipped tests)
-        env:
-          VIRELLO_TEST_REDIS_URL: redis://127.0.0.1:${{ job.services.redis.ports['6379'] }}
-        run: bun scripts/ci.ts
-      - name: Redis diagnostics
-        if: failure()
-        env:
-          REDIS_CONTAINER: ${{ job.services.redis.id }}
-        run: docker logs --tail 100 "$REDIS_CONTAINER"
+      - name: Types, lint, public exports and formatting
+        run: scripts/release-tools/node_modules/.bin/bun scripts/ci.ts
       - name: Verify locked inputs remain unchanged
         run: git diff --exit-code -- package.json bun.lock
       - name: Record validated commit

@@ -5,7 +5,6 @@
 import "@virello/util/bun";
 
 export * from "@virello/util/async";
-export * from "@virello/util/async";
 /** Binary buffers, codecs, schemas, and serialization helpers. */
 export * as Binary from "@virello/util/binary";
 export * from "@virello/util/collections";

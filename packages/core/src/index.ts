@@ -1,5 +1,5 @@
 /**
- * Virello client, modules, commands, events, extensions, and shared helpers. Low-level engine APIs are available from virello/engine.
+ * Virello client, modules, commands, events, extensions, and shared helpers. Low-level engine APIs are available from @virello/engine.
  * @packageDocumentation
  */
 import "@virello/util/bun";

@@ -10,3 +10,4 @@ sharding.sqlite*
 
 .engine-validation/
 .virello-sharding/
+output.log

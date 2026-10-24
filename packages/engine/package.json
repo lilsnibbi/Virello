@@ -1,6 +1,6 @@
 {
 	"name": "@virello/engine",
-	"version": "0.1.0",
+	"version": "0.2.0",
 	"description": "Native Discord client combining REST, Gateway transport and entity caches for Bun.",
 	"type": "module",
 	"repository": {

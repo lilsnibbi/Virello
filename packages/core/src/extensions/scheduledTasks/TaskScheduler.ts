@@ -361,7 +361,7 @@ export class TaskScheduler {
 				: options.end + 1,
 		);
 	}
-	private resolveTask(task: TaskResolvable): {
+	private resolveTask(task: string | { name: unknown; payload?: unknown }): {
 		name: string;
 		payload: unknown;
 	} {

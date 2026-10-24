@@ -1,6 +1,6 @@
 {
 	"name": "@virello/rest",
-	"version": "0.1.0",
+	"version": "0.2.0",
 	"description": "Independent Discord REST client with bounded queues, retries and rate limits for Bun.",
 	"type": "module",
 	"repository": {

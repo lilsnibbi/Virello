@@ -5,5 +5,3 @@
 import "@virello/util/bun";
 
 export * from "@virello/util/time";
-export * from "@virello/util/time";
-export * from "@virello/util/time";

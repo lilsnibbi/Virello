@@ -119,6 +119,18 @@ for (const pkg of packages) {
 		manifest.publishConfig.registry !== registry
 	)
 		throw new Error(`Invalid public package metadata: ${pkg.path}`);
+	for (const file of [
+		"package.json",
+		...manifest.files,
+		manifest.types,
+		...Object.values(manifest.exports).flatMap((entry) => [
+			entry.types,
+			entry.bun,
+		]),
+	]) {
+		if (!existsSync(resolve(pkg.directory, file)))
+			throw new Error(`Missing publish input in ${pkg.path}: ${file}`);
+	}
 	if (pkg.path !== ".") {
 		if (
 			!extraFiles.includes(`${pkg.path}/package.json`) ||
@@ -163,7 +175,7 @@ if (command === "pack" || command === "verify" || command === "publish") {
 	).bunRevision;
 	if (run([process.execPath, "--revision"]) !== expected)
 		throw new Error(
-			"Use the locked Bun from scripts/release-tools (see docs/releasing.md).",
+			"Use the locked Bun installed by npm ci --prefix scripts/release-tools.",
 		);
 }
 
@@ -219,9 +231,7 @@ if (command === "pack") {
 					entry.bun,
 				]),
 				...scanFiles("src/**", pkg.directory),
-				...pkg.manifest.files.filter(
-					(file) => !["src", "docs", "examples"].includes(file),
-				),
+				...pkg.manifest.files.filter((file) => file !== "src"),
 			];
 			for (const file of required) {
 				if (!entries.has(`package/${packagePath(file).replace(/^\.\//, "")}`))
@@ -286,10 +296,7 @@ if (command === "verify") {
 				throw new Error(
 					`Standalone ${pkg.manifest.name} installed the aggregate.`,
 				);
-			cpSync(
-				join(root, "tests/fixtures/imports.ts"),
-				join(consumer, "imports.ts"),
-			);
+			cpSync(join(root, "scripts/imports.ts"), join(consumer, "imports.ts"));
 			for (const path of Object.keys(pkg.manifest.exports)) {
 				const spec = pkg.manifest.name + (path === "." ? "" : path.slice(1));
 				run(
@@ -305,7 +312,7 @@ if (command === "verify") {
 			if (pkg.path === ".") {
 				const identityCheck = `
 					const root = await import("virello");
-					const engine = await import("virello/engine");
+					const engine = await import("@virello/engine");
 					for (const name of ${JSON.stringify(packages.filter((value) => value.path !== ".").map((value) => value.manifest.name))}) {
 						const owned = await import(name);
 						let shared = 0;

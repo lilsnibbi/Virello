@@ -13,27 +13,22 @@ import {
 	type Symbol as ExportSymbol,
 	SymbolFlags,
 } from "typescript/unstable/sync";
-import baseline from "../tests/fixtures/public.json";
+import baseline from "./public-api.json";
 
-/** Validate the same public contract in the checkout and the installed tarball. */
+/** Validate the root entrypoint and its public export contract. */
 export function auditExports(root: string, failures: string[]): void {
 	const manifest = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
-	const paths = [
-		".",
-		"./engine",
-		...baseline.categories.map((name) => `./${name}`),
-	];
+	const paths = ["."];
 	if (
 		JSON.stringify(Object.keys(manifest.exports).sort()) !==
 		JSON.stringify(paths.sort())
 	)
 		failures.push("Package paths differ from the supported public contract.");
-	if (manifest.types !== "./src/index.ts")
+	if (manifest.types !== "./index.ts")
 		failures.push("Root type fallback changed.");
 	const entries = new Map<string, string>();
 	for (const path of paths) {
-		const expected =
-			path === "." ? "./src/index.ts" : `./src/public/${path.slice(2)}.ts`;
+		const expected = "./index.ts";
 		const conditions = manifest.exports[path];
 		if (
 			!conditions ||
@@ -82,32 +77,21 @@ export function auditExports(root: string, failures: string[]): void {
 				failures.push(`Missing TypeScript source file: ${path}`);
 				continue;
 			}
+			if (syntax.statements.length !== 1)
+				failures.push("Root entrypoint must contain a single barrel export.");
 			for (const statement of syntax.statements) {
 				if (
-					ts.isImportDeclaration(statement) &&
-					!statement.importClause &&
-					ts.isStringLiteral(statement.moduleSpecifier) &&
-					statement.moduleSpecifier.text ===
-						(path === "." ? "./core/runtime" : "../core/runtime")
-				)
-					continue;
-				if (
 					ts.isExportDeclaration(statement) &&
+					!statement.isTypeOnly &&
+					!statement.exportClause &&
 					statement.moduleSpecifier &&
-					ts.isStringLiteral(statement.moduleSpecifier)
+					ts.isStringLiteral(statement.moduleSpecifier) &&
+					statement.moduleSpecifier.text === "@virello/core"
 				) {
-					const dependency = statement.moduleSpecifier.text;
-					if (
-						path === "."
-							? dependency.startsWith("./public/")
-							: !dependency.startsWith("./") &&
-								dependency !== "../index" &&
-								!dependency.includes("/public/")
-					)
-						continue;
+					continue;
 				}
 				failures.push(
-					`Public entrypoint must only re-export feature definitions and check Bun: ${path}`,
+					`Public entrypoint must re-export @virello/core: ${path}`,
 				);
 			}
 		}
@@ -129,31 +113,18 @@ export function auditExports(root: string, failures: string[]): void {
 					]),
 			);
 		}
-		const rootSymbols = exported(resolve(root, "src/index.ts"));
+		const rootSymbols = exported(resolve(root, "index.ts"));
 		if (
 			JSON.stringify([...rootSymbols.keys()].sort()) !==
 			JSON.stringify(baseline.exports)
 		)
 			failures.push(
-				"Root runtime/type export names changed from the compatibility baseline.",
-			);
-		const covered = new Set<string>();
-		for (const name of baseline.categories) {
-			for (const [key, symbol] of exported(
-				resolve(root, `src/public/${name}.ts`),
-			)) {
-				covered.add(key);
-				if (symbol !== rootSymbols.get(key))
-					failures.push(
-						`Different TypeScript identity or new private export: ${name}.${key}`,
-					);
-			}
-		}
-		if (
-			JSON.stringify([...covered].sort()) !== JSON.stringify(baseline.exports)
-		)
-			failures.push(
-				"Categories do not cover the complete root TypeScript API.",
+				`Public exports differ from the baseline. Missing: ${baseline.exports.filter((name) => !rootSymbols.has(name)).join(", ") || "none"}. Added: ${
+					[...rootSymbols.keys()]
+						.filter((name) => !baseline.exports.includes(name))
+						.sort()
+						.join(", ") || "none"
+				}.`,
 			);
 	} finally {
 		try {

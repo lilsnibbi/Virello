@@ -8,7 +8,11 @@ import { fallbackLogger } from "@virello/logging/console";
 import { writeEvent } from "@virello/logging/diagnostics";
 import { EngineCache } from "@virello/cache";
 import { systemClock } from "@virello/util/runtime";
-import type { $GatewayState } from "@virello/ws";
+import type {
+	$GatewayState,
+	$GatewayCommand,
+	$GatewaySendOptions,
+} from "@virello/ws";
 import { GatewayShard, GatewayBlockedError } from "@virello/ws";
 import { IdentifyGate } from "@virello/ws/identify";
 import type { $GatewayDispatch } from "@virello/ws/types";
@@ -77,6 +81,23 @@ export class EngineClient {
 	/** Last acknowledged heartbeat latency in milliseconds, or null before an acknowledgement. */
 	public get ping(): number | null {
 		return this.gateway?.ping ?? null;
+	}
+	/** Number of outbound application commands waiting for a Gateway rate-limit slot. */
+	public get pendingGatewaySends(): number {
+		return this.gateway?.pendingSends ?? 0;
+	}
+	/**
+	 * Send an application command through the owning ready shard's bounded Gateway queue.
+	 * Guild IDs must route to this engine's shard; use fleet messaging to reach another worker.
+	 * Resolves on local write only. Responses arrive through dispatch events; failed commands are never replayed.
+	 */
+	public sendGateway(
+		payload: $GatewayCommand,
+		options?: $GatewaySendOptions,
+	): Promise<void> {
+		if (this.closed || !this.gateway)
+			return Promise.reject(new Error("Engine Gateway is not ready."));
+		return this.gateway.send(payload, options);
 	}
 	/** Stop the current session and clear its cache, retaining REST and event subscriptions for reassignment. */
 	public reassign(shard: readonly [number, number] | null): void {

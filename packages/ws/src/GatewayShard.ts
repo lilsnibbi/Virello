@@ -14,7 +14,13 @@ import {
 } from "@virello/util/runtime";
 import { Heartbeat } from "./Heartbeat";
 import { decodeFrame, gatewayURL } from "./protocol";
-import type { $GatewayDispatch } from "./types";
+import { commandSnapshot } from "./commands";
+import { SendQueue } from "./SendQueue";
+import type {
+	$GatewayCommand,
+	$GatewayDispatch,
+	$GatewaySendOptions,
+} from "./types";
 
 /** WebSocket members needed by one engine shard. Custom factories must provide browser-style callbacks and send/close methods. */
 export type $GatewaySocket = Pick<
@@ -79,6 +85,8 @@ export interface $GatewayOptions {
 	maxReconnectAttempts?: number;
 	/** Maximum inbound frame size in bytes. Defaults to 8388608. */
 	maxFrameBytes?: number;
+	/** Positive integer cap on queued application commands. Defaults to 128; each payload is at most 4096 bytes. */
+	maxPendingSends?: number;
 }
 /** Synchronous callbacks invoked by a gateway shard. */
 export interface $GatewayCallbacks {
@@ -113,6 +121,7 @@ export class GatewayShard {
 	private readonly maximumFailures: number;
 	private readonly frameLimit: number;
 	private readonly shard: [number, number];
+	private readonly outbound: SendQueue;
 	private socket?: $GatewaySocket;
 	private handshake?: unknown;
 	private reconnect?: unknown;
@@ -166,15 +175,47 @@ export class GatewayShard {
 			"maxFrameBytes",
 			1,
 		);
+		this.outbound = new SendQueue(
+			this.clock,
+			integer(options.maxPendingSends ?? 128, "maxPendingSends", 1),
+			(payload) =>
+				this.current === "ready" && !this.stopped && this.write(payload),
+		);
 		this.heartbeat = new Heartbeat(
 			this.clock,
-			() => this.send({ op: Op.Heartbeat, d: this.sequence }),
+			() => this.write({ op: Op.Heartbeat, d: this.sequence }),
 			() => this.retry(new Error("Gateway heartbeat was not acknowledged.")),
 		);
 	}
 	/** Current gateway lifecycle state. */
 	public get state(): $GatewayState {
 		return this.current;
+	}
+	/** Number of application commands waiting for a rate-limit slot. */
+	public get pendingSends(): number {
+		return this.outbound.size;
+	}
+	/**
+	 * Queue a validated application command on this ready shard. Guild commands must belong to this shard.
+	 * Resolves after the local socket write, not a Discord acknowledgement; consume dispatches for responses.
+	 * Reconnect, closure and reassignment reject unsent commands. Failed writes are never replayed.
+	 */
+	public send(
+		payload: $GatewayCommand,
+		options: $GatewaySendOptions = {},
+	): Promise<void> {
+		if (this.stopped || this.current !== "ready")
+			return Promise.reject(
+				new Error("Gateway must be ready to send application commands."),
+			);
+		try {
+			return this.outbound.add(
+				commandSnapshot(payload, this.shard, this.#options.intents),
+				{ ...options },
+			);
+		} catch (error) {
+			return Promise.reject(error);
+		}
 	}
 	/** Stable terminal cause until explicit replacement of this Gateway object. */
 	public get blocked(): GatewayBlockedError | undefined {
@@ -305,6 +346,11 @@ export class GatewayShard {
 				}
 				if (packet.t === E.Resumed && !this.session)
 					throw new Error("RESUMED without a session.");
+				if (
+					packet.t === E.RateLimited &&
+					packet.d.opcode === Op.RequestGuildMembers
+				)
+					this.outbound.limited(packet.d.meta.guild_id, packet.d.retry_after);
 				try {
 					this.callbacks.dispatch(packet);
 				} catch (error) {
@@ -330,7 +376,7 @@ export class GatewayShard {
 		try {
 			if (this.session && this.sequence !== null) {
 				this.stateChanged("resuming");
-				this.authenticated = this.send({
+				this.authenticated = this.write({
 					op: Op.Resume,
 					d: {
 						token: this.#options.token,
@@ -347,7 +393,7 @@ export class GatewayShard {
 				if (this.stopped || generation !== this.generation) return;
 				this.stateChanged("identifying");
 				const write = () =>
-					this.send({
+					this.write({
 						op: Op.Identify,
 						d: {
 							token: this.#options.token,
@@ -369,13 +415,16 @@ export class GatewayShard {
 				this.retry(errorOf(error));
 		}
 	}
-	private send(payload: GatewaySendPayload): boolean {
+	private write(payload: GatewaySendPayload): boolean {
 		try {
 			if (!this.socket || this.socket.readyState !== WebSocket.OPEN)
 				throw new Error("Gateway socket is not open.");
 			const text = JSON.stringify(payload);
 			if (new TextEncoder().encode(text).byteLength > 4096)
 				throw new Error("Outbound gateway payload exceeds 4096 bytes.");
+			if (!this.outbound.canWrite())
+				throw new Error("Gateway connection send limit exhausted.");
+			this.outbound.record(payload);
 			this.socket.send(text);
 			return true;
 		} catch (error) {
@@ -401,6 +450,9 @@ export class GatewayShard {
 	}
 	private detach(code: number): void {
 		++this.generation;
+		this.outbound.reset(
+			new Error("Gateway connection replaced before transmission."),
+		);
 		this.controller?.abort(new Error("Gateway connection replaced."));
 		this.controller = undefined;
 		this.clearHandshake();

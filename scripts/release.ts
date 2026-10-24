@@ -213,7 +213,6 @@ if (command === "pack") {
 			const required = [
 				"package.json",
 				"README.md",
-				"LICENSE",
 				packed.types,
 				...Object.values(packed.exports).flatMap((entry) => [
 					entry.types,

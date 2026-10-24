@@ -1,6 +1,3 @@
-// Adapted from Ovencord (cc6100f8), Apache-2.0.
-// Modified for Virello: serialization always validates; no global bypass.
-// See NOTICE and LICENSE at the root of @virello/builders.
 import type { z } from "zod";
 import { ValidationError } from "./ValidationError";
 

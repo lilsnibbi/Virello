@@ -1,6 +1,3 @@
-// Adapted from Ovencord (cc6100f8), Apache-2.0.
-// Modified for Virello: native attachments and complete nested message validation.
-// See NOTICE and LICENSE at the root of @virello/builders.
 import { ComponentType, MessageFlags } from "discord-api-types/v10";
 import { z } from "zod";
 import { snowflakePredicate } from "../Assertions";

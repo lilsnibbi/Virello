@@ -8,7 +8,7 @@ They share one version; keep first-party dependencies on that same version.
 
 | Package             | Implementation and primary exports                                                                       | First-party dependencies                                   |
 | ------------------- | -------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
-| `@virello/builders` | Payload builders, validation and retained upstream notices                                               | None                                                       |
+| `@virello/builders` | Payload builders and validation                                               | None                                                       |
 | `@virello/logging`  | `Logger`, `createConsoleLogger`, `logEvent`, console formatting and redaction                            | None                                                       |
 | `@virello/util`     | General helpers, results/options, parsing, timers, binary codecs, iterators, filesystem and HTTP helpers | logging                                                    |
 | `@virello/rest`     | `RestClient`, `RestError`, bounded requests, retries, rate limits and multipart uploads                  | util                                                       |
@@ -71,7 +71,7 @@ category subpaths. Other explicit transport, logging and sharding subpaths serve
 advanced integrations and first-party boundaries; there is no wildcard exposing
 every source file. Physical repository paths are not stable public imports.
 
-`bun release:pack` verifies every tarball's exports, sources, notices and exact
+`bun release:pack` verifies every tarball's exports, sources and exact
 internal versions. After packing, `bun release:verify` uses the existing cold
 import fixture in temporary consumers: each scoped package installs without
 `virello`, every exported subpath imports without opening resources, and the

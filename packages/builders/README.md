@@ -20,6 +20,4 @@ its final content. File uploads use named Blobs. No global validation bypass is
 provided.
 
 See the repository's [builder guide](https://github.com/lilsnibbi/Virello/blob/main/docs/builders.md) for migration and
-examples. [NOTICE](NOTICE), [LICENSE](LICENSE), [UPSTREAM-LICENSE](UPSTREAM-LICENSE),
-[utility license](src/util/LICENSE) and [Virello license](VIRELLO-LICENSE) retain
-the applicable source attribution and modification notices.
+examples.

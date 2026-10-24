@@ -66,7 +66,6 @@ per-package trusted-publisher setup.
 - [ ] Update the relevant topic page and runnable examples when APIs change.
 - [ ] Keep public exports and `tests/fixtures/public.json` in sync deliberately.
 - [ ] Describe breaking field/signature changes in [BREAKING_CHANGES](../BREAKING_CHANGES.md).
-- [ ] Keep licences and attribution comments with retained source.
 - [ ] Use a Conventional Commit, such as `fix(commands): handle missing arguments`.
 
 A PR should explain the changed behavior, validation performed, and remaining

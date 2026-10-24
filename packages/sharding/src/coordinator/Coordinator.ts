@@ -1,6 +1,3 @@
-// Adapted architecture from discord-sharding, with fixed assignments and named RPC.
-// Apache-2.0; see ../LICENSE and https://github.com/lilsnibbi/Virello/blob/main/docs/source-retention.md. This is a new incompatible protocol.
-
 import { setTimeout as wait } from "node:timers/promises";
 import type { Logger } from "@lilsnibbi/logger";
 import { createConsoleLogger } from "@virello/logging/console";

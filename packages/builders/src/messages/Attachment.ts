@@ -1,6 +1,3 @@
-// Adapted from Ovencord (cc6100f8), Apache-2.0.
-// Modified for Virello: uploads are named Blobs, with message-local numeric IDs.
-// See NOTICE and LICENSE at the root of @virello/builders.
 import type { RESTAPIAttachment } from "discord-api-types/v10";
 import type { JSONEncodable } from "../util/jsonEncodable";
 import { validate } from "../util/validation";

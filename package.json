@@ -1,9 +1,8 @@
 {
 	"name": "virello",
 	"version": "0.1.2",
-	"description": "Aggregate entry point for the modular Virello Discord framework for Bun.",
+	"description": "entry point for the modular Virello Discord framework for Bun.",
 	"type": "module",
-	"license": "MIT AND Apache-2.0",
 	"repository": {
 		"type": "git",
 		"url": "https://github.com/lilsnibbi/Virello.git"
@@ -80,8 +79,7 @@
 		"docs",
 		"examples",
 		"README.md",
-		"BREAKING_CHANGES.md",
-		"LICENSE"
+		"BREAKING_CHANGES.md"
 	],
 	"engines": {
 		"bun": ">=1.4.2"
